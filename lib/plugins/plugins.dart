@@ -1,6 +1,7 @@
 import 'package:kazumi/modules/roads/road_module.dart';
 import 'package:kazumi/modules/search/plugin_search_module.dart';
 import 'package:kazumi/plugins/anti_crawler_config.dart';
+import 'package:kazumi/plugins/api_auth_config.dart';
 import 'package:kazumi/plugins/api_rule_config.dart';
 import 'package:kazumi/request/config/api_endpoints.dart';
 import 'package:kazumi/services/plugin/api_rule_engine.dart';
@@ -48,6 +49,10 @@ class Plugin {
   ApiChapterConfig chapterApiConfig;
   AntiCrawlerConfig antiCrawlerConfig;
 
+  /// Optional per-rule login flow. Null for rules that need no
+  /// authentication; credentials themselves are stored locally.
+  ApiAuthConfig? auth;
+
   Plugin({
     required this.api,
     required this.type,
@@ -73,6 +78,7 @@ class Plugin {
     ApiSearchConfig? searchApiConfig,
     ApiChapterConfig? chapterApiConfig,
     AntiCrawlerConfig? antiCrawlerConfig,
+    this.auth,
   })  : searchApiConfig = searchApiConfig ?? ApiSearchConfig(),
         chapterApiConfig = chapterApiConfig ?? ApiChapterConfig(),
         antiCrawlerConfig = antiCrawlerConfig ?? AntiCrawlerConfig.empty();
@@ -115,6 +121,11 @@ class Plugin {
               Map<String, dynamic>.from(json['antiCrawlerConfig']),
             )
           : AntiCrawlerConfig.empty(),
+      auth: json['auth'] is Map
+          ? ApiAuthConfig.fromJson(
+              Map<String, dynamic>.from(json['auth']),
+            )
+          : null,
     );
   }
 
@@ -178,6 +189,7 @@ class Plugin {
           chapterApiConfig.request.url.isNotEmpty)
         'chapterApiConfig': chapterApiConfig.toJson(),
       'antiCrawlerConfig': antiCrawlerConfig.toJson(),
+      if (auth != null) 'auth': auth!.toJson(),
     };
   }
 
@@ -200,6 +212,7 @@ class Plugin {
         searchApiConfig: searchApiConfig,
         chapterApiConfig: chapterApiConfig,
         antiCrawlerConfig: antiCrawlerConfig,
+        auth: auth,
       );
 
   Future<RuleSearchTrace> traceSearch(

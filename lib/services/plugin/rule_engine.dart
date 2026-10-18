@@ -6,6 +6,7 @@ import 'package:kazumi/request/core/network_exception.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/services/plugin/api_rule_strategy.dart';
 import 'package:kazumi/services/plugin/plugin_cookie_manager.dart';
+import 'package:kazumi/services/plugin/plugin_credentials_store.dart';
 import 'package:kazumi/services/plugin/rule_engine_models.dart';
 import 'package:kazumi/services/plugin/xpath_rule_strategy.dart';
 
@@ -23,7 +24,7 @@ class RuleEngine {
     ApiRuleStrategy apiStrategy = const ApiRuleStrategy(),
     XPathRuleStrategy xpathStrategy = const XPathRuleStrategy(),
     bool logFailures = true,
-  })  : _requestExecutor = requestExecutor ?? _DefaultRuleRequestExecutor(),
+  })  : _requestExecutor = requestExecutor ?? DefaultRuleRequestExecutor(),
         _apiStrategy = apiStrategy,
         _xpathStrategy = xpathStrategy,
         _logFailures = logFailures;
@@ -32,6 +33,9 @@ class RuleEngine {
   final ApiRuleStrategy _apiStrategy;
   final XPathRuleStrategy _xpathStrategy;
   final bool _logFailures;
+
+  /// Visible for tests: drives the production executor directly.
+  RuleRequestExecutor get testRequestExecutor => _requestExecutor;
 
   Future<RuleSearchTrace> search(
     RuleExecutionConfig config,
@@ -291,11 +295,134 @@ class RuleEngine {
   }
 }
 
-class _DefaultRuleRequestExecutor implements RuleRequestExecutor {
+/// Sends a fully prepared request and returns the raw response body.
+///
+/// Injected so tests can drive the production executor without the network.
+typedef RuleTextSender = Future<String> Function(
+  PreparedRuleRequest request,
+  Map<String, dynamic> headers,
+  CancelToken? cancelToken,
+);
+
+/// Executes rule requests, adding the login/token handling declared by the
+/// rule's `auth` block.
+class DefaultRuleRequestExecutor implements RuleRequestExecutor {
+  DefaultRuleRequestExecutor({RuleTextSender? textSender})
+      : _textSender = textSender ?? _sendViaClient;
+
+  final RuleTextSender _textSender;
+
+  /// Tokens currently being refreshed, so a 401 during the retry itself does
+  /// not loop back into another re-login.
+  final Set<String> _refreshing = {};
+
+  static Future<String> _sendViaClient(
+    PreparedRuleRequest request,
+    Map<String, dynamic> headers,
+    CancelToken? cancelToken,
+  ) {
+    return PluginSiteClient.instance.requestText(
+      request.url,
+      method: request.method,
+      headers: headers,
+      queryParameters: request.query,
+      data: request.method == 'POST' ? request.body : null,
+      cancelToken: cancelToken,
+    );
+  }
+
   @override
   Future<String> execute(
     PreparedRuleRequest request,
     RuleExecutionConfig config, {
+    CancelToken? cancelToken,
+  }) async {
+    if (config.auth != null && !_isLoginRequest(request, config)) {
+      return _executeWithAuth(request, config, cancelToken: cancelToken);
+    }
+    return _send(request, config, cancelToken: cancelToken);
+  }
+
+  /// Whether [request] was rendered from the rule's own login endpoint —
+  /// sending the token to the token issuer makes no sense.
+  bool _isLoginRequest(PreparedRuleRequest request, RuleExecutionConfig config) {
+    final loginUrl = config.auth!.login.url.trim();
+    return loginUrl.isNotEmpty && request.url.startsWith(loginUrl);
+  }
+
+  Future<String> _executeWithAuth(
+    PreparedRuleRequest request,
+    RuleExecutionConfig config, {
+    CancelToken? cancelToken,
+  }) async {
+    final auth = config.auth!;
+    final store = PluginCredentialsStore.instance;
+    if (!store.hasCredentials(config.pluginName)) {
+      throw RuleAuthRequiredException(config.pluginName);
+    }
+
+    var token = store.tokenFor(config.pluginName);
+    if (token == null || token.isEmpty) {
+      token = await _login(config, cancelToken: cancelToken);
+    }
+
+    try {
+      return await _send(request, config,
+          token: token, cancelToken: cancelToken);
+    } on NetworkException catch (error) {
+      final status = error.statusCode;
+      if (status == null || !auth.shouldRefreshOn(status)) rethrow;
+      if (_refreshing.contains(config.pluginName)) rethrow;
+      _refreshing.add(config.pluginName);
+      try {
+        // The cached token was rejected: drop it and log in once more.
+        await store.clearToken(config.pluginName);
+        final fresh = await _login(config, cancelToken: cancelToken);
+        return await _send(request, config,
+            token: fresh, cancelToken: cancelToken);
+      } finally {
+        _refreshing.remove(config.pluginName);
+      }
+    }
+  }
+
+  /// Runs the rule's login request, extracts the token and caches it.
+  Future<String> _login(
+    RuleExecutionConfig config, {
+    CancelToken? cancelToken,
+  }) async {
+    final auth = config.auth!;
+    final store = PluginCredentialsStore.instance;
+    final username = store.usernameFor(config.pluginName) ?? '';
+    final password = store.passwordFor(config.pluginName) ?? '';
+    try {
+      final request = const ApiRuleStrategy()
+          .prepareRequest(auth.login, <String, Object?>{
+        'username': username,
+        'password': password,
+      });
+      final raw = await _send(request, config, cancelToken: cancelToken);
+      final document = const ApiRuleStrategy().decodeResponse(raw);
+      final value = RestrictedJsonPath.readFirst(document, auth.tokenPath);
+      final token = value?.toString() ?? '';
+      if (token.trim().isEmpty) {
+        throw RuleAuthFailedException(config.pluginName);
+      }
+      await store.saveToken(config.pluginName, token);
+      return token;
+    } on RuleAuthFailedException {
+      rethrow;
+    } on ApiRuleFormatException catch (error) {
+      throw RuleAuthFailedException(config.pluginName, cause: error);
+    } on NetworkException catch (error) {
+      throw RuleAuthFailedException(config.pluginName, cause: error);
+    }
+  }
+
+  Future<String> _send(
+    PreparedRuleRequest request,
+    RuleExecutionConfig config, {
+    String? token,
     CancelToken? cancelToken,
   }) async {
     final cookieHeader = request.includeCookies
@@ -304,6 +431,7 @@ class _DefaultRuleRequestExecutor implements RuleRequestExecutor {
     final verifiedUserAgent = cookieHeader.isNotEmpty
         ? PluginCookieManager.instance.userAgentFor(config.pluginName)
         : null;
+    final auth = config.auth;
     // Header names are lowercased so a rule-supplied 'User-Agent' collides
     // with ours instead of being sent as a second, conflicting header.
     final headers = <String, dynamic>{
@@ -316,6 +444,13 @@ class _DefaultRuleRequestExecutor implements RuleRequestExecutor {
       // would make the site serve the challenge page again.
       if (verifiedUserAgent != null) 'user-agent': verifiedUserAgent,
     };
+    // Auth token goes last so it wins over a rule-supplied static header of
+    // the same name (lowercased keys collide by design, see above).
+    final headerName = auth?.headerName.trim() ?? '';
+    if (token != null && headerName.isNotEmpty) {
+      headers[headerName.toLowerCase()] =
+          '${auth!.tokenPrefix}$token';
+    }
     if (request.method == 'POST') {
       switch (request.bodyType) {
         case ApiBodyType.json:
@@ -329,14 +464,7 @@ class _DefaultRuleRequestExecutor implements RuleRequestExecutor {
           break;
       }
     }
-    return PluginSiteClient.instance.requestText(
-      request.url,
-      method: request.method,
-      headers: headers,
-      queryParameters: request.query,
-      data: request.method == 'POST' ? request.body : null,
-      cancelToken: cancelToken,
-    );
+    return _textSender(request, headers, cancelToken);
   }
 
   Future<String> _cookieHeaderFor(String pluginName, String url) async {
