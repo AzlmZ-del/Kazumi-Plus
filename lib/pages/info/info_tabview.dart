@@ -4,12 +4,14 @@ import 'package:flutter_modular/flutter_modular.dart';
 import 'package:kazumi/bean/widget/error_widget.dart';
 import 'package:kazumi/bean/widget/empty_state_widget.dart';
 import 'package:kazumi/pages/info/info_comments_view.dart';
+import 'package:kazumi/pages/info/info_episodes_view.dart';
 import 'package:kazumi/bean/card/character_card.dart';
 import 'package:kazumi/bean/card/staff_card.dart';
 import 'package:kazumi/bean/card/network_img_layer.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/modules/bangumi/bangumi_relation.dart';
+import 'package:kazumi/modules/bangumi/episode_item.dart';
 import 'package:kazumi/modules/comments/comment_item.dart';
 import 'package:kazumi/modules/characters/character_item.dart';
 import 'package:kazumi/modules/staff/staff_item.dart';
@@ -28,6 +30,12 @@ class InfoTabView extends StatefulWidget {
     required this.relationsQueryTimeout,
     required this.relationsIsLoading,
     required this.relationsHasLoaded,
+    required this.episodes,
+    required this.episodesIsLoading,
+    required this.episodesHasLoaded,
+    required this.episodesQueryTimeout,
+    required this.episodesRequireLogin,
+    required this.loadEpisodes,
     required this.tabController,
     required this.loadMoreComments,
     required this.loadCharacters,
@@ -54,6 +62,12 @@ class InfoTabView extends StatefulWidget {
   final bool relationsQueryTimeout;
   final bool relationsIsLoading;
   final bool relationsHasLoaded;
+  final List<EpisodeInfo> episodes;
+  final bool episodesIsLoading;
+  final bool episodesHasLoaded;
+  final bool episodesQueryTimeout;
+  final bool episodesRequireLogin;
+  final Future<void> Function() loadEpisodes;
   final TabController tabController;
   final Future<void> Function({bool loadMore}) loadMoreComments;
   final Future<void> Function() loadCharacters;
@@ -495,6 +509,14 @@ class _InfoTabViewState extends State<InfoTabView> {
               ],
             );
           },
+        ),
+        InfoEpisodesView(
+          episodes: widget.episodes,
+          isLoading: widget.episodesIsLoading,
+          hasLoaded: widget.episodesHasLoaded,
+          hasError: widget.episodesQueryTimeout,
+          requiresLogin: widget.episodesRequireLogin,
+          onRetry: widget.loadEpisodes,
         ),
         InfoCommentsView(
           interest: widget.bangumiItem.interest,

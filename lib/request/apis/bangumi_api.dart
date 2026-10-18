@@ -463,7 +463,14 @@ class BangumiApi {
     return episodeInfo;
   }
 
-  static Future<List<EpisodeInfo>> getBangumiEpisodesByID(int id) async {
+  /// 拉取条目下的全部剧集。
+  ///
+  /// 默认吞掉异常并返回空列表（播放器的分集选择弹窗依赖这个宽松行为）；
+  /// 详情页需要区分「没有剧集」和「拉取失败」时把 [throwOnError] 设为 true。
+  static Future<List<EpisodeInfo>> getBangumiEpisodesByID(
+    int id, {
+    bool throwOnError = false,
+  }) async {
     final List<EpisodeInfo> episodeList = [];
     const int limit = 100;
     int offset = 0;
@@ -475,9 +482,16 @@ class BangumiApi {
           'offset': offset,
           'limit': limit,
         };
-        final jsonData = await _client.get(
-          ApiEndpoints.bangumiAPIDomain + ApiEndpoints.bangumiEpisodeByID,
-          queryParameters: params,
+        // R18 subjects only expose their episode list to authenticated
+        // callers on the official host, while the mirror serves them
+        // anonymously. Ask for the token first and fall back to anonymous.
+        final jsonData = await _requestWithAuthFallback(
+          (anonymous) => _client.get(
+            ApiEndpoints.bangumiAPIDomain + ApiEndpoints.bangumiEpisodeByID,
+            queryParameters: params,
+            anonymous: anonymous,
+            requiresAuth: !anonymous,
+          ),
         );
         total ??= jsonData['total'] as int?;
         final data = jsonData['data'] as List<dynamic>? ?? [];
@@ -492,6 +506,7 @@ class BangumiApi {
     } catch (e) {
       KazumiLogger()
           .e('Network: resolve bangumi episode list failed', error: e);
+      if (throwOnError) rethrow;
     }
     return episodeList;
   }

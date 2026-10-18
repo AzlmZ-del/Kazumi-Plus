@@ -21,6 +21,7 @@ import 'package:kazumi/pages/info/rating_review_dialog.dart';
 import 'package:kazumi/pages/info/source_sheet.dart';
 import 'package:kazumi/plugins/plugins_controller.dart';
 import 'package:kazumi/services/logging/logger.dart';
+import 'package:kazumi/services/network/bangumi_acceleration.dart';
 import 'package:kazumi/services/platform/desktop_window_config.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/utils/device.dart';
@@ -45,6 +46,7 @@ class _InfoPageState extends State<InfoPage>
     with SingleTickerProviderStateMixin {
   static const List<String> _infoTabs = <String>[
     '概览',
+    '剧集',
     '吐槽',
     '角色',
     '关联',
@@ -56,6 +58,15 @@ class _InfoPageState extends State<InfoPage>
   InfoController get infoController => widget.infoController;
   late final TabController infoTabController;
   late final bool showRating;
+
+  /// 直连/ECH 模式下 R18 条目的剧集只对已登录用户开放；镜像不受影响。
+  bool get _episodesRequireLogin =>
+      infoController.bangumiItem.nsfw &&
+      BangumiAcceleration.current != BangumiAcceleration.mirror &&
+      GStorage.getSetting(SettingsKeys.bangumiAccessToken)
+          .toString()
+          .trim()
+          .isEmpty;
 
   bool commentsIsLoading = false;
   bool charactersIsLoading = false;
@@ -71,8 +82,7 @@ class _InfoPageState extends State<InfoPage>
   bool get _isShowingBangumiInfoSkeleton =>
       infoController.isLoading || _showBangumiInfoSkeleton;
 
-  bool _needsBangumiInfoRefresh(BangumiItem bangumiItem) {
-    final votesCount = bangumiItem.votesCount;
+  bool _needsBangumiInfoRefresh(BangumiItem bangumiItem) {    final votesCount = bangumiItem.votesCount;
     final missingVoteDistribution =
         votesCount.isEmpty || bangumiItem.votes <= 0 || votesCount.length < 10;
     return bangumiItem.summary == '' || missingVoteDistribution;
@@ -133,6 +143,15 @@ class _InfoPageState extends State<InfoPage>
           staffQueryTimeout = true;
         });
       }
+    }
+  }
+
+  Future<void> loadEpisodes() async {
+    try {
+      await infoController
+          .queryBangumiEpisodesByID(infoController.bangumiItem.id);
+    } catch (e) {
+      KazumiLogger().e('InfoPage: failed to load episodes', error: e);
     }
   }
 
@@ -210,6 +229,7 @@ class _InfoPageState extends State<InfoPage>
     infoController.bangumiItem = widget.inputBangumiItem;
     infoController.characterList.clear();
     infoController.clearComments();
+    infoController.clearEpisodes();
     infoController.staffList.clear();
     infoController.clearRelations();
     infoController.pluginSearchResponseList.clear();
@@ -224,20 +244,27 @@ class _InfoPageState extends State<InfoPage>
 
   void onInfoTabChanged() {
     final index = infoTabController.index;
-    if (index == 1) {
+    if (index == 1 &&
+        infoController.episodeList.isEmpty &&
+        !infoController.episodesIsLoading &&
+        !infoController.episodesHasLoaded &&
+        !infoController.episodesQueryTimeout) {
+      loadEpisodes();
+    }
+    if (index == 2) {
       onCommentsTabSelected();
     }
-    if (index == 2 &&
+    if (index == 3 &&
         infoController.characterList.isEmpty &&
         !charactersIsLoading &&
         !charactersIsEmpty &&
         !charactersQueryTimeout) {
       loadCharacters();
     }
-    if (index == 3 && infoController.canLoadRelations) {
+    if (index == 4 && infoController.canLoadRelations) {
       loadRelations();
     }
-    if (index == 4 &&
+    if (index == 5 &&
         infoController.staffList.isEmpty &&
         !staffIsLoading &&
         !staffIsEmpty &&
@@ -270,6 +297,7 @@ class _InfoPageState extends State<InfoPage>
     infoTabController.removeListener(onInfoTabChanged);
     infoController.characterList.clear();
     infoController.clearComments();
+    infoController.clearEpisodes();
     infoController.staffList.clear();
     infoController.clearRelations();
     infoController.pluginSearchResponseList.clear();
@@ -464,6 +492,12 @@ class _InfoPageState extends State<InfoPage>
             relationsQueryTimeout: infoController.relationsQueryTimeout,
             relationsHasLoaded: infoController.relationsHasLoaded,
             loadRelations: loadRelations,
+            episodes: infoController.episodeList.toList(growable: false),
+            episodesIsLoading: infoController.episodesIsLoading,
+            episodesHasLoaded: infoController.episodesHasLoaded,
+            episodesQueryTimeout: infoController.episodesQueryTimeout,
+            episodesRequireLogin: _episodesRequireLogin,
+            loadEpisodes: loadEpisodes,
             isLoading: showBangumiInfoSkeleton,
           );
         }),

@@ -3,6 +3,7 @@ import 'package:kazumi/modules/bangumi/bangumi_interest.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/modules/bangumi/bangumi_relation.dart';
 import 'package:kazumi/modules/bangumi/bangumi_review.dart';
+import 'package:kazumi/modules/bangumi/episode_item.dart';
 import 'package:kazumi/pages/collect/collect_controller.dart';
 import 'package:kazumi/modules/search/plugin_search_module.dart';
 import 'package:kazumi/request/apis/bangumi_api.dart';
@@ -42,6 +43,18 @@ abstract class _InfoController with Store {
 
   @observable
   var relationList = ObservableList<BangumiRelation>();
+
+  @observable
+  var episodeList = ObservableList<EpisodeInfo>();
+
+  @observable
+  bool episodesIsLoading = false;
+
+  @observable
+  bool episodesQueryTimeout = false;
+
+  @observable
+  bool episodesHasLoaded = false;
 
   @observable
   bool relationsIsLoading = false;
@@ -208,6 +221,37 @@ abstract class _InfoController with Store {
     }
     KazumiLogger().i(
         'InfoController: loaded character list length ${characterList.length}');
+  }
+
+  Future<void> queryBangumiEpisodesByID(int id) async {
+    if (episodesIsLoading) return;
+    episodesIsLoading = true;
+    episodesQueryTimeout = false;
+    episodesHasLoaded = false;
+    try {
+      final episodes =
+          await BangumiApi.getBangumiEpisodesByID(id, throwOnError: true);
+      if (bangumiItem.id != id) return;
+      episodeList = ObservableList<EpisodeInfo>.of(episodes);
+      episodesHasLoaded = true;
+      KazumiLogger().i(
+          'InfoController: loaded episode list length ${episodeList.length}');
+    } catch (e) {
+      if (bangumiItem.id == id) {
+        episodesQueryTimeout = true;
+      }
+      rethrow;
+    } finally {
+      episodesIsLoading = false;
+    }
+  }
+
+  @action
+  void clearEpisodes() {
+    episodeList = ObservableList<EpisodeInfo>();
+    episodesIsLoading = false;
+    episodesQueryTimeout = false;
+    episodesHasLoaded = false;
   }
 
   Future<void> queryBangumiStaffsByID(int id) async {

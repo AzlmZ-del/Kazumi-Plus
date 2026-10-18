@@ -41,6 +41,10 @@ class BangumiItem {
   final List<String> metaTags;
   BangumiInterest? interest;
 
+  /// Whether the subject is adult-only. Only available from the API (the /p1
+  /// subject endpoint and search results carry it) and never persisted.
+  final bool nsfw;
+
   BangumiItem({
     required this.id,
     required this.type,
@@ -59,6 +63,7 @@ class BangumiItem {
     required this.info,
     this.metaTags = const [],
     this.interest,
+    this.nsfw = false,
   });
 
   factory BangumiItem.fromJson(Map<String, dynamic> json) {
@@ -173,6 +178,7 @@ class BangumiItem {
               .toList()
           : const [],
       interest: interest,
+      nsfw: json['nsfw'] == true,
     );
   }
 }
