@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/bean/settings/settings_detail_scaffold.dart';
-import 'package:kazumi/bean/widget/empty_state_widget.dart';
 import 'package:kazumi/bean/widget/kazumi_menu.dart';
+import 'package:kazumi/modules/plugin/plugin_http_module.dart';
 import 'package:kazumi/modules/plugin/rule_repository.dart';
 import 'package:kazumi/pages/plugin_editor/rule_management_widgets.dart';
 import 'package:kazumi/plugins/plugins_controller.dart';
@@ -34,6 +34,11 @@ class _RuleRepositoryPageState extends State<RuleRepositoryPage> {
   void initState() {
     super.initState();
     _repositories = RulesRepositoryConfig.repositories();
+    // Rule counts come from the aggregated catalog; load it if the page is
+    // opened before anything else touched it.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_refreshCatalog());
+    });
   }
 
   /// Applies a configuration change: persist, drop the cached catalog and
@@ -205,49 +210,46 @@ class _RuleRepositoryPageState extends State<RuleRepositoryPage> {
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 1000),
-            child: _repositories.isEmpty
-                ? GeneralEmptyState(
-                    icon: Icons.lan_rounded,
-                    title: '暂无规则仓库',
-                    actions: [
-                      FilledButton.tonalIcon(
-                        onPressed: _busy ? null : _add,
-                        icon: const Icon(Icons.add_rounded),
-                        label: const Text('添加规则仓库'),
-                      ),
-                    ],
-                  )
-                : Observer(builder: (context) {
-                    final failures = {
-                      for (final failure in _controller.repositoryFailures)
-                        failure.repositoryUrl: failure,
-                    };
-                    return ReorderableListView.builder(
-                      buildDefaultDragHandles: false,
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                      itemCount: _repositories.length,
-                      onReorderItem: _busy
-                          ? (_, _) {}
-                          : (oldIndex, newIndex) =>
-                              unawaited(_reorder(oldIndex, newIndex)),
-                      footer: const _RepositoryFooter(),
-                      itemBuilder: (context, index) {
-                        final repository = _repositories[index];
-                        return _RepositoryTile(
-                          key: ValueKey(repository.url),
-                          index: index,
-                          repository: repository,
-                          busy: _busy,
-                          ruleCount: _ruleCountFor(repository.url),
-                          failed: failures.containsKey(repository.url),
-                          onToggle: (enabled) => _toggle(repository, enabled),
-                          onEdit: () => _edit(repository),
-                          onDelete:
-                              repository.isOfficial ? null : () => _remove(repository),
-                        );
-                      },
-                    );
-                  }),
+            // The list is never empty: [RuleRepositoryList.decode] restores the
+            // official repository whenever storage holds nothing, and the
+            // official entry cannot be deleted. Reordering is therefore always
+            // meaningful and no empty state is needed here.
+            child: Observer(builder: (context) {
+              // Reading the observable list here is what subscribes this
+              // Observer to catalog changes; [repositoryFailures] is set in the
+              // same pass, so it needs no tracking of its own.
+              final catalog = _controller.pluginHTTPList;
+              final failures = {
+                for (final failure in _controller.repositoryFailures)
+                  failure.repositoryUrl: failure,
+              };
+              return ReorderableListView.builder(
+                buildDefaultDragHandles: false,
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                itemCount: _repositories.length,
+                onReorderItem: _busy
+                    ? (_, _) {}
+                    : (oldIndex, newIndex) =>
+                        unawaited(_reorder(oldIndex, newIndex)),
+                footer: const _RepositoryFooter(),
+                itemBuilder: (context, index) {
+                  final repository = _repositories[index];
+                  return _RepositoryTile(
+                    key: ValueKey(repository.url),
+                    index: index,
+                    repository: repository,
+                    busy: _busy,
+                    ruleCount: _ruleCountFor(repository.url, catalog),
+                    failed: failures.containsKey(repository.url),
+                    onToggle: (enabled) => _toggle(repository, enabled),
+                    onEdit: () => _edit(repository),
+                    onDelete: repository.isOfficial
+                        ? null
+                        : () => _remove(repository),
+                  );
+                },
+              );
+            }),
           ),
         ),
       ),
@@ -259,11 +261,9 @@ class _RuleRepositoryPageState extends State<RuleRepositoryPage> {
   /// Only the winners of same-name conflicts carry a repository tag, so this
   /// undercounts when two repositories list the same rule. That is fine: the
   /// number is a hint that the repository is reachable and non-empty.
-  int _ruleCountFor(String url) {
+  int _ruleCountFor(String url, List<PluginHTTPItem> catalog) {
     if (!_controller.isPluginCatalogFresh) return -1;
-    return _controller.pluginHTTPList
-        .where((item) => item.repositoryUrl == url)
-        .length;
+    return catalog.where((item) => item.repositoryUrl == url).length;
   }
 }
 
