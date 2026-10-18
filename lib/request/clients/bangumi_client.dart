@@ -23,6 +23,7 @@ class BangumiClient {
     bool anonymous = false,
     String? accessToken,
     CancelToken? cancelToken,
+    Map<String, dynamic>? extra,
   }) async {
     try {
       final response = await DioFactory.bangumiDio.get(
@@ -36,6 +37,7 @@ class BangumiClient {
             url: url,
             method: 'GET',
           ),
+          extra: extra,
         ),
         cancelToken: cancelToken,
       );
