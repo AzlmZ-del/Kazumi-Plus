@@ -485,6 +485,14 @@ class SettingsKeys {
     'list',
     group: SettingGroup.interface,
   );
+
+  // Opt-in R18 search. Requires a Bangumi access token; without one the API
+  // silently drops the nsfw filter, so the setting has no effect.
+  static const bangumiShowR18 = SettingKey<bool>(
+    'bangumiShowR18',
+    false,
+    group: SettingGroup.interface,
+  );
   static const downloadParallelEpisodes = SettingKey<int>(
     _SettingBoxKey.downloadParallelEpisodes,
     2,
@@ -666,6 +674,7 @@ class SettingsKeys {
     proxyTestUrl,
     showRating,
     defaultCollectLayout,
+    bangumiShowR18,
     downloadParallelEpisodes,
     downloadParallelSegments,
     downloadDanmaku,

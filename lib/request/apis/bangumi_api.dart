@@ -16,6 +16,7 @@ import 'package:kazumi/modules/bangumi/bangumi_collection_type.dart';
 import 'package:kazumi/modules/comments/comment_item.dart';
 import 'package:kazumi/utils/search_parser.dart';
 import 'package:kazumi/utils/async_rate_limiter.dart';
+import 'package:kazumi/services/storage/storage.dart';
 
 class BangumiSearchPage {
   const BangumiSearchPage({
@@ -274,6 +275,7 @@ class BangumiApi {
     SearchIntRange? rankRange,
     SearchDoubleRange? scoreRange,
     List<int> weekdays = const [],
+    bool nsfw = false,
   }) {
     final rankFilter = rankRange?.isValid == true
         ? _buildNumberFilter<int>(rankRange!.min, rankRange.max)
@@ -285,7 +287,7 @@ class BangumiApi {
       "type": [2],
       "tag": tags,
       "rank": rankFilter,
-      "nsfw": false
+      "nsfw": nsfw
     };
 
     if (dateRange?.isValid == true) {
@@ -317,6 +319,7 @@ class BangumiApi {
       List<int> weekdays = const []}) async {
     List<BangumiItem> bangumiList = [];
 
+    final wantNsfw = GStorage.getSetting(SettingsKeys.bangumiShowR18);
     final params = buildBangumiSearchParams(
       keyword,
       tags: tags,
@@ -325,15 +328,27 @@ class BangumiApi {
       rankRange: rankRange,
       scoreRange: scoreRange,
       weekdays: weekdays,
+      nsfw: wantNsfw,
     );
 
     try {
-      final jsonData = await _client.post(
-        ApiEndpoints.formatUrl(
-            ApiEndpoints.bangumiAPIDomain + ApiEndpoints.bangumiRankSearch,
-            [limit, offset]),
-        data: params,
-      );
+      final url = ApiEndpoints.formatUrl(
+          ApiEndpoints.bangumiAPIDomain + ApiEndpoints.bangumiRankSearch,
+          [limit, offset]);
+      // The nsfw filter only takes effect for authenticated requests. When the
+      // saved token is stale the API answers 401, so drop back to an anonymous
+      // request instead of failing the whole search.
+      final jsonData = wantNsfw
+          ? await _requestWithAuthFallback(
+              (anonymous) => _client.post(url,
+                  data: params,
+                  anonymous: anonymous,
+                  // The nsfw filter is only honoured for authenticated
+                  // callers, so ask for the token explicitly instead of
+                  // relying on the sync toggle having been enabled.
+                  requiresAuth: !anonymous),
+            )
+          : await _client.post(url, data: params);
       final jsonList = jsonData['data'];
       for (dynamic jsonItem in jsonList) {
         if (jsonItem is Map<String, dynamic>) {
@@ -358,13 +373,33 @@ class BangumiApi {
     }
   }
 
+  /// Runs [request] with the saved credentials first and retries anonymously
+  /// when the server rejects them. Other failures propagate unchanged.
+  static Future<dynamic> _requestWithAuthFallback(
+    Future<dynamic> Function(bool anonymous) request,
+  ) async {
+    try {
+      return await request(false);
+    } on NetworkException catch (e) {
+      if (e.statusCode != 401) rethrow;
+      KazumiLogger().w('Network: auth rejected, retrying anonymously');
+      return request(true);
+    }
+  }
+
   static Future<BangumiItem?> getBangumiInfoByID(int id) async {
     try {
-      final jsonData = await _client.get(
-        ApiEndpoints.formatUrl(
-            ApiEndpoints.bangumiAPINextDomain +
-                ApiEndpoints.bangumiInfoByIDNext,
-            [id]),
+      final jsonData = await _requestWithAuthFallback(
+        (anonymous) => _client.get(
+          ApiEndpoints.formatUrl(
+              ApiEndpoints.bangumiAPINextDomain +
+                  ApiEndpoints.bangumiInfoByIDNext,
+              [id]),
+          anonymous: anonymous,
+          // R18 subject details are only served to authenticated callers, so
+          // the first attempt always carries the token when one is saved.
+          requiresAuth: !anonymous,
+        ),
       );
       return BangumiItem.fromJson(jsonData);
     } catch (e) {

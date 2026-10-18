@@ -19,6 +19,7 @@ class BangumiClient {
     String url, {
     Map<String, dynamic>? queryParameters,
     bool requiresAuth = false,
+    bool anonymous = false,
     String? accessToken,
     CancelToken? cancelToken,
   }) async {
@@ -29,6 +30,7 @@ class BangumiClient {
         options: Options(
           headers: _headers(
             requiresAuth: requiresAuth,
+            anonymous: anonymous,
             accessToken: accessToken,
             url: url,
             method: 'GET',
@@ -47,6 +49,7 @@ class BangumiClient {
     Object? data,
     Map<String, dynamic>? queryParameters,
     bool requiresAuth = false,
+    bool anonymous = false,
     CancelToken? cancelToken,
   }) async {
     try {
@@ -57,6 +60,7 @@ class BangumiClient {
         options: Options(
           headers: _headers(
             requiresAuth: requiresAuth,
+            anonymous: anonymous,
             url: url,
             method: 'POST',
             data: data,
@@ -72,6 +76,7 @@ class BangumiClient {
 
   Map<String, dynamic> _headers({
     required bool requiresAuth,
+    bool anonymous = false,
     String? accessToken,
     required String url,
     required String method,
@@ -85,7 +90,12 @@ class BangumiClient {
         (accessToken ??
                 GStorage.getSetting<String>(SettingsKeys.bangumiAccessToken))
             .trim();
-    if ((requiresAuth || bangumiSyncEnable) && token.isNotEmpty) {
+    // `anonymous` exists for the auth fallback path: `bangumiSyncEnable` adds
+    // the token to every request, so without an explicit opt-out a retry that
+    // asks for no auth would still replay the rejected credentials.
+    if (!anonymous &&
+        (requiresAuth || bangumiSyncEnable) &&
+        token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
     }
     if (_shouldSignProtectedMirrorRequest(url, method)) {

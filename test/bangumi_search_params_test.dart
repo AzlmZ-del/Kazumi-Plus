@@ -40,5 +40,16 @@ void main() {
       expect(filter['air_weekday'], [1, 6]);
       expect(filter['nsfw'], isFalse);
     });
+
+    test('passes nsfw through when R18 search is enabled', () {
+      final params = BangumiApi.buildBangumiSearchParams(
+        'kuroinu',
+        nsfw: true,
+      );
+      final filter = params['filter'] as Map<String, dynamic>;
+
+      expect(filter['nsfw'], isTrue);
+      expect(filter['type'], [2]);
+    });
   });
 }
