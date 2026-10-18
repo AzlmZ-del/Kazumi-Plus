@@ -13,6 +13,7 @@ enum MyDestination {
   history,
   downloads,
   sync,
+  network,
   storage,
   about,
 }
@@ -207,6 +208,7 @@ class _CompactSpaceLayout extends StatelessWidget {
         ContentSection.group(
           title: '数据与应用',
           children: [
+            _entry('网络设置', Icons.language_rounded, MyDestination.network),
             _entry('同步备份', Icons.cloud_sync_rounded, MyDestination.sync),
             _entry(
                 '存储管理', Icons.cleaning_services_rounded, MyDestination.storage),

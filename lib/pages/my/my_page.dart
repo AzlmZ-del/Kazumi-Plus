@@ -59,6 +59,7 @@ class _MyPageState extends State<MyPage> {
         MyDestination.history => '/settings/history/',
         MyDestination.downloads => '/settings/download/',
         MyDestination.sync => '/settings/sync',
+        MyDestination.network => '/settings/proxy',
         MyDestination.storage => '/settings/storage',
         MyDestination.about => '/settings/about/',
       });
