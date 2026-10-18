@@ -266,6 +266,13 @@ class SettingsKeys {
     true,
     group: SettingGroup.proxy,
   );
+  // JSON-encoded rule repository list. An empty string means "never
+  // configured", which decodes to the built-in official repository only.
+  static const ruleRepositories = SettingKey<String>(
+    'ruleRepositories',
+    '',
+    group: SettingGroup.proxy,
+  );
   static const enableBangumiProxy = SettingKey<bool>(
     _SettingBoxKey.enableBangumiProxy,
     true,
@@ -616,6 +623,7 @@ class SettingsKeys {
     oledEnhance,
     displayMode,
     enableGitProxy,
+    ruleRepositories,
     enableBangumiProxy,
     imageAcceleration,
     bangumiAcceleration,
