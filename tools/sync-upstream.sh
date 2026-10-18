@@ -143,13 +143,20 @@ if [ -f pubspec.yaml ]; then
   if [ -d test ]; then
     say ""
     say "${DIM}$FLUTTER test...${NC}"
-    if "$FLUTTER" test; then
+    testlog=$(mktemp)
+    if "$FLUTTER" test 2>&1 | tee "$testlog"; then
       ok "测试通过"
+    elif grep -qiE 'Visual Studio C\+\+ build tools|Building native assets failed' "$testlog"; then
+      # 本机没装 MSVC 工具链，native assets 编不出来，与代码无关。
+      warn "本机缺少 C++ 工具链，测试跑不了（环境问题，不是代码问题）"
+      say "需要人工验证时可先装 Visual Studio Build Tools"
     else
       warn "测试失败 —— 重放后代码需要检查"
       say "回退到重放前: git reset --hard $rollback"
+      rm -f "$testlog"
       exit 1
     fi
+    rm -f "$testlog"
   fi
 fi
 
