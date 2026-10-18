@@ -89,6 +89,49 @@ class EpisodeInfo {
     }
   }
 
+  /// 首播日期解析结果；日期缺失或格式非法时返回 null。
+  ///
+  /// 只接受 `yyyy-MM-dd`：`DateTime.tryParse` 会把 `2026-13-40` 这类溢出值
+  /// 规范化成 `2027-02-09` 而不是返回 null，直接用会把脏数据当成未来剧集。
+  DateTime? parsedAirDate() {
+    final raw = airDate.trim();
+    if (!_airDatePattern.hasMatch(raw)) return null;
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return null;
+    // 规范化后必须原样反映输入，否则就是溢出或非公历日期。
+    if (parsed.year != int.parse(raw.substring(0, 4)) ||
+        parsed.month != int.parse(raw.substring(5, 7)) ||
+        parsed.day != int.parse(raw.substring(8, 10))) {
+      return null;
+    }
+    return parsed;
+  }
+
+  static final RegExp _airDatePattern = RegExp(r'^\d{4}-\d{2}-\d{2}$');
+
+  /// 是否尚未播出。
+  ///
+  /// 没有可用日期时按「已播出」处理：接口会给未定档的条目返回空串，
+  /// 把这类占位条目标成待播只会造成误读。
+  bool isUpcoming(DateTime now) {
+    final date = parsedAirDate();
+    if (date == null) return false;
+    final today = DateTime(now.year, now.month, now.day);
+    return _dateOnly(date).isAfter(today);
+  }
+
+  /// 距首播还有几天；已播出或日期无效时返回 null。
+  int? daysUntilAir(DateTime now) {
+    final date = parsedAirDate();
+    if (date == null) return null;
+    final today = DateTime(now.year, now.month, now.day);
+    final days = _dateOnly(date).difference(today).inDays;
+    return days > 0 ? days : null;
+  }
+
+  static DateTime _dateOnly(DateTime value) =>
+      DateTime(value.year, value.month, value.day);
+
   /// 分组标题；未知类型统一归到「其他」。
   String readTypeLabel() {
     switch (type) {
