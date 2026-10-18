@@ -17,6 +17,7 @@ class InterfaceSettingsPage extends StatefulWidget {
 class _InterfaceSettingsPageState extends State<InterfaceSettingsPage> {
   late bool showRating;
   late bool showR18;
+  late bool hideUntranslated;
   late String defaultPage;
   late CollectLayout _defaultCollectLayout;
   bool _savingCollectLayout = false;
@@ -36,6 +37,8 @@ class _InterfaceSettingsPageState extends State<InterfaceSettingsPage> {
     super.initState();
     showRating = GStorage.getSetting(SettingsKeys.showRating);
     showR18 = GStorage.getSetting(SettingsKeys.bangumiShowR18);
+    hideUntranslated =
+        GStorage.getSetting(SettingsKeys.bangumiHideUntranslated);
     defaultPage = GStorage.getSetting(SettingsKeys.defaultStartupPage);
     _defaultCollectLayout = CollectLayout.fromValue(
       GStorage.getSetting(SettingsKeys.defaultCollectLayout),
@@ -118,6 +121,18 @@ class _InterfaceSettingsPageState extends State<InterfaceSettingsPage> {
                       ? '搜索时包含 R18 条目，需要先在追番同步中登录 Bangumi'
                       : '搜索时包含 R18 条目'),
               initialValue: showR18,
+            ),
+            SettingsTile.switchTile(
+              leading: Icons.translate_rounded,
+              onToggle: (value) async {
+                hideUntranslated = value ?? !hideUntranslated;
+                await GStorage.putSetting(
+                    SettingsKeys.bangumiHideUntranslated, hideUntranslated);
+                setState(() {});
+              },
+              title: const Text('隐藏无中文名的条目'),
+              description: const Text('开启后搜索结果只保留有中文译名的番剧'),
+              initialValue: hideUntranslated,
             ),
           ]),
           if (isDesktop())
