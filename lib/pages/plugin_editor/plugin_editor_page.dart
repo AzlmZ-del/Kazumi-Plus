@@ -1024,6 +1024,9 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
         captchaDetectValue: captchaDetectValueController.text,
         captchaScript: captchaScriptController.text,
       ),
+      // The editor has no fields for the login flow yet, but rebuilding the
+      // plugin from the form must not silently drop it.
+      auth: widget.plugin.auth,
     );
   }
 
@@ -1101,6 +1104,9 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
                 '播放页查询参数',
               ),
             ),
+      // The editor has no fields for the play endpoint yet, but saving the form
+      // must not silently drop it.
+      play: widget.plugin.chapterApiConfig.play,
     );
     if (chapterMode != RuleMode.api) return config;
     if (config.request.url.isEmpty) {
