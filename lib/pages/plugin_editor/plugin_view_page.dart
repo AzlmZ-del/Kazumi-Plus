@@ -272,6 +272,13 @@ class _PluginViewPageState extends State<PluginViewPage> {
                                     context.pushNamed('/settings/plugin/shop'),
                                 icon: const Icon(Icons.travel_explore_rounded),
                                 label: const Text('规则仓库')),
+                            FilledButton.tonalIcon(
+                                style: FilledButton.styleFrom(
+                                    minimumSize: const Size(120, 48)),
+                                onPressed: () => context
+                                    .pushNamed('/settings/plugin/accounts'),
+                                icon: const Icon(Icons.key_rounded),
+                                label: const Text('规则账号')),
                           ],
                         ),
                         const SizedBox(height: 20),
