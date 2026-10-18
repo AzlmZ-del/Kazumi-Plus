@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/bean/settings/settings_detail_scaffold.dart';
@@ -328,11 +329,22 @@ class _RepositoryTile extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 2),
-                  Text(_address(repository.url),
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: colors.onSurfaceVariant),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
+                  // Full address, tappable to copy: the usual reason to look at
+                  // it is to compare or tweak it somewhere else.
+                  InkWell(
+                    onTap: () => _copyAddress(context),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Text(
+                        repository.url,
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: colors.onSurfaceVariant),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 4),
                   _statusLine(theme, colors),
                 ],
@@ -390,8 +402,15 @@ class _RepositoryTile extends StatelessWidget {
             theme.textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant));
   }
 
-  static String _address(String url) {
-    return url.replaceFirst(RegExp(r'^https?://'), '');
+  Future<void> _copyAddress(BuildContext context) async {
+    try {
+      await Clipboard.setData(ClipboardData(text: repository.url));
+      if (!context.mounted) return;
+      KazumiDialog.showToast(context: context, message: '仓库地址已复制');
+    } catch (_) {
+      if (!context.mounted) return;
+      KazumiDialog.showToast(context: context, message: '复制失败，请重试');
+    }
   }
 }
 
@@ -497,6 +516,22 @@ class _RepositoryEditorDialogState extends State<_RepositoryEditorDialog> {
     );
   }
 
+  Future<void> _pasteAddress() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = data?.text?.trim() ?? '';
+    if (!mounted) return;
+    if (text.isEmpty) {
+      KazumiDialog.showToast(context: context, message: '剪贴板为空');
+      return;
+    }
+    if (text.length > RulesRepositoryConfig.maxUrlLength) {
+      setState(() => _error = '仓库地址过长');
+      return;
+    }
+    _url.text = text;
+    setState(() => _error = null);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -526,7 +561,14 @@ class _RepositoryEditorDialogState extends State<_RepositoryEditorDialog> {
               decoration: ruleInputDecoration(
                 context,
                 label: '仓库地址',
-              ).copyWith(errorText: _error),
+              ).copyWith(
+                errorText: _error,
+                suffixIcon: IconButton(
+                  tooltip: '粘贴',
+                  icon: const Icon(Icons.content_paste_rounded, size: 20),
+                  onPressed: _pasteAddress,
+                ),
+              ),
             ),
             const SizedBox(height: 8),
             Text(
