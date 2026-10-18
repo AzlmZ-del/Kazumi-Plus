@@ -14,15 +14,12 @@ import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/bean/widget/collect_button.dart';
 import 'package:kazumi/bean/widget/embedded_native_control_area.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
-import 'package:kazumi/modules/bangumi/episode_item.dart';
-import 'package:kazumi/modules/comments/comment_item.dart';
 import 'package:kazumi/pages/info/info_actions_menu.dart';
 import 'package:kazumi/pages/info/info_controller.dart';
 import 'package:kazumi/pages/info/info_tabview.dart';
 import 'package:kazumi/pages/info/rating_review_dialog.dart';
 import 'package:kazumi/pages/info/source_sheet.dart';
 import 'package:kazumi/plugins/plugins_controller.dart';
-import 'package:kazumi/request/apis/bangumi_api.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/services/network/bangumi_acceleration.dart';
 import 'package:kazumi/services/platform/desktop_window_config.dart';
@@ -156,15 +153,6 @@ class _InfoPageState extends State<InfoPage>
     } catch (e) {
       KazumiLogger().e('InfoPage: failed to load episodes', error: e);
     }
-  }
-
-  /// 拉取某一集的讨论，供剧集行内联展开使用。
-  ///
-  /// 失败时向上抛，由调用方就地展示错误态与重试按钮。
-  Future<List<EpisodeCommentItem>> loadEpisodeComments(
-      EpisodeInfo episode) async {
-    final response = await BangumiApi.getBangumiCommentsByEpisodeID(episode.id);
-    return response.commentList;
   }
 
   Future<void> loadRelations() async {
@@ -510,7 +498,6 @@ class _InfoPageState extends State<InfoPage>
             episodesQueryTimeout: infoController.episodesQueryTimeout,
             episodesRequireLogin: _episodesRequireLogin,
             loadEpisodes: loadEpisodes,
-            loadEpisodeComments: loadEpisodeComments,
             isLoading: showBangumiInfoSkeleton,
           );
         }),
