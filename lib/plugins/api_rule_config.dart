@@ -131,6 +131,39 @@ class ApiEpisodePageConfig {
       };
 }
 
+/// Turns the episode page URL into a media URL by calling an API.
+///
+/// Rules that serve a player page are resolved in a webview. Sites that hand
+/// out a signed media URL through an authenticated endpoint cannot be handled
+/// that way, because the webview has no credentials. Such rules declare this
+/// block instead: the episode URL is requested as an API call and the media
+/// URL is read out of the JSON response.
+class ApiPlayConfig {
+  /// Request used to fetch the media URL. An empty [ApiRequestConfig.url]
+  /// means the episode page URL itself is the endpoint.
+  ApiRequestConfig request;
+
+  /// JSONPath of the media URL inside the response.
+  String urlPath;
+
+  ApiPlayConfig({
+    ApiRequestConfig? request,
+    this.urlPath = r'$.data.url',
+  }) : request = request ?? ApiRequestConfig();
+
+  factory ApiPlayConfig.fromJson(Map<String, dynamic> json) {
+    return ApiPlayConfig(
+      request: ApiRequestConfig.fromJson(_asStringMap(json['request'])),
+      urlPath: json['urlPath'] as String? ?? r'$.data.url',
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'request': request.toJson(),
+        'urlPath': urlPath,
+      };
+}
+
 class ApiChapterConfig {
   ApiRequestConfig request;
   String format;
@@ -159,6 +192,10 @@ class ApiChapterConfig {
   /// Optional final playback page template used instead of a response URL.
   ApiEpisodePageConfig? episodePage;
 
+  /// Optional API call that turns the episode URL into a media URL. When set,
+  /// playback skips the webview and requests the endpoint directly.
+  ApiPlayConfig? play;
+
   ApiChapterConfig({
     ApiRequestConfig? request,
     this.format = ApiChapterFormat.nested,
@@ -174,6 +211,7 @@ class ApiChapterConfig {
     this.fieldSeparator = r'$',
     Map<String, String>? variables,
     this.episodePage,
+    this.play,
   })  : request = request ?? ApiRequestConfig(),
         variables = variables ?? <String, String>{};
 
@@ -197,6 +235,9 @@ class ApiChapterConfig {
       ),
       episodePage: json['episodePage'] is Map
           ? ApiEpisodePageConfig.fromJson(_asStringMap(json['episodePage']))
+          : null,
+      play: json['play'] is Map
+          ? ApiPlayConfig.fromJson(_asStringMap(json['play']))
           : null,
     );
   }
@@ -235,6 +276,7 @@ class ApiChapterConfig {
         },
         if (variables.isNotEmpty) 'variables': variables,
         if (episodePage != null) 'episodePage': episodePage!.toJson(),
+        if (play != null) 'play': play!.toJson(),
       };
 }
 

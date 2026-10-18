@@ -572,32 +572,51 @@ abstract class _DownloadController with Store {
           'DownloadController: resolving video URL for episode ${request.episodeNumber} from $fullUrl');
 
       String? m3u8Url;
-      try {
-        if (lease.isCancelled) {
-          throw const VideoSourceCancelledException();
+      if (plugin.hasPlayApi) {
+        // The media URL comes from an authenticated API, so a webview would
+        // never see it.
+        try {
+          if (lease.isCancelled) {
+            throw const VideoSourceCancelledException();
+          }
+          m3u8Url = await plugin.resolvePlayUrl(fullUrl);
+        } catch (e) {
+          if (lease.isCancelled) {
+            wasCancelled = true;
+          } else {
+            KazumiLogger()
+                .e('DownloadController: play api resolution failed', error: e);
+          }
         }
-        final source = await lease.resolve(
-          fullUrl,
-          useLegacyParser: plugin.useLegacyParser,
-          timeout: const Duration(seconds: 30),
-        );
-        m3u8Url = source.url;
-      } on VideoSourceTimeoutException {
-        if (lease.isCancelled) {
+      } else {
+        try {
+          if (lease.isCancelled) {
+            throw const VideoSourceCancelledException();
+          }
+          final source = await lease.resolve(
+            fullUrl,
+            useLegacyParser: plugin.useLegacyParser,
+            timeout: const Duration(seconds: 30),
+          );
+          m3u8Url = source.url;
+        } on VideoSourceTimeoutException {
+          if (lease.isCancelled) {
+            wasCancelled = true;
+          } else {
+            KazumiLogger()
+                .w('DownloadController: WebView resolution timed out');
+          }
+        } on VideoSourceCancelledException {
           wasCancelled = true;
-        } else {
-          KazumiLogger().w('DownloadController: WebView resolution timed out');
-        }
-      } on VideoSourceCancelledException {
-        wasCancelled = true;
-        KazumiLogger().i('DownloadController: WebView resolution cancelled');
-      } catch (e) {
-        if (lease.isCancelled) {
-          wasCancelled = true;
-        } else {
-          lease.retire();
-          KazumiLogger()
-              .e('DownloadController: WebView resolution failed', error: e);
+          KazumiLogger().i('DownloadController: WebView resolution cancelled');
+        } catch (e) {
+          if (lease.isCancelled) {
+            wasCancelled = true;
+          } else {
+            lease.retire();
+            KazumiLogger()
+                .e('DownloadController: WebView resolution failed', error: e);
+          }
         }
       }
 

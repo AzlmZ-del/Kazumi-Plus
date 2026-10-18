@@ -94,6 +94,7 @@ class RuleExecutionConfig {
     required this.chapterApiConfig,
     required this.antiCrawlerConfig,
     this.auth,
+    this.play,
   });
 
   final String pluginName;
@@ -113,6 +114,10 @@ class RuleExecutionConfig {
 
   /// Login flow declared by the rule, or null when the rule needs no auth.
   final ApiAuthConfig? auth;
+
+  /// Playback endpoint that returns a media URL, or null when playback has to
+  /// go through the webview.
+  final ApiPlayConfig? play;
 }
 
 class PreparedRuleRequest {
