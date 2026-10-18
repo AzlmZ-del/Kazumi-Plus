@@ -9,6 +9,7 @@ import 'package:kazumi/request/core/network_config.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/services/network/bangumi_acceleration.dart';
 import 'package:kazumi/services/network/bangumi_ech_resolver.dart';
+import 'package:kazumi/services/network/bangumi_mirror_signature.dart';
 
 const _echRequestKey = 'bangumiEch';
 
@@ -26,6 +27,15 @@ class BangumiAccelerationInterceptor extends Interceptor {
           options.queryParameters = {};
           options.extra[_echRequestKey] = true;
         case BangumiAcceleration.mirror:
+          // Signed endpoints answer 401 on the mirror when the build has no
+          // credentials, while the official host serves them anonymously.
+          // Keep those paths on the official host rather than returning empty.
+          if (!hasBangumiMirrorCredentials &&
+              isSignatureProtectedBangumiPath(options.method, uri.path)) {
+            KazumiLogger().d(
+                'Bangumi mirror: skipping ${options.method} ${uri.path} (no credentials)');
+            break;
+          }
           options.path =
               ApiEndpoints.bangumiMirrorDomain +
               uri.path +
