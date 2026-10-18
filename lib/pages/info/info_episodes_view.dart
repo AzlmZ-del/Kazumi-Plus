@@ -3,8 +3,7 @@ import 'package:flutter_modular/flutter_modular.dart';
 import 'package:kazumi/bean/widget/empty_state_widget.dart';
 import 'package:kazumi/bean/widget/error_widget.dart';
 import 'package:kazumi/modules/bangumi/episode_item.dart';
-import 'package:kazumi/modules/comments/comment_item.dart';
-import 'package:kazumi/pages/info/info_episode_comments.dart';
+import 'package:kazumi/pages/info/episode_comments_page.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 /// 详情页「剧集」页签。
@@ -13,13 +12,13 @@ import 'package:skeletonizer/skeletonizer.dart';
 class InfoEpisodesView extends StatelessWidget {
   const InfoEpisodesView({
     super.key,
+    required this.subjectTitle,
     required this.episodes,
     required this.isLoading,
     required this.hasLoaded,
     required this.hasError,
     required this.requiresLogin,
     required this.onRetry,
-    required this.loadComments,
   });
 
   static const double _maxWidth = 950;
@@ -32,14 +31,13 @@ class InfoEpisodesView extends StatelessWidget {
   final bool hasLoaded;
   final bool hasError;
 
+  /// 所属番剧名，传给单集讨论页做上下文提示。
+  final String subjectTitle;
+
   /// 直连模式下未登录时，服务端不会返回 R18 条目的剧集。
   final bool requiresLogin;
 
   final Future<void> Function() onRetry;
-
-  /// 拉取某一集的讨论；由行内展开时按需调用。
-  final Future<List<EpisodeCommentItem>> Function(EpisodeInfo episode)
-  loadComments;
 
   @override
   Widget build(BuildContext context) {
@@ -128,11 +126,11 @@ class InfoEpisodesView extends StatelessWidget {
                     children.add(
                       _EpisodeRow(
                         episode: episode,
+                        subjectTitle: subjectTitle,
                         now: now,
                         countdownDays: identical(episode, nearestUpcoming)
                             ? episode.daysUntilAir(now)
                             : null,
-                        loadComments: loadComments,
                       ),
                     );
                   }
@@ -228,12 +226,15 @@ class _GroupHeader extends StatelessWidget {
 class _EpisodeRow extends StatefulWidget {
   const _EpisodeRow({
     required this.episode,
+    required this.subjectTitle,
     required this.now,
-    required this.loadComments,
     this.countdownDays,
   });
 
   final EpisodeInfo episode;
+
+  /// 点到单集讨论页时带上所属番剧名。
+  final String subjectTitle;
 
   /// 判定「未播出」用的当前时间，由列表统一传入，避免每行各取一次时钟。
   final DateTime now;
@@ -241,21 +242,12 @@ class _EpisodeRow extends StatefulWidget {
   /// 仅最近一集未来剧集有值，用于显示「还有 N 天」。
   final int? countdownDays;
 
-  final Future<List<EpisodeCommentItem>> Function(EpisodeInfo episode)
-  loadComments;
-
   @override
   State<_EpisodeRow> createState() => _EpisodeRowState();
 }
 
 class _EpisodeRowState extends State<_EpisodeRow> {
   bool _expanded = false;
-
-  // 讨论首次展开时才请求，之后复用；失败后可手动重试。
-  bool _commentsExpanded = false;
-  bool _commentsLoading = false;
-  bool _commentsFailed = false;
-  List<EpisodeCommentItem>? _comments;
 
   String get _metaLine {
     final parts = <String>[];
@@ -272,51 +264,24 @@ class _EpisodeRowState extends State<_EpisodeRow> {
   @override
   void didUpdateWidget(covariant _EpisodeRow oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // 行被复用到另一集时，旧的讨论不能跟过来。
+    // 行被复用到另一集时，旧的简介展开状态不能跟过来。
     if (oldWidget.episode.id != widget.episode.id ||
         oldWidget.episode.episode != widget.episode.episode) {
       _expanded = false;
-      _commentsExpanded = false;
-      _commentsLoading = false;
-      _commentsFailed = false;
-      _comments = null;
     }
   }
 
   bool get _hasComments => widget.episode.commentCount > 0;
 
-  Future<void> _toggleComments() async {
-    if (_commentsExpanded) {
-      setState(() => _commentsExpanded = false);
-      return;
-    }
-    setState(() {
-      _commentsExpanded = true;
-      _commentsFailed = false;
-    });
-    if (_comments != null || _commentsLoading) return;
-    await _loadComments();
-  }
-
-  Future<void> _loadComments() async {
-    setState(() {
-      _commentsLoading = true;
-      _commentsFailed = false;
-    });
-    try {
-      final comments = await widget.loadComments(widget.episode);
-      if (!mounted) return;
-      setState(() {
-        _comments = comments;
-        _commentsLoading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _commentsLoading = false;
-        _commentsFailed = true;
-      });
-    }
+  /// 讨论单独成页：一集可能有几十条回复，内联展开会把剧集列表撑得很长。
+  void _openComments() {
+    context.pushNamed(
+      '/info/episode/comments',
+      arguments: EpisodeCommentsArgs(
+        subjectTitle: widget.subjectTitle,
+        episode: widget.episode,
+      ),
+    );
   }
 
   @override
@@ -394,9 +359,8 @@ class _EpisodeRowState extends State<_EpisodeRow> {
                           const SizedBox(height: 4),
                           _CommentToggle(
                             count: episode.commentCount,
-                            expanded: _commentsExpanded,
                             color: upcoming ? faded : colors.primary,
-                            onTap: _toggleComments,
+                            onTap: _openComments,
                           ),
                         ],
                       ],
@@ -422,16 +386,6 @@ class _EpisodeRowState extends State<_EpisodeRow> {
                   ),
                 ),
               ],
-              if (_commentsExpanded) ...[
-                const SizedBox(height: 8),
-                const Divider(thickness: 0.5, height: 1),
-                InfoEpisodeComments(
-                  comments: _comments ?? const [],
-                  isLoading: _commentsLoading,
-                  hasFailed: _commentsFailed,
-                  onRetry: _loadComments,
-                ),
-              ],
             ],
           ),
         ),
@@ -440,17 +394,15 @@ class _EpisodeRowState extends State<_EpisodeRow> {
   }
 }
 
-/// 行内的「N 条讨论」入口，点一下展开该集评论。
+/// 行内的「N 条讨论」入口，点一下打开该集的讨论页。
 class _CommentToggle extends StatelessWidget {
   const _CommentToggle({
     required this.count,
-    required this.expanded,
     required this.color,
     required this.onTap,
   });
 
   final int count;
-  final bool expanded;
   final Color color;
   final VoidCallback onTap;
 
@@ -459,7 +411,6 @@ class _CommentToggle extends StatelessWidget {
     final theme = Theme.of(context);
     return Semantics(
       button: true,
-      expanded: expanded,
       label: '$count 条讨论',
       excludeSemantics: true,
       child: InkWell(
@@ -477,13 +428,7 @@ class _CommentToggle extends StatelessWidget {
                 style: theme.textTheme.bodySmall?.copyWith(color: color),
               ),
               const SizedBox(width: 2),
-              Icon(
-                expanded
-                    ? Icons.expand_less_rounded
-                    : Icons.expand_more_rounded,
-                size: 14,
-                color: color,
-              ),
+              Icon(Icons.chevron_right_rounded, size: 14, color: color),
             ],
           ),
         ),
