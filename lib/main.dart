@@ -6,6 +6,7 @@ import 'package:flutter_modular/flutter_modular.dart';
 import 'package:kazumi/bean/settings/theme_provider.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:kazumi/services/storage/storage.dart';
+import 'package:kazumi/services/plugin/plugin_credentials_store.dart';
 import 'package:kazumi/services/download/download_directory_service.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:kazumi/services/network/metered_network_service.dart';
@@ -44,6 +45,7 @@ void main() async {
     final hivePath = '${(await getApplicationSupportDirectory()).path}/hive';
     await Hive.initFlutter(hivePath);
     await GStorage.init();
+    await PluginCredentialsStore.instance.load();
   } catch (e) {
     debugPrint('Storage initialization failed: $e');
 
