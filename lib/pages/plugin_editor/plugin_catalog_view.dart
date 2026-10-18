@@ -10,9 +10,11 @@ import 'package:kazumi/bean/widget/empty_state_widget.dart';
 import 'package:kazumi/bean/widget/loading_indicator.dart';
 import 'package:kazumi/bean/widget/state_presentation.dart';
 import 'package:kazumi/modules/plugin/plugin_http_module.dart';
+import 'package:kazumi/modules/plugin/rule_repository.dart';
 import 'package:kazumi/pages/plugin_editor/plugin_update_actions.dart';
 import 'package:kazumi/pages/plugin_editor/rule_management_widgets.dart';
 import 'package:kazumi/plugins/plugins_controller.dart';
+import 'package:kazumi/request/config/rules_repository_config.dart';
 import 'package:kazumi/services/storage/storage.dart';
 
 enum _CatalogSort { lastUpdate, name }
@@ -23,6 +25,7 @@ class PluginCatalogView extends StatefulWidget {
   const PluginCatalogView({
     super.key,
     required this.controller,
+    this.onManageRepositories,
   }) : _scrollViewBuilder = null;
 
   const PluginCatalogView.onboarding({
@@ -30,19 +33,25 @@ class PluginCatalogView extends StatefulWidget {
     required this.controller,
     required Widget Function(BuildContext context, List<Widget> slivers)
         builder,
-  }) : _scrollViewBuilder = builder;
+  })  : _scrollViewBuilder = builder,
+        onManageRepositories = null;
 
   final PluginsController controller;
+
+  /// Opens the repository management page. `null` hides every entry point, which
+  /// is what the onboarding step wants.
+  final VoidCallback? onManageRepositories;
+
   final Widget Function(BuildContext context, List<Widget> slivers)?
       _scrollViewBuilder;
 
   bool get _onboarding => _scrollViewBuilder != null;
 
   @override
-  State<PluginCatalogView> createState() => _PluginCatalogViewState();
+  State<PluginCatalogView> createState() => PluginCatalogViewState();
 }
 
-class _PluginCatalogViewState extends State<PluginCatalogView> {
+class PluginCatalogViewState extends State<PluginCatalogView> {
   final _search = TextEditingController();
   final Set<String> _installing = {};
   _CatalogSort _sort = _CatalogSort.lastUpdate;
@@ -50,11 +59,21 @@ class _PluginCatalogViewState extends State<PluginCatalogView> {
   bool _loading = true;
   bool _loadFailed = false;
 
+  /// Repository totals captured after each load, so the header can show them
+  /// without re-reading settings on every frame.
+  int _repositoryCount = 0;
+  int _enabledRepositoryCount = 0;
+
+  /// Hosts of the repositories that failed. Cleared whenever the user dismisses
+  /// the banner; a new failure set brings it back.
+  String _dismissedFailures = '';
+
   PluginsController get _controller => widget.controller;
 
   @override
   void initState() {
     super.initState();
+    _captureRepositoryCounts();
     if (_controller.isPluginCatalogFresh) {
       _loading = false;
     } else {
@@ -79,6 +98,7 @@ class _PluginCatalogViewState extends State<PluginCatalogView> {
         setState(() {
           _loading = false;
           _loadFailed = false;
+          _captureRepositoryCounts();
         });
       }
     } catch (_) {
@@ -86,16 +106,37 @@ class _PluginCatalogViewState extends State<PluginCatalogView> {
         setState(() {
           _loading = false;
           _loadFailed = true;
+          _captureRepositoryCounts();
         });
       }
     }
   }
 
+  void _captureRepositoryCounts() {
+    final repositories = RulesRepositoryConfig.repositories();
+    _repositoryCount = repositories.length;
+    _enabledRepositoryCount =
+        repositories.where((repository) => repository.enabled).length;
+  }
+
   void _refresh() {
     if (_loading) return;
+    _startRefresh();
+  }
+
+  /// Reloads the catalog, ignoring the in-flight guard.
+  ///
+  /// Called after the repository configuration changed. Unlike [_refresh] it
+  /// must not be swallowed while the first load is still running, otherwise
+  /// switching a repository on/off would leave the list showing the old
+  /// catalog.
+  void reload() => _startRefresh();
+
+  void _startRefresh() {
     setState(() {
       _loading = true;
       _loadFailed = false;
+      _captureRepositoryCounts();
     });
     unawaited(_loadPluginCatalog(forceRefresh: true));
   }
@@ -170,6 +211,10 @@ class _PluginCatalogViewState extends State<PluginCatalogView> {
           description: '浏览社区规则，为你的番剧搜索添加更多选择。',
           icon: Icons.travel_explore_rounded,
         ),
+        if (widget.onManageRepositories != null) ...[
+          const SizedBox(height: 12),
+          _repositoryEntry(),
+        ],
         const SizedBox(height: 20),
         TextField(
           controller: _search,
@@ -231,13 +276,234 @@ class _PluginCatalogViewState extends State<PluginCatalogView> {
     ]);
   }
 
+  /// Compact entry point into the repository management page.
+  ///
+  /// Only rendered when the host page wires [PluginCatalogView.onManageRepositories];
+  /// the onboarding step passes nothing and stays free of management UI.
+  Widget _repositoryEntry() {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final summary = _repositoryCount == 0
+        ? '暂无规则仓库'
+        : '$_repositoryCount 个仓库 · $_enabledRepositoryCount 个已启用';
+    return Material(
+      color: colors.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: widget.onManageRepositories,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(children: [
+            Icon(Icons.lan_rounded, size: 20, color: colors.onSurfaceVariant),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(summary,
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 2),
+                  Text('规则仓库镜像只作用于官方仓库，第三方仓库不受影响',
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: colors.onSurfaceVariant)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, color: colors.onSurfaceVariant),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  /// Yellow banner naming the repositories whose last load failed.
+  ///
+  /// Partial failures are not errors: the rest of the catalog is perfectly
+  /// usable, so this stays dismissible instead of taking over the page.
+  Widget? _failureBanner() {
+    if (widget._onboarding || _loading || _loadFailed) {
+      return null;
+    }
+    final failures = _controller.repositoryFailures;
+    if (failures.isEmpty) {
+      return null;
+    }
+    final labels = failures.map((failure) => failure.repositoryLabel).toList();
+    final signature = labels.join('\u0000');
+    if (signature == _dismissedFailures) {
+      return null;
+    }
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Material(
+        color: colors.tertiaryContainer,
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+          child: Row(children: [
+            Icon(Icons.cloud_off_rounded,
+                size: 20, color: colors.onTertiaryContainer),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                '${labels.join('、')} 无法访问，正在显示其他仓库的规则。',
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: colors.onTertiaryContainer),
+              ),
+            ),
+            IconButton(
+              tooltip: '忽略',
+              visualDensity: VisualDensity.compact,
+              onPressed: () => setState(() => _dismissedFailures = signature),
+              icon: Icon(Icons.close_rounded,
+                  size: 18, color: colors.onTertiaryContainer),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  /// Source badge for a catalog card.
+  ///
+  /// Official rules keep the neutral tag every other badge uses; third-party
+  /// rules get a tinted one so "this is not from the built-in repository" is
+  /// visible at a glance. `+N` marks rules hidden behind a same-name conflict.
+  Widget _sourceTag(PluginHTTPItem item) {
+    final colors = Theme.of(context).colorScheme;
+    final official = item.repositoryUrl == RuleRepositoryList.officialUrl;
+    final shadowedCount = _controller.shadowedRulesFor(item.name).length;
+    final label = item.repositoryLabel.isEmpty
+        ? (Uri.tryParse(item.repositoryUrl)?.host ?? '未知来源')
+        : item.repositoryLabel;
+    return GestureDetector(
+      onTap: shadowedCount == 0 ? null : () => _showShadowedSources(item),
+      child: RuleTag(
+        label: shadowedCount == 0 ? label : '$label +$shadowedCount',
+        background:
+            official ? colors.surfaceContainerHighest : colors.secondaryContainer,
+        foreground: official
+            ? colors.onSurfaceVariant
+            : colors.onSecondaryContainer,
+      ),
+    );
+  }
+
+  void _showShadowedSources(PluginHTTPItem item) {
+    final shadowed = _controller.shadowedRulesFor(item.name);
+    if (shadowed.isEmpty) return;
+    KazumiDialog.show<void>(
+      builder: (context) {
+        final theme = Theme.of(context);
+        return AlertDialog(
+          title: Text('「${item.name}」的来源'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('同名规则在多个仓库中存在，按仓库顺序使用第一个。',
+                  style: theme.textTheme.bodySmall),
+              const SizedBox(height: 12),
+              for (final source in [item, ...shadowed])
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(children: [
+                    Icon(
+                      source == item
+                          ? Icons.check_circle_rounded
+                          : Icons.remove_circle_outline_rounded,
+                      size: 18,
+                      color: source == item
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        source.repositoryLabel.isEmpty
+                            ? source.repositoryUrl
+                            : source.repositoryLabel,
+                        style: theme.textTheme.bodyMedium,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(source.version,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant)),
+                  ]),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('关闭'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _emptyBody() {
     if (_loading) {
       return const Padding(
           padding: EdgeInsets.all(48),
           child: Center(child: LoadingIndicator()));
     }
+    final manageButton = widget.onManageRepositories == null
+        ? null
+        : StateActionButton.tonal(
+            onPressed: widget.onManageRepositories,
+            icon: Icons.lan_rounded,
+            text: '管理规则仓库',
+          );
+    if (_enabledRepositoryCount == 0 && _repositoryCount > 0) {
+      return GeneralErrorWidget(
+        title: '所有规则仓库已关闭',
+        errMsg: '打开规则仓库管理，启用至少一个仓库后才能浏览规则。',
+        icon: Icons.lan_rounded,
+        onRetry: widget.onManageRepositories,
+        retryText: '管理规则仓库',
+        actions: [
+          if (widget.onManageRepositories != null)
+            StateActionButton(
+              onPressed: reload,
+              icon: Icons.refresh_rounded,
+              text: '重新加载',
+            ),
+        ],
+      );
+    }
     if (_loadFailed && _controller.pluginHTTPList.isEmpty) {
+      final failures = _controller.repositoryFailures;
+      if (failures.isNotEmpty) {
+        return GeneralErrorWidget(
+          title: '无法访问任何规则仓库',
+          errMsg: '${failures.map((f) => f.repositoryLabel).join('、')} 均无法访问，'
+              '请检查网络连接或仓库地址。',
+          icon: Icons.cloud_off_rounded,
+          onRetry: _refresh,
+          retryText: '重新加载',
+          actions: [
+            ?manageButton,
+            if (widget.onManageRepositories == null)
+              StateActionButton.tonal(
+                onPressed: _toggleGitProxyAndRefresh,
+                icon: Icons.tune_rounded,
+                text: GStorage.getSetting(SettingsKeys.enableGitProxy)
+                    ? '关闭规则镜像'
+                    : '启用规则镜像',
+              ),
+          ],
+        );
+      }
       final enabled = GStorage.getSetting(SettingsKeys.enableGitProxy);
       return GeneralErrorWidget(
         title: '无法访问规则仓库',
@@ -246,11 +512,13 @@ class _PluginCatalogViewState extends State<PluginCatalogView> {
         onRetry: _refresh,
         retryText: '重新加载',
         actions: [
-          StateActionButton.tonal(
-            onPressed: _toggleGitProxyAndRefresh,
-            icon: Icons.tune_rounded,
-            text: enabled ? '关闭规则镜像' : '启用规则镜像',
-          ),
+          ?manageButton,
+          if (widget.onManageRepositories == null)
+            StateActionButton.tonal(
+              onPressed: _toggleGitProxyAndRefresh,
+              icon: Icons.tune_rounded,
+              text: enabled ? '关闭规则镜像' : '启用规则镜像',
+            ),
         ],
       );
     }
@@ -282,7 +550,13 @@ class _PluginCatalogViewState extends State<PluginCatalogView> {
                 : const EdgeInsets.fromLTRB(16, 12, 16, 24),
             sliver: SliverMainAxisGroup(slivers: [
               SliverToBoxAdapter(
-                  child: _header(catalog.length, installed, updates)),
+                  child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _header(catalog.length, installed, updates),
+                  ?_failureBanner(),
+                ],
+              )),
               if (items.isEmpty)
                 SliverToBoxAdapter(child: _emptyBody())
               else
@@ -308,6 +582,7 @@ class _PluginCatalogViewState extends State<PluginCatalogView> {
                               label: '含验证支持',
                               background: colors.tertiaryContainer,
                               foreground: colors.onTertiaryContainer),
+                        if (item.repositoryUrl.isNotEmpty) _sourceTag(item),
                       ],
                       caption: item.lastUpdate > 0
                           ? '更新于 ${DateTime.fromMillisecondsSinceEpoch(item.lastUpdate).toString().split(' ').first}'
