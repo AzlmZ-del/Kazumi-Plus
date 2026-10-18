@@ -16,6 +16,7 @@ class InterfaceSettingsPage extends StatefulWidget {
 
 class _InterfaceSettingsPageState extends State<InterfaceSettingsPage> {
   late bool showRating;
+  late bool showR18;
   late String defaultPage;
   late CollectLayout _defaultCollectLayout;
   bool _savingCollectLayout = false;
@@ -34,6 +35,7 @@ class _InterfaceSettingsPageState extends State<InterfaceSettingsPage> {
   void initState() {
     super.initState();
     showRating = GStorage.getSetting(SettingsKeys.showRating);
+    showR18 = GStorage.getSetting(SettingsKeys.bangumiShowR18);
     defaultPage = GStorage.getSetting(SettingsKeys.defaultStartupPage);
     _defaultCollectLayout = CollectLayout.fromValue(
       GStorage.getSetting(SettingsKeys.defaultCollectLayout),
@@ -99,6 +101,23 @@ class _InterfaceSettingsPageState extends State<InterfaceSettingsPage> {
               title: Text('显示评分'),
               description: Text('关闭后隐藏概览和番剧列表中的评分信息'),
               initialValue: showRating,
+            ),
+            SettingsTile.switchTile(
+              leading: Icons.visibility_rounded,
+              onToggle: (value) async {
+                showR18 = value ?? !showR18;
+                await GStorage.putSetting(
+                    SettingsKeys.bangumiShowR18, showR18);
+                setState(() {});
+              },
+              title: const Text('显示 R18 内容'),
+              description: Text(
+                  GStorage.getSetting(SettingsKeys.bangumiAccessToken)
+                          .trim()
+                          .isEmpty
+                      ? '搜索时包含 R18 条目，需要先在追番同步中登录 Bangumi'
+                      : '搜索时包含 R18 条目'),
+              initialValue: showR18,
             ),
           ]),
           if (isDesktop())
