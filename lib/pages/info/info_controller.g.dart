@@ -122,6 +122,71 @@ mixin _$InfoController on _InfoController, Store {
     });
   }
 
+  late final _$episodeListAtom =
+      Atom(name: '_InfoController.episodeList', context: context);
+
+  @override
+  ObservableList<EpisodeInfo> get episodeList {
+    _$episodeListAtom.reportRead();
+    return super.episodeList;
+  }
+
+  @override
+  set episodeList(ObservableList<EpisodeInfo> value) {
+    _$episodeListAtom.reportWrite(value, super.episodeList, () {
+      super.episodeList = value;
+    });
+  }
+
+  late final _$episodesIsLoadingAtom =
+      Atom(name: '_InfoController.episodesIsLoading', context: context);
+
+  @override
+  bool get episodesIsLoading {
+    _$episodesIsLoadingAtom.reportRead();
+    return super.episodesIsLoading;
+  }
+
+  @override
+  set episodesIsLoading(bool value) {
+    _$episodesIsLoadingAtom.reportWrite(value, super.episodesIsLoading, () {
+      super.episodesIsLoading = value;
+    });
+  }
+
+  late final _$episodesQueryTimeoutAtom =
+      Atom(name: '_InfoController.episodesQueryTimeout', context: context);
+
+  @override
+  bool get episodesQueryTimeout {
+    _$episodesQueryTimeoutAtom.reportRead();
+    return super.episodesQueryTimeout;
+  }
+
+  @override
+  set episodesQueryTimeout(bool value) {
+    _$episodesQueryTimeoutAtom.reportWrite(value, super.episodesQueryTimeout,
+        () {
+      super.episodesQueryTimeout = value;
+    });
+  }
+
+  late final _$episodesHasLoadedAtom =
+      Atom(name: '_InfoController.episodesHasLoaded', context: context);
+
+  @override
+  bool get episodesHasLoaded {
+    _$episodesHasLoadedAtom.reportRead();
+    return super.episodesHasLoaded;
+  }
+
+  @override
+  set episodesHasLoaded(bool value) {
+    _$episodesHasLoadedAtom.reportWrite(value, super.episodesHasLoaded, () {
+      super.episodesHasLoaded = value;
+    });
+  }
+
   late final _$relationsIsLoadingAtom =
       Atom(name: '_InfoController.relationsIsLoading', context: context);
 
@@ -185,6 +250,17 @@ mixin _$InfoController on _InfoController, Store {
       ActionController(name: '_InfoController', context: context);
 
   @override
+  void clearEpisodes() {
+    final _$actionInfo = _$_InfoControllerActionController.startAction(
+        name: '_InfoController.clearEpisodes');
+    try {
+      return super.clearEpisodes();
+    } finally {
+      _$_InfoControllerActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
   void clearRelations() {
     final _$actionInfo = _$_InfoControllerActionController.startAction(
         name: '_InfoController.clearRelations');
@@ -205,6 +281,10 @@ commentsList: ${commentsList},
 characterList: ${characterList},
 staffList: ${staffList},
 relationList: ${relationList},
+episodeList: ${episodeList},
+episodesIsLoading: ${episodesIsLoading},
+episodesQueryTimeout: ${episodesQueryTimeout},
+episodesHasLoaded: ${episodesHasLoaded},
 relationsIsLoading: ${relationsIsLoading},
 relationsQueryTimeout: ${relationsQueryTimeout},
 relationsHasLoaded: ${relationsHasLoaded}
