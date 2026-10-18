@@ -3,6 +3,7 @@ import 'package:kazumi/pages/plugin_editor/plugin_editor_page.dart';
 import 'package:kazumi/pages/plugin_editor/plugin_shop_page.dart';
 import 'package:kazumi/pages/plugin_editor/plugin_test_page.dart';
 import 'package:kazumi/pages/plugin_editor/plugin_view_page.dart';
+import 'package:kazumi/pages/plugin_editor/rule_repository_page.dart';
 import 'package:kazumi/pages/route_error_page.dart';
 import 'package:kazumi/plugins/plugins.dart';
 import 'package:kazumi/plugins/plugins_controller.dart';
@@ -20,6 +21,12 @@ final pluginModule = createModule(
       ..route(
         '/shop',
         child: (context, state) => PluginShopPage(
+          controller: inject<PluginsController>(),
+        ),
+      )
+      ..route(
+        '/shop/repositories',
+        child: (context, state) => RuleRepositoryPage(
           controller: inject<PluginsController>(),
         ),
       )
