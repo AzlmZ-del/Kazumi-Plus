@@ -5,7 +5,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:kazumi/plugins/plugins.dart';
 import 'package:kazumi/services/plugin/plugin_validity_tracker.dart';
 import 'package:kazumi/request/apis/plugin_catalog_api.dart';
+import 'package:kazumi/request/config/rules_repository_config.dart';
 import 'package:kazumi/modules/plugin/plugin_http_module.dart';
+import 'package:kazumi/modules/plugin/rule_repository.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/utils/async_serial_queue.dart';
 import 'package:kazumi/utils/async_single_flight.dart';
@@ -39,8 +41,23 @@ class PluginBatchUpdateResult {
   bool get hasNoCandidates => candidates == 0;
 }
 
+/// Loads the whole catalog from a single injected source.
+///
+/// This replaces catalog aggregation entirely: when it is supplied the
+/// controller never reads repository settings. Tests and embedded callers use
+/// it to describe "one catalog, period", which the per-repository loaders
+/// below cannot express.
 typedef PluginCatalogLoader = Future<List<PluginHTTPItem>> Function();
 typedef PluginLoader = Future<Plugin> Function(String name);
+
+/// Loads the catalog of one repository.
+typedef PluginRepositoryCatalogLoader =
+    Future<List<PluginHTTPItem>> Function(String repositoryUrl);
+
+/// Loads a single rule from the repository that advertised it.
+typedef PluginRepositoryLoader =
+    Future<Plugin> Function(String repositoryUrl, String name);
+
 typedef PluginJsonWriter = Future<void> Function(String jsonData);
 typedef PluginErrorReporter = void Function(
   String message,
@@ -48,6 +65,27 @@ typedef PluginErrorReporter = void Function(
   StackTrace stackTrace,
 );
 typedef _PluginUpdateAttempt = ({PluginUpdateResult result, Plugin? plugin});
+typedef _RepositoryLoad = ({
+  RuleRepository repository,
+  List<PluginHTTPItem> items,
+  Object? error,
+});
+
+/// A repository that could not be read during the last catalog refresh.
+///
+/// Kept around so the catalog view can explain *why* rules are missing instead
+/// of silently showing a shorter list.
+class RuleRepositoryFailure {
+  const RuleRepositoryFailure({
+    required this.repositoryUrl,
+    required this.repositoryLabel,
+    required this.error,
+  });
+
+  final String repositoryUrl;
+  final String repositoryLabel;
+  final Object error;
+}
 
 void _defaultPluginErrorReporter(
   String message,
@@ -61,15 +99,27 @@ abstract class _PluginsController with Store {
   _PluginsController({
     PluginCatalogLoader? catalogLoader,
     PluginLoader? pluginLoader,
+    PluginRepositoryCatalogLoader? repositoryCatalogLoader,
+    PluginRepositoryLoader? repositoryLoader,
     PluginJsonWriter? pluginJsonWriter,
     PluginErrorReporter? errorReporter,
-  })  : _catalogLoader = catalogLoader ?? PluginCatalogApi.getPluginList,
-        _pluginLoader = pluginLoader ?? PluginCatalogApi.getPlugin,
+  })  : _catalogLoader = catalogLoader,
+        _pluginLoader = pluginLoader,
+        _repositoryCatalogLoader =
+            repositoryCatalogLoader ?? PluginCatalogApi.getPluginListFrom,
+        _repositoryLoader =
+            repositoryLoader ?? PluginCatalogApi.getPluginFromRepository,
         _pluginJsonWriter = pluginJsonWriter,
         _errorReporter = errorReporter ?? _defaultPluginErrorReporter;
 
-  final PluginCatalogLoader _catalogLoader;
-  final PluginLoader _pluginLoader;
+  /// Whole-catalog override; bypasses repository aggregation when set.
+  final PluginCatalogLoader? _catalogLoader;
+
+  /// Whole-catalog single-rule override; bypasses per-repository routing.
+  final PluginLoader? _pluginLoader;
+
+  final PluginRepositoryCatalogLoader _repositoryCatalogLoader;
+  final PluginRepositoryLoader _repositoryLoader;
   final PluginJsonWriter? _pluginJsonWriter;
   final PluginErrorReporter _errorReporter;
   final AsyncSingleFlight<List<PluginHTTPItem>> _catalogRefreshSingleFlight =
@@ -77,6 +127,23 @@ abstract class _PluginsController with Store {
   final AsyncSerialQueue _mutations = AsyncSerialQueue();
   Map<String, PluginHTTPItem> _pluginCatalogByName = const {};
   DateTime? _pluginCatalogRefreshedAt;
+
+  /// Rules hidden behind a same-named rule from an earlier repository.
+  ///
+  /// Keyed by the winning name's [pluginNameKey]; the values are the shadowed
+  /// items in repository order, so the UI can show "+2" and offer a picker
+  /// without re-reading settings.
+  Map<String, List<PluginHTTPItem>> _shadowedRules = const {};
+  List<RuleRepositoryFailure> _repositoryFailures = const [];
+
+  /// Bumped whenever the repository configuration changes.
+  ///
+  /// An in-flight refresh that started before the bump must discard its result
+  /// instead of publishing it, otherwise a slow old request can overwrite the
+  /// new configuration's catalog and stamp `_pluginCatalogRefreshedAt`, which
+  /// would then serve stale data for [_pluginCatalogMaxAge].
+  int _pluginCatalogGeneration = 0;
+
   int _optimisticReorderRevision = 0;
 
   // Reuse a recent catalog across startup, the rule list, and the rule shop.
@@ -247,18 +314,24 @@ abstract class _PluginsController with Store {
     }
   }
 
+  /// Drops the cached catalog so the next read re-aggregates every enabled
+  /// repository.
+  ///
+  /// Called whenever the repository list changes. The generation bump makes any
+  /// refresh that is already in flight discard its result.
+  void invalidatePluginCatalog() {
+    _pluginCatalogGeneration++;
+    _pluginCatalogRefreshedAt = null;
+    _pluginCatalogByName = const {};
+    _shadowedRules = const {};
+    _repositoryFailures = const [];
+    pluginHTTPList.clear();
+  }
+
   Future<List<PluginHTTPItem>> refreshPluginCatalog() {
     return _catalogRefreshSingleFlight.run(() async {
       try {
-        final catalog = await _catalogLoader();
-        _pluginCatalogByName = {
-          for (final item in catalog) pluginNameKey(item.name): item,
-        };
-        pluginHTTPList
-          ..clear()
-          ..addAll(catalog);
-        _pluginCatalogRefreshedAt = DateTime.now();
-        return List<PluginHTTPItem>.unmodifiable(catalog);
+        return List<PluginHTTPItem>.unmodifiable(await _loadCatalog());
       } catch (error, stackTrace) {
         _errorReporter(
           'Plugin: failed to refresh rule catalog',
@@ -269,6 +342,144 @@ abstract class _PluginsController with Store {
       }
     });
   }
+
+  /// Loads and merges the catalog, retrying if the configuration changed
+  /// underneath an in-flight fetch.
+  ///
+  /// A refresh that started before [invalidatePluginCatalog] must not publish
+  /// its result: doing so would both show rules from a repository the user just
+  /// disabled *and* stamp `_pluginCatalogRefreshedAt`, which would keep serving
+  /// that stale catalog for [_pluginCatalogMaxAge]. Retrying against the new
+  /// configuration is cheaper than failing the call, because the caller only
+  /// ever wanted "the current catalog".
+  Future<List<PluginHTTPItem>> _loadCatalog() async {
+    const maxAttempts = 3;
+    for (var attempt = 1;; attempt++) {
+      final generation = _pluginCatalogGeneration;
+      final catalog = await _loadCatalogOnce();
+      if (generation == _pluginCatalogGeneration) {
+        return catalog;
+      }
+      if (attempt >= maxAttempts) {
+        throw StateError(
+          'Rule repository configuration kept changing during catalog refresh',
+        );
+      }
+    }
+  }
+
+  /// One aggregation pass over the current configuration.
+  ///
+  /// Publishes its result; the caller is responsible for generation checking.
+  Future<List<PluginHTTPItem>> _loadCatalogOnce() async {
+    final wholeCatalogLoader = _catalogLoader;
+    if (wholeCatalogLoader != null) {
+      final catalog = await wholeCatalogLoader();
+      _publishCatalog(catalog, shadowed: const {}, failures: const []);
+      return catalog;
+    }
+
+    final repositories = RulesRepositoryConfig.enabledRepositories();
+    if (repositories.isEmpty) {
+      // Every repository was switched off. That is a legal configuration, not
+      // an error: there is simply nothing to show.
+      _publishCatalog(const [], shadowed: const {}, failures: const []);
+      return const [];
+    }
+
+    final loads = await Future.wait([
+      for (final repository in repositories) _loadOneRepository(repository),
+    ]);
+
+    final merged = <String, PluginHTTPItem>{};
+    final order = <String>[];
+    final shadowed = <String, List<PluginHTTPItem>>{};
+    final failures = <RuleRepositoryFailure>[];
+    for (final load in loads) {
+      if (load.error != null) {
+        failures.add(
+          RuleRepositoryFailure(
+            repositoryUrl: load.repository.url,
+            repositoryLabel: load.repository.displayLabel,
+            error: load.error!,
+          ),
+        );
+        continue;
+      }
+      for (final item in load.items) {
+        final key = pluginNameKey(item.name);
+        final winner = merged[key];
+        if (winner == null) {
+          merged[key] = item;
+          order.add(key);
+        } else {
+          // Repository order is the user's priority order: the first
+          // repository to advertise a name keeps it.
+          (shadowed[key] ??= <PluginHTTPItem>[]).add(item);
+        }
+      }
+    }
+
+    if (failures.length == repositories.length) {
+      _repositoryFailures = List.unmodifiable(failures);
+      throw StateError(
+        'None of the ${repositories.length} enabled rule repositories could be '
+        'reached: ${failures.map((f) => f.repositoryLabel).join(', ')}',
+      );
+    }
+
+    final catalog = <PluginHTTPItem>[for (final key in order) merged[key]!];
+    _publishCatalog(catalog, shadowed: shadowed, failures: failures);
+    return catalog;
+  }
+
+  /// Reads one repository, never throwing.
+  ///
+  /// Callers aggregate with [Future.wait]; a repository that is down or
+  /// misconfigured must degrade into a missing section, not a failed refresh.
+  Future<_RepositoryLoad> _loadOneRepository(RuleRepository repository) async {
+    try {
+      final items = await _repositoryCatalogLoader(repository.url);
+      return (repository: repository, items: items, error: null);
+    } catch (error, stackTrace) {
+      _errorReporter(
+        'Plugin: failed to load rules from ${repository.url}',
+        error,
+        stackTrace,
+      );
+      return (
+        repository: repository,
+        items: const <PluginHTTPItem>[],
+        error: error,
+      );
+    }
+  }
+
+  void _publishCatalog(
+    List<PluginHTTPItem> catalog, {
+    required Map<String, List<PluginHTTPItem>> shadowed,
+    required List<RuleRepositoryFailure> failures,
+  }) {
+    _pluginCatalogByName = {
+      for (final item in catalog) pluginNameKey(item.name): item,
+    };
+    _shadowedRules = {
+      for (final entry in shadowed.entries) entry.key: List.unmodifiable(entry.value),
+    };
+    _repositoryFailures = List.unmodifiable(failures);
+    pluginHTTPList
+      ..clear()
+      ..addAll(catalog);
+    _pluginCatalogRefreshedAt = DateTime.now();
+  }
+
+  /// Rules that lost the same-name conflict, keyed by the winning name.
+  List<PluginHTTPItem> shadowedRulesFor(String name) {
+    return _shadowedRules[pluginNameKey(name)] ?? const <PluginHTTPItem>[];
+  }
+
+  /// Repositories that failed during the last successful refresh.
+  List<RuleRepositoryFailure> get repositoryFailures => _repositoryFailures;
 
   Future<List<PluginHTTPItem>> ensurePluginCatalog() {
     if (isPluginCatalogFresh) {
@@ -284,7 +495,7 @@ abstract class _PluginsController with Store {
       return 0;
     }
     await refreshPluginCatalog();
-    return _updatablePluginNames().length;
+    return _updatablePlugins().length;
   }
 
   bool _remoteIsNewer(String localVersion, String remoteVersion) {
@@ -323,19 +534,29 @@ abstract class _PluginsController with Store {
         : PluginUpdateAvailability.latest;
   }
 
-  List<String> _updatablePluginNames() {
-    return [
-      for (final plugin in pluginList)
-        if (pluginUpdateStatus(plugin) == PluginUpdateAvailability.updatable)
-          _pluginCatalogByName[pluginNameKey(plugin.name)]!.name,
-    ];
+  /// Catalog entries that have a newer version than the installed rule.
+  ///
+  /// Returns the catalog items rather than bare names so batch updates know
+  /// which repository to download each one from.
+  List<PluginHTTPItem> _updatablePlugins() {
+    final items = <PluginHTTPItem>[];
+    for (final plugin in pluginList) {
+      if (pluginUpdateStatus(plugin) != PluginUpdateAvailability.updatable) {
+        continue;
+      }
+      final remote = _pluginCatalogByName[pluginNameKey(plugin.name)];
+      if (remote != null) {
+        items.add(remote);
+      }
+    }
+    return items;
   }
 
   Future<PluginUpdateResult> tryUpdatePluginByName(String name) {
     return _mutations.run(() async {
-      final catalogName =
-          _pluginCatalogByName[pluginNameKey(name)]?.name ?? name;
-      final attempt = await _preparePluginUpdate(catalogName);
+      final catalogItem = _pluginCatalogByName[pluginNameKey(name)];
+      final catalogName = catalogItem?.name ?? name;
+      final attempt = await _preparePluginUpdate(catalogItem, catalogName);
       if (attempt.result == PluginUpdateResult.updated) {
         await _mutateAndPersistNow(
           () => _replacePlugin(attempt.plugin!),
@@ -347,10 +568,29 @@ abstract class _PluginsController with Store {
     });
   }
 
-  Future<_PluginUpdateAttempt> _preparePluginUpdate(String name) async {
+  /// Downloads [name] from the repository that advertised it.
+  ///
+  /// [catalogItem] carries that repository. When it is null the rule is not in
+  /// any currently enabled catalog, and the official repository is used as a
+  /// last resort so an installed rule can still be refreshed directly.
+  Future<_PluginUpdateAttempt> _preparePluginUpdate(
+    PluginHTTPItem? catalogItem,
+    String name,
+  ) async {
     late final Plugin remotePlugin;
     try {
-      remotePlugin = await _pluginLoader(name);
+      final wholeLoader = _pluginLoader;
+      final repositoryUrl = catalogItem?.repositoryUrl ?? '';
+      if (wholeLoader != null) {
+        remotePlugin = await wholeLoader(name);
+      } else if (repositoryUrl.isNotEmpty) {
+        remotePlugin = await _repositoryLoader(repositoryUrl, name);
+      } else {
+        remotePlugin = await _repositoryLoader(
+          RuleRepositoryList.officialUrl,
+          name,
+        );
+      }
     } catch (error, stackTrace) {
       _errorReporter(
         'Plugin: failed to download rule $name',
@@ -420,7 +660,7 @@ abstract class _PluginsController with Store {
       throw StateError('Plugin catalog has not been loaded');
     }
 
-    final candidates = _updatablePluginNames();
+    final candidates = _updatablePlugins();
     final attempts = await _preparePluginUpdates(candidates);
     var updated = 0;
     var requiresNewerClient = 0;
@@ -462,23 +702,24 @@ abstract class _PluginsController with Store {
   }
 
   Future<List<_PluginUpdateAttempt>> _preparePluginUpdates(
-    List<String> names,
+    List<PluginHTTPItem> candidates,
   ) async {
-    if (names.isEmpty) {
+    if (candidates.isEmpty) {
       return const [];
     }
-    final results = List<_PluginUpdateAttempt?>.filled(names.length, null);
+    final results = List<_PluginUpdateAttempt?>.filled(candidates.length, null);
     var nextIndex = 0;
 
     Future<void> worker() async {
-      while (nextIndex < names.length) {
+      while (nextIndex < candidates.length) {
         final index = nextIndex++;
-        results[index] = await _preparePluginUpdate(names[index]);
+        final item = candidates[index];
+        results[index] = await _preparePluginUpdate(item, item.name);
       }
     }
 
-    final workerCount = names.length < _maxConcurrentRuleDownloads
-        ? names.length
+    final workerCount = candidates.length < _maxConcurrentRuleDownloads
+        ? candidates.length
         : _maxConcurrentRuleDownloads;
     await Future.wait(List.generate(workerCount, (_) => worker()));
     return results.cast<_PluginUpdateAttempt>();
