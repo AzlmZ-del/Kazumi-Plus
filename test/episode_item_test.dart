@@ -108,6 +108,46 @@ void main() {
     });
   });
 
+  group('EpisodeInfo air schedule', () {
+    final now = DateTime(2026, 10, 19, 15, 30);
+
+    EpisodeInfo withDate(String date) => EpisodeInfo(
+          id: 1,
+          episode: 1,
+          type: 0,
+          name: 'x',
+          nameCn: '',
+          airDate: date,
+        );
+
+    test('treats a later date as upcoming', () {
+      final episode = withDate('2026-10-22');
+      expect(episode.isUpcoming(now), isTrue);
+      expect(episode.daysUntilAir(now), 3);
+    });
+
+    test('treats today as already aired regardless of the clock time', () {
+      final episode = withDate('2026-10-19');
+      expect(episode.isUpcoming(now), isFalse);
+      expect(episode.daysUntilAir(now), isNull);
+    });
+
+    test('treats a past date as already aired', () {
+      final episode = withDate('2026-10-01');
+      expect(episode.isUpcoming(now), isFalse);
+      expect(episode.daysUntilAir(now), isNull);
+    });
+
+    test('treats a missing or malformed date as already aired', () {
+      for (final raw in ['', '  ', 'TBD', '2026-13-40']) {
+        final episode = withDate(raw);
+        expect(episode.parsedAirDate(), isNull, reason: raw);
+        expect(episode.isUpcoming(now), isFalse, reason: raw);
+        expect(episode.daysUntilAir(now), isNull, reason: raw);
+      }
+    });
+  });
+
   group('EpisodeInfo.readTypeLabel', () {
     test('groups known types', () {
       String labelFor(int type) => EpisodeInfo(
