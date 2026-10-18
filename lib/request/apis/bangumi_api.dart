@@ -350,11 +350,15 @@ class BangumiApi {
             )
           : await _client.post(url, data: params);
       final jsonList = jsonData['data'];
+      // Untranslated entries used to be dropped unconditionally. Keep that as
+      // the default, but honour the setting so users can see them.
+      final hideUntranslated =
+          GStorage.getSetting(SettingsKeys.bangumiHideUntranslated);
       for (dynamic jsonItem in jsonList) {
         if (jsonItem is Map<String, dynamic>) {
           try {
             BangumiItem bangumiItem = BangumiItem.fromJson(jsonItem);
-            if (bangumiItem.nameCn != '') {
+            if (!hideUntranslated || bangumiItem.nameCn != '') {
               bangumiList.add(bangumiItem);
             }
           } catch (e) {
