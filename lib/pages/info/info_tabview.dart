@@ -36,6 +36,7 @@ class InfoTabView extends StatefulWidget {
     required this.episodesQueryTimeout,
     required this.episodesRequireLogin,
     required this.loadEpisodes,
+    required this.loadEpisodeComments,
     required this.tabController,
     required this.loadMoreComments,
     required this.loadCharacters,
@@ -68,6 +69,8 @@ class InfoTabView extends StatefulWidget {
   final bool episodesQueryTimeout;
   final bool episodesRequireLogin;
   final Future<void> Function() loadEpisodes;
+  final Future<List<EpisodeCommentItem>> Function(EpisodeInfo episode)
+      loadEpisodeComments;
   final TabController tabController;
   final Future<void> Function({bool loadMore}) loadMoreComments;
   final Future<void> Function() loadCharacters;
@@ -517,6 +520,7 @@ class _InfoTabViewState extends State<InfoTabView> {
           hasError: widget.episodesQueryTimeout,
           requiresLogin: widget.episodesRequireLogin,
           onRetry: widget.loadEpisodes,
+          loadComments: widget.loadEpisodeComments,
         ),
         InfoCommentsView(
           interest: widget.bangumiItem.interest,
