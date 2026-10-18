@@ -445,12 +445,65 @@ class ApiRuleStrategy {
     );
   }
 
+  /// Builds the request that turns an episode URL into a media URL.
+  ///
+  /// An empty template means the episode URL already is the endpoint, which is
+  /// the common case: the chapter rule's `episodePage` template produced it.
+  PreparedRuleRequest preparePlayRequest(
+    ApiPlayConfig config,
+    String episodeUrl,
+  ) {
+    final method = config.request.method.toUpperCase();
+    if (method != 'GET' && method != 'POST') {
+      throw ApiRuleFormatException('播放接口仅支持 GET/POST，当前为 $method');
+    }
+    final template = config.request.url.trim();
+    final variables = <String, Object?>{'episodeUrl': episodeUrl};
+    final url = template.isEmpty
+        ? episodeUrl
+        : _renderTemplate(template, variables, encode: true);
+    final uri = Uri.tryParse(url);
+    if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+      throw ApiRuleFormatException('播放接口地址无效: $url');
+    }
+    final hasBody = method == 'POST' &&
+        config.request.bodyType != ApiBodyType.none;
+    return PreparedRuleRequest(
+      method: method,
+      url: url,
+      headers: _renderMap(config.request.headers, variables),
+      query: _renderMap(config.request.query, variables),
+      bodyType: config.request.bodyType,
+      body: hasBody ? _renderValue(config.request.body, variables) : null,
+      includeCookies: true,
+    );
+  }
+
+  /// Reads the media URL out of a play API response.
+  String parsePlayUrl(String raw, ApiPlayConfig config) {
+    final document = decodeResponse(raw);
+    final value = RestrictedJsonPath.readFirst(document, config.urlPath);
+    final url = _stringValue(value);
+    if (url.isEmpty) {
+      throw ApiRuleFormatException('播放接口响应中没有播放地址: ${config.urlPath}');
+    }
+    return url;
+  }
+
   /// Validates the JSONPath expressions and format-specific invariants of a
   /// chapter rule. Also used by the plugin editor to reject invalid rules
   /// before saving.
   void validateChapterConfig(ApiChapterConfig config) {
     for (final path in config.variables.values) {
       RestrictedJsonPath.validate(path);
+    }
+    final play = config.play;
+    if (play != null) {
+      RestrictedJsonPath.validate(play.urlPath);
+      final method = play.request.method.toUpperCase();
+      if (method != 'GET' && method != 'POST') {
+        throw ApiRuleFormatException('播放接口仅支持 GET/POST，当前为 $method');
+      }
     }
     if (config.format == ApiChapterFormat.delimited) {
       RestrictedJsonPath.validate(config.roadNamesPath);

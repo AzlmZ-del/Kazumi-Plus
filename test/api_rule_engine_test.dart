@@ -56,8 +56,7 @@ void main() {
     expect(request.body, {'source': 'a/b', 'label': 'video-a/b'});
   });
 
-  test('ignores inactive request bodies for GET requests', () {
-    final request = engine.prepareRequest(
+  test('ignores inactive request bodies for GET requests', () {    final request = engine.prepareRequest(
       ApiRequestConfig(
         method: 'GET',
         url: 'https://example.com/search',
@@ -292,5 +291,67 @@ void main() {
       ),
       throwsA(isA<ApiRuleFormatException>()),
     );
+  });
+
+  group('play api', () {
+    test('uses the episode url as the endpoint when the template is empty',
+        () {
+      final request = engine.preparePlayRequest(
+        ApiPlayConfig(),
+        'https://cycani.org/api/v2/sections/42/play-url',
+      );
+
+      expect(request.method, 'GET');
+      expect(request.url, 'https://cycani.org/api/v2/sections/42/play-url');
+      expect(request.includeCookies, isTrue);
+    });
+
+    test('renders the episode url into a template and encodes it', () {
+      final request = engine.preparePlayRequest(
+        ApiPlayConfig(
+          request: ApiRequestConfig(
+            url: 'https://example.com/play?target=@episodeUrl',
+            headers: {'X-Episode': '@episodeUrl'},
+          ),
+        ),
+        'https://example.com/a/b',
+      );
+
+      expect(
+        request.url,
+        'https://example.com/play?target=https%3A%2F%2Fexample.com%2Fa%2Fb',
+      );
+      expect(request.headers['X-Episode'], 'https://example.com/a/b');
+    });
+
+    test('rejects unsupported methods and malformed urls', () {
+      expect(
+        () => engine.preparePlayRequest(
+          ApiPlayConfig(request: ApiRequestConfig(method: 'PUT', url: 'x')),
+          'https://example.com/a',
+        ),
+        throwsA(isA<ApiRuleFormatException>()),
+      );
+      expect(
+        () => engine.preparePlayRequest(
+          ApiPlayConfig(request: ApiRequestConfig(url: 'not a url')),
+          'https://example.com/a',
+        ),
+        throwsA(isA<ApiRuleFormatException>()),
+      );
+    });
+
+    test('reads the media url out of the response', () {
+      final config = ApiPlayConfig(urlPath: r'$.data.url');
+
+      expect(
+        engine.parsePlayUrl('{"data":{"url":"https://cdn.test/v.mp4"}}', config),
+        'https://cdn.test/v.mp4',
+      );
+      expect(
+        () => engine.parsePlayUrl('{"data":{}}', config),
+        throwsA(isA<ApiRuleFormatException>()),
+      );
+    });
   });
 }

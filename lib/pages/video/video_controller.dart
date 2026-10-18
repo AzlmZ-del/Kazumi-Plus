@@ -11,6 +11,7 @@ import 'package:kazumi/modules/history/history_module.dart';
 import 'package:kazumi/repositories/download_repository.dart';
 import 'package:kazumi/services/download/download_manager.dart';
 import 'package:kazumi/services/video_source/services.dart';
+import 'package:kazumi/services/video_source/video_source_format.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:mobx/mobx.dart';
 import 'package:kazumi/services/logging/logger.dart';
@@ -464,6 +465,17 @@ abstract class _VideoPageController with Store implements Disposable {
       resolvedEpisode.pageUrl,
     );
 
+    if (currentPlugin.hasPlayApi) {
+      await _resolveWithPlayApi(
+        urlItem,
+        offset,
+        resolvedEpisode: resolvedEpisode,
+        session: session,
+        playerController: playerController,
+      );
+      return;
+    }
+
     await _resolveWithVideoSourceService(
       urlItem,
       offset,
@@ -471,6 +483,72 @@ abstract class _VideoPageController with Store implements Disposable {
       session: session,
       playerController: playerController,
     );
+  }
+
+  /// Resolves the media URL through the rule's play API instead of a webview.
+  ///
+  /// Used by rules whose media URL is handed out by an authenticated endpoint;
+  /// such a page never becomes playable inside a webview.
+  Future<void> _resolveWithPlayApi(
+    String url,
+    int offset, {
+    required EpisodeRef resolvedEpisode,
+    required AsyncSession session,
+    required PlayerController playerController,
+  }) async {
+    final String videoUrl;
+    try {
+      videoUrl = await currentPlugin.resolvePlayUrl(url);
+    } catch (e) {
+      if (session.isStale) return;
+      KazumiLogger()
+          .e('VideoPageController: play api resolution failed', error: e);
+      _failLoading('播放地址解析失败：${e.toString()}');
+      return;
+    }
+    if (session.isStale) return;
+
+    _finishLoading();
+    KazumiLogger().i('VideoPageController: play api resolved $videoUrl');
+
+    final params = PlaybackInitParams(
+      videoUrl: videoUrl,
+      offset: offset,
+      isLocalPlayback: false,
+      videoSourceFormat: VideoSourceFormat.auto,
+      bangumiId: bangumiItem.id,
+      pluginName: currentPlugin.name,
+      episode: resolvedEpisode.listIndex,
+      danmakuEpisodeNumber: resolvedEpisode.danmakuEpisodeNumber,
+      pageUrl: resolvedEpisode.pageUrl,
+      sortNumber: resolvedEpisode.sortNumber,
+      httpHeaders: {
+        'user-agent': currentPlugin.userAgent.isEmpty
+            ? getRandomUA()
+            : currentPlugin.userAgent,
+        if (currentPlugin.referer.isNotEmpty)
+          'referer': currentPlugin.referer,
+      },
+      adBlockerEnabled: GStorage.getSetting(SettingsKeys.forceAdBlocker),
+      episodeTitle: resolvedEpisode.displayTitle,
+      referer: currentPlugin.referer,
+      currentRoad: resolvedEpisode.roadIndex,
+      coverUrl: bangumiItem.images['large'],
+      bangumiName: bangumiItem.nameCn.isNotEmpty
+          ? bangumiItem.nameCn
+          : bangumiItem.name,
+    );
+
+    final initialized = await playerController.init(params);
+    if (session.isActive && initialized) {
+      playingEpisode = VideoEpisodeSelection(
+        episode: resolvedEpisode.listIndex,
+        road: resolvedEpisode.roadIndex,
+      );
+      unawaited(_loadPlaybackDanmaku(playerController, params, session));
+    } else if (session.isActive) {
+      _playbackSessions.cancel();
+    }
   }
 
   Future<void> _changeOfflineEpisode(

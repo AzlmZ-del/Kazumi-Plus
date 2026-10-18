@@ -213,7 +213,26 @@ class Plugin {
         chapterApiConfig: chapterApiConfig,
         antiCrawlerConfig: antiCrawlerConfig,
         auth: auth,
+        play: chapterApiConfig.play,
       );
+
+  /// Whether playback can skip the webview by calling the rule's play API.
+  bool get hasPlayApi => chapterApiConfig.play != null;
+
+  /// Resolves the media URL for [episodeUrl] through the rule's play API.
+  ///
+  /// Throws [ChapterErrorException] when the request fails or the rule
+  /// declares no play endpoint.
+  Future<String> resolvePlayUrl(
+    String episodeUrl, {
+    RuleCancelToken? cancelToken,
+  }) {
+    return _ruleEngine.resolvePlayUrl(
+      _executionConfig,
+      episodeUrl,
+      cancelToken: cancelToken,
+    );
+  }
 
   Future<RuleSearchTrace> traceSearch(
     String keyword, {

@@ -184,10 +184,47 @@ class RuleEngine {
     }
   }
 
+  /// Resolves the media URL for [episodeUrl] through the rule's play API.
+  ///
+  /// Throws [ChapterErrorException] when the rule declares no play endpoint;
+  /// callers use that to fall back to the webview.
+  Future<String> resolvePlayUrl(
+    RuleExecutionConfig config,
+    String episodeUrl, {
+    CancelToken? cancelToken,
+  }) async {
+    final play = config.play;
+    if (play == null) {
+      throw ChapterErrorException(config.pluginName);
+    }
+    late final PreparedRuleRequest request;
+    try {
+      request = _apiStrategy.preparePlayRequest(play, episodeUrl);
+    } catch (error, stackTrace) {
+      _logFailure(config, 'play request preparation', error, stackTrace);
+      throw ChapterErrorException(config.pluginName, cause: error);
+    }
+
+    final raw = await _executeRequest(
+      request,
+      config,
+      phase: 'play request',
+      wrapError: (error) =>
+          ChapterErrorException(config.pluginName, cause: error),
+      cancelToken: cancelToken,
+    );
+    try {
+      return _apiStrategy.parsePlayUrl(raw, play);
+    } catch (error, stackTrace) {
+      if (_isCancellation(error)) rethrow;
+      _logFailure(config, 'play response parsing', error, stackTrace);
+      throw ChapterErrorException(config.pluginName, cause: error);
+    }
+  }
+
   Future<String> _executeRequest(
     PreparedRuleRequest request,
-    RuleExecutionConfig config, {
-    required String phase,
+    RuleExecutionConfig config, {    required String phase,
     required Object Function(Object error) wrapError,
     CancelToken? cancelToken,
   }) async {
