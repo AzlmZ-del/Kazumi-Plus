@@ -131,7 +131,8 @@ if [ -f pubspec.yaml ]; then
 
   say ""
   say "${DIM}$FLUTTER analyze...${NC}"
-  if "$FLUTTER" analyze; then
+  # 上游现有 17 条 info，不应让重放判失败；error / warning 仍然致命。
+  if "$FLUTTER" analyze --no-fatal-infos; then
     ok "analyze 通过"
   else
     warn "analyze 有问题 —— 重放后代码需要检查"
