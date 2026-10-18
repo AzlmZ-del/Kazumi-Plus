@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:kazumi/modules/roads/road_module.dart';
 import 'package:kazumi/modules/search/plugin_search_module.dart';
+import 'package:kazumi/plugins/api_auth_config.dart';
 import 'package:kazumi/plugins/anti_crawler_config.dart';
 import 'package:kazumi/plugins/api_rule_config.dart';
 
@@ -48,6 +49,30 @@ class ChapterErrorException implements Exception {
       '${cause != null ? ' ($cause)' : ''}';
 }
 
+/// The rule requires credentials that the user has not entered yet.
+class RuleAuthRequiredException implements Exception {
+  const RuleAuthRequiredException(this.pluginName);
+
+  final String pluginName;
+
+  @override
+  String toString() =>
+      'RuleAuthRequiredException: $pluginName requires an account';
+}
+
+/// Login ran but did not yield a token (bad credentials or changed API).
+class RuleAuthFailedException implements Exception {
+  const RuleAuthFailedException(this.pluginName, {this.cause});
+
+  final String pluginName;
+  final Object? cause;
+
+  @override
+  String toString() =>
+      'RuleAuthFailedException: $pluginName login failed'
+      '${cause != null ? ' ($cause)' : ''}';
+}
+
 /// Immutable runtime snapshot built from a plugin rule.
 ///
 /// Playback-only headers such as the rule's User-Agent and Referer are
@@ -68,6 +93,7 @@ class RuleExecutionConfig {
     required this.searchApiConfig,
     required this.chapterApiConfig,
     required this.antiCrawlerConfig,
+    this.auth,
   });
 
   final String pluginName;
@@ -84,6 +110,9 @@ class RuleExecutionConfig {
   final ApiSearchConfig searchApiConfig;
   final ApiChapterConfig chapterApiConfig;
   final AntiCrawlerConfig antiCrawlerConfig;
+
+  /// Login flow declared by the rule, or null when the rule needs no auth.
+  final ApiAuthConfig? auth;
 }
 
 class PreparedRuleRequest {
