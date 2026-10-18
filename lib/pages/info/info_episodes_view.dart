@@ -305,13 +305,6 @@ class _EpisodeRowState extends State<_EpisodeRow> {
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Padding(
-                              padding: const EdgeInsets.only(top: 6, right: 6),
-                              child: _EpisodeDot(
-                                upcoming: upcoming,
-                                color: upcoming ? faded : colors.primary,
-                              ),
-                            ),
                             Expanded(
                               child: Text(
                                 episode.displayTitle(),
@@ -361,30 +354,6 @@ class _EpisodeRowState extends State<_EpisodeRow> {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// 已播出为实心圆点，未播出为空心圆环。
-class _EpisodeDot extends StatelessWidget {
-  const _EpisodeDot({required this.upcoming, required this.color});
-
-  final bool upcoming;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    const double size = 8;
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: upcoming ? Colors.transparent : color,
-        border: upcoming
-            ? Border.all(color: color, width: 1.2)
-            : null,
       ),
     );
   }
