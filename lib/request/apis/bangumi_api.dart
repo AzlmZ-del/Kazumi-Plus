@@ -1,6 +1,7 @@
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/request/config/api_endpoints.dart';
 import 'package:kazumi/request/clients/bangumi_client.dart';
+import 'package:kazumi/request/core/bangumi_transport.dart';
 import 'package:kazumi/request/core/network_exception.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/modules/bangumi/bangumi_relation.dart';
@@ -497,7 +498,7 @@ class BangumiApi {
 
   static Future<CommentResponse> getBangumiCommentsByID(int id,
       {int offset = 0}) async {
-    final jsonData = await _client.get(
+    final jsonData = await _getCommentsWithFallback(
       ApiEndpoints.formatUrl(
           ApiEndpoints.bangumiAPINextDomain +
               ApiEndpoints.bangumiCommentsByIDNext,
@@ -508,7 +509,7 @@ class BangumiApi {
 
   static Future<EpisodeCommentResponse> getBangumiCommentsByEpisodeID(
       int id) async {
-    final jsonData = await _client.get(
+    final jsonData = await _getCommentsWithFallback(
       ApiEndpoints.formatUrl(
           ApiEndpoints.bangumiAPINextDomain +
               ApiEndpoints.bangumiEpisodeCommentsByIDNext,
@@ -519,13 +520,38 @@ class BangumiApi {
 
   static Future<CharacterCommentResponse> getCharacterCommentsByCharacterID(
       int id) async {
-    final jsonData = await _client.get(
+    final jsonData = await _getCommentsWithFallback(
       ApiEndpoints.formatUrl(
           ApiEndpoints.bangumiAPINextDomain +
               ApiEndpoints.bangumiCharacterCommentsByIDNext,
           [id]),
     );
     return CharacterCommentResponse.fromJson(jsonData);
+  }
+
+  /// Fetches a comment page, falling back to the official host when the
+  /// configured acceleration cannot serve it.
+  ///
+  /// The mirror forwards `/p1/.../comments` without credentials, so subjects
+  /// that require authentication (R18 among them) come back as an upstream
+  /// error. Retrying on the official host with the saved token recovers them;
+  /// anonymous works for everything else, so a rejected token still degrades.
+  static Future<dynamic> _getCommentsWithFallback(String url) async {
+    try {
+      return await _client.get(url);
+    } on NetworkException catch (e) {
+      if (e.statusCode == null) rethrow;
+      KazumiLogger().w(
+          'Network: comments failed (${e.statusCode}), retrying on the official host');
+    }
+    return _requestWithAuthFallback(
+      (anonymous) => _client.get(
+        url,
+        anonymous: anonymous,
+        requiresAuth: !anonymous,
+        extra: const {bangumiForceOfficialKey: true},
+      ),
+    );
   }
 
   static Future<StaffResponse> getBangumiStaffByID(int id) async {

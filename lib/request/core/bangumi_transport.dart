@@ -13,10 +13,20 @@ import 'package:kazumi/services/network/bangumi_mirror_signature.dart';
 
 const _echRequestKey = 'bangumiEch';
 
+/// Set on [RequestOptions.extra] to keep a request on the official host even
+/// when the mirror is selected. Callers use it to retry an endpoint the mirror
+/// cannot serve (it forwards anonymously, so subject-gated data like R18
+/// comments comes back as an upstream error).
+const bangumiForceOfficialKey = 'bangumiForceOfficial';
+
 class BangumiAccelerationInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     options.extra.remove(_echRequestKey);
+    if (options.extra.remove(bangumiForceOfficialKey) == true) {
+      handler.next(options);
+      return;
+    }
     final uri = options.uri;
     if (ApiEndpoints.bangumiPublicApiHosts.contains(uri.host)) {
       switch (BangumiAcceleration.current) {
