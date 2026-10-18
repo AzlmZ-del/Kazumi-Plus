@@ -56,8 +56,12 @@ class _RuleRepositoryPageState extends State<RuleRepositoryPage> {
       if (!mounted) return;
       _reportReload(successMessage);
     } on FormatException catch (error) {
+      if (mounted) setState(() => _repositories = RulesRepositoryConfig.repositories());
       KazumiDialog.showToast(message: error.message);
     } catch (_) {
+      // Re-read storage so an optimistic reorder cannot leave the list showing
+      // an order that was never persisted.
+      if (mounted) setState(() => _repositories = RulesRepositoryConfig.repositories());
       KazumiDialog.showToast(message: '保存规则仓库失败，请重试');
     } finally {
       if (mounted) setState(() => _busy = false);
