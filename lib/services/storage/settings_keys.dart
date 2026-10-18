@@ -496,9 +496,9 @@ class SettingsKeys {
   // Search results without a Chinese title used to be dropped silently. Keep
   // that as the default so existing behaviour does not change, but let users
   // opt in to the untranslated entries instead of losing them.
-  static const bangumiHideUntranslated = SettingKey<bool>(
-    'bangumiHideUntranslated',
-    true,
+  static const bangumiShowUntranslated = SettingKey<bool>(
+    'bangumiShowUntranslated',
+    false,
     group: SettingGroup.interface,
   );
   static const downloadParallelEpisodes = SettingKey<int>(
@@ -683,7 +683,7 @@ class SettingsKeys {
     showRating,
     defaultCollectLayout,
     bangumiShowR18,
-    bangumiHideUntranslated,
+    bangumiShowUntranslated,
     downloadParallelEpisodes,
     downloadParallelSegments,
     downloadDanmaku,

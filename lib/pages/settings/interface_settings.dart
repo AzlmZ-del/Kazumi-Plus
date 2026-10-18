@@ -17,7 +17,7 @@ class InterfaceSettingsPage extends StatefulWidget {
 class _InterfaceSettingsPageState extends State<InterfaceSettingsPage> {
   late bool showRating;
   late bool showR18;
-  late bool hideUntranslated;
+  late bool showUntranslated;
   late String defaultPage;
   late CollectLayout _defaultCollectLayout;
   bool _savingCollectLayout = false;
@@ -37,8 +37,8 @@ class _InterfaceSettingsPageState extends State<InterfaceSettingsPage> {
     super.initState();
     showRating = GStorage.getSetting(SettingsKeys.showRating);
     showR18 = GStorage.getSetting(SettingsKeys.bangumiShowR18);
-    hideUntranslated =
-        GStorage.getSetting(SettingsKeys.bangumiHideUntranslated);
+    showUntranslated =
+        GStorage.getSetting(SettingsKeys.bangumiShowUntranslated);
     defaultPage = GStorage.getSetting(SettingsKeys.defaultStartupPage);
     _defaultCollectLayout = CollectLayout.fromValue(
       GStorage.getSetting(SettingsKeys.defaultCollectLayout),
@@ -125,14 +125,14 @@ class _InterfaceSettingsPageState extends State<InterfaceSettingsPage> {
             SettingsTile.switchTile(
               leading: Icons.translate_rounded,
               onToggle: (value) async {
-                hideUntranslated = value ?? !hideUntranslated;
+                showUntranslated = value ?? !showUntranslated;
                 await GStorage.putSetting(
-                    SettingsKeys.bangumiHideUntranslated, hideUntranslated);
+                    SettingsKeys.bangumiShowUntranslated, showUntranslated);
                 setState(() {});
               },
-              title: const Text('隐藏无中文名的条目'),
-              description: const Text('开启后搜索结果只保留有中文译名的番剧'),
-              initialValue: hideUntranslated,
+              title: const Text('显示无中文名的条目'),
+              description: const Text('关闭后搜索结果只保留有中文译名的番剧'),
+              initialValue: showUntranslated,
             ),
           ]),
           if (isDesktop())
