@@ -56,7 +56,11 @@ class _NetworkMirrorSettingsState extends State<NetworkMirrorSettings> {
         SettingsTile.switchTile(
           leading: Icons.extension_rounded,
           title: const Text('规则仓库镜像'),
-          description: const Text('加速规则的下载与更新'),
+          description: const Text(
+            '仅加速官方规则仓库',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
           initialValue: gitProxy,
           onToggle: (value) =>
               _save(SettingsKeys.enableGitProxy, value ?? !gitProxy),
