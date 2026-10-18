@@ -104,15 +104,34 @@ ok "重放完成"
 # -- 重放后的验收 -----------------------------------------------------
 
 if [ -f pubspec.yaml ]; then
-  if ! command -v flutter >/dev/null 2>&1; then
+  # flutter 通常不在 PATH 里，按常见位置兜底找一次。
+  FLUTTER=""
+  if command -v flutter >/dev/null 2>&1; then
+    FLUTTER="flutter"
+  else
+    for candidate in \
+      "${FLUTTER_ROOT:-}/bin/flutter" \
+      /d/Tools/dev/flutter/bin/flutter \
+      /c/flutter/bin/flutter \
+      "$HOME/flutter/bin/flutter"
+    do
+      if [ -x "$candidate" ]; then
+        FLUTTER="$candidate"
+        break
+      fi
+    done
+  fi
+
+  if [ -z "$FLUTTER" ]; then
     warn "找不到 flutter，跳过 analyze 与测试"
+    say "可用 FLUTTER_ROOT 环境变量指定 SDK 位置"
     say "重放结果: $(git log --oneline -1)"
     exit 0
   fi
 
   say ""
-  say "${DIM}flutter analyze...${NC}"
-  if flutter analyze; then
+  say "${DIM}$FLUTTER analyze...${NC}"
+  if "$FLUTTER" analyze; then
     ok "analyze 通过"
   else
     warn "analyze 有问题 —— 重放后代码需要检查"
@@ -122,8 +141,8 @@ if [ -f pubspec.yaml ]; then
 
   if [ -d test ]; then
     say ""
-    say "${DIM}flutter test...${NC}"
-    if flutter test; then
+    say "${DIM}$FLUTTER test...${NC}"
+    if "$FLUTTER" test; then
       ok "测试通过"
     else
       warn "测试失败 —— 重放后代码需要检查"
