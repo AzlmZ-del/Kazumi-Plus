@@ -236,13 +236,10 @@ class _AccountDialogState extends State<_AccountDialog> {
   final TextEditingController _password = TextEditingController();
   String? _error;
 
-  // Plain text by default so the user can confirm what they typed before
-  // saving; the eye toggle hides it for over-the-shoulder privacy.
+  // The field starts empty; while typing it shows plain text so the user can
+  // confirm what they entered, and the eye toggle re-hides it. An empty field
+  // with a stored password means "keep the stored one".
   bool _obscured = false;
-
-  /// Masked stand-in shown while the stored password is kept, so the field
-  /// never reads as empty.
-  static const String _storedPasswordHint = '●●●●●●●●';
 
   @override
   void dispose() {
@@ -309,9 +306,7 @@ class _AccountDialogState extends State<_AccountDialog> {
               decoration: ruleInputDecoration(
                 context,
                 label: '密码',
-                hint: widget.passwordOptional
-                    ? _storedPasswordHint
-                    : null,
+                hint: widget.passwordOptional ? '留空则不修改' : null,
               ).copyWith(
                 errorText: _error,
                 suffixIcon: Row(
