@@ -244,10 +244,11 @@ class _AccountDialogState extends State<_AccountDialog> {
       TextEditingController(text: widget.initialPassword);
   String? _error;
 
-  // The field starts empty; while typing it shows plain text so the user can
-  // confirm what they entered, and the eye toggle re-hides it. An empty field
-  // with a stored password means "keep the stored one".
-  bool _obscured = false;
+  // The stored password is pre-filled but hidden by default; typing shows
+  // plain text only after the user toggles the eye (or it can be toggled to
+  // confirm before saving). Empty field with a stored password means "keep
+  // the stored one".
+  bool _obscured = true;
 
   @override
   void dispose() {
