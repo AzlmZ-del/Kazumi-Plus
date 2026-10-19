@@ -100,6 +100,7 @@ class _AccountCard extends StatelessWidget {
         pluginName: plugin.name,
         initialUsername: store.usernameFor(plugin.name) ?? '',
         passwordOptional: hadPassword,
+        hasStoredPassword: hadPassword,
       ),
     );
     if (result == null) return;
@@ -211,6 +212,7 @@ class _AccountDialog extends StatefulWidget {
     required this.pluginName,
     required this.initialUsername,
     this.passwordOptional = false,
+    this.hasStoredPassword = false,
   });
 
   final String pluginName;
@@ -219,6 +221,10 @@ class _AccountDialog extends StatefulWidget {
   /// When true the password field may be left empty, meaning "keep the
   /// password that is already stored".
   final bool passwordOptional;
+
+  /// Whether a password is already stored; when true the masked placeholder
+  /// is shown so the field never reads as empty.
+  final bool hasStoredPassword;
 
   @override
   State<_AccountDialog> createState() => _AccountDialogState();
@@ -233,6 +239,10 @@ class _AccountDialogState extends State<_AccountDialog> {
   // Plain text by default so the user can confirm what they typed before
   // saving; the eye toggle hides it for over-the-shoulder privacy.
   bool _obscured = false;
+
+  /// Masked stand-in shown while the stored password is kept, so the field
+  /// never reads as empty.
+  static const String _storedPasswordHint = '●●●●●●●●';
 
   @override
   void dispose() {
@@ -299,7 +309,9 @@ class _AccountDialogState extends State<_AccountDialog> {
               decoration: ruleInputDecoration(
                 context,
                 label: '密码',
-                hint: widget.passwordOptional ? '留空则不修改' : null,
+                hint: widget.passwordOptional
+                    ? _storedPasswordHint
+                    : null,
               ).copyWith(
                 errorText: _error,
                 suffixIcon: Row(
