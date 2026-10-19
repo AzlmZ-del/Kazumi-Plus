@@ -249,17 +249,7 @@ class _EpisodeRow extends StatefulWidget {
 class _EpisodeRowState extends State<_EpisodeRow> {
   bool _expanded = false;
 
-  String get _metaLine {
-    final parts = <String>[];
-    final episode = widget.episode;
-    if (episode.airDate.isNotEmpty) {
-      parts.add(episode.airDate);
-    }
-    if (episode.duration.isNotEmpty) {
-      parts.add(episode.duration);
-    }
-    return parts.join(' · ');
-  }
+  String get _metaLine => widget.episode.metaLine();
 
   @override
   void didUpdateWidget(covariant _EpisodeRow oldWidget) {

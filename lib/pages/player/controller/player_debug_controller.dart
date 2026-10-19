@@ -35,6 +35,10 @@ abstract class _PlayerDebugController with Store {
   String playerAudioBitrate = '';
   @observable
   String playerVideoBitrate = '';
+  @observable
+  String playerFps = '';
+  @observable
+  String playerEstimatedFps = '';
 
   StreamSubscription<PlayerLog>? playerLogSubscription;
   StreamSubscription<int?>? playerWidthSubscription;
@@ -45,6 +49,11 @@ abstract class _PlayerDebugController with Store {
   StreamSubscription<Track>? playerTracksSubscription;
   StreamSubscription<double?>? playerAudioBitrateSubscription;
   StreamSubscription<double?>? playerVideoBitrateSubscription;
+
+  // 帧率：标称 fps 与实测 estimated-frame-rate 都靠 observeProperty 推送。
+  NativePlayer? _fpsPlayer;
+  bool _fpsListenerAttached = false;
+  final Set<String> _fpsObserved = <String>{};
 
   Future<void> setup(
     Player player, {
@@ -100,6 +109,42 @@ abstract class _PlayerDebugController with Store {
     playerVideoBitrateSubscription = player.stream.videoBitrate.listen((event) {
       playerVideoBitrate = event.toString();
     });
+
+    // 帧率：setup 发生在媒体加载之前，getProperty 此刻拿不到值，
+    // 因此全部改用 observeProperty 注册监听，mpv 在媒体加载后自动推送。
+    final native = player.platform;
+    if (native is NativePlayer && !_fpsListenerAttached) {
+      _fpsPlayer = native;
+      // 标称帧率：不同 mpv 版本属性名不同（container-fps / fps），两个都监听。
+      for (final property in const ['container-fps', 'fps']) {
+        try {
+          await native.observeProperty(property, (value) async {
+            if (!isCurrentPlayer(player)) return;
+            final v = value.trim();
+            if (v.isNotEmpty && double.tryParse(v) != null) playerFps = v;
+          });
+          _fpsObserved.add(property);
+        } catch (_) {
+          // 该属性不受支持，忽略。
+        }
+      }
+      // 实测帧率：mpv 的正式属性名是 estimated-vf-fps，旧名 estimated-frame-rate 一并监听兜底。
+      for (final property in const ['estimated-vf-fps', 'estimated-frame-rate']) {
+        try {
+          await native.observeProperty(property, (value) async {
+            if (!isCurrentPlayer(player)) return;
+            final v = value.trim();
+            if (v.isNotEmpty && double.tryParse(v) != null) {
+              playerEstimatedFps = v;
+            }
+          });
+          _fpsObserved.add(property);
+        } catch (_) {
+          // 该属性不受支持，忽略。
+        }
+      }
+      _fpsListenerAttached = true;
+    }
   }
 
   Future<void> cancel() async {
@@ -123,6 +168,11 @@ abstract class _PlayerDebugController with Store {
     playerTracksSubscription = null;
     playerAudioBitrateSubscription = null;
     playerVideoBitrateSubscription = null;
+    _fpsListenerAttached = false;
+    final fpsPlayer = _fpsPlayer;
+    _fpsPlayer = null;
+    final fpsObserved = _fpsObserved.toList();
+    _fpsObserved.clear();
 
     await logSubscription?.cancel();
     await widthSubscription?.cancel();
@@ -133,5 +183,10 @@ abstract class _PlayerDebugController with Store {
     await tracksSubscription?.cancel();
     await audioBitrateSubscription?.cancel();
     await videoBitrateSubscription?.cancel();
+    for (final property in fpsObserved) {
+      try {
+        await fpsPlayer?.unobserveProperty(property);
+      } catch (_) {}
+    }
   }
 }

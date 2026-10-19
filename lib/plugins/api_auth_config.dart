@@ -12,11 +12,19 @@ class ApiAuthConfig {
     this.headerName = defaultHeaderName,
     this.tokenPrefix = '',
     List<int>? refreshOnStatus,
+    this.enabled = true,
   })  : login = login ?? ApiRequestConfig(),
         refreshOnStatus = refreshOnStatus ?? const [401];
 
   static const String defaultTokenPath = r'$.data.token';
   static const String defaultHeaderName = 'Authorization';
+
+  /// Whether the login flow is used at runtime.
+  ///
+  /// Turning the login off in the editor keeps the configuration around
+  /// instead of deleting it: the request template stays in the rule JSON and
+  /// only this flag flips, so re-enabling restores everything as it was.
+  final bool enabled;
 
   /// Login request template. `@username` / `@password` are rendered from the
   /// locally stored credentials via the regular template mechanism.
@@ -37,6 +45,17 @@ class ApiAuthConfig {
   final List<int> refreshOnStatus;
 
   bool shouldRefreshOn(int statusCode) => refreshOnStatus.contains(statusCode);
+
+  /// Same flow, enabled flag flipped. Used by the editor when the user turns
+  /// the login off but wants the template kept.
+  ApiAuthConfig copyWith({bool? enabled}) => ApiAuthConfig(
+        login: login,
+        tokenPath: tokenPath,
+        headerName: headerName,
+        tokenPrefix: tokenPrefix,
+        refreshOnStatus: refreshOnStatus,
+        enabled: enabled ?? this.enabled,
+      );
 
   factory ApiAuthConfig.fromJson(Map<String, dynamic> json) {
     final login = json['login'];
@@ -63,6 +82,8 @@ class ApiAuthConfig {
       headerName: json['headerName'] as String? ?? defaultHeaderName,
       tokenPrefix: json['tokenPrefix'] as String? ?? '',
       refreshOnStatus: _statusCodes(json['refreshOnStatus']),
+      // 老规则没有这个字段，默认当启用。
+      enabled: json['enabled'] as bool? ?? true,
     );
   }
 
@@ -72,6 +93,7 @@ class ApiAuthConfig {
         if (headerName != defaultHeaderName) 'headerName': headerName,
         if (tokenPrefix.isNotEmpty) 'tokenPrefix': tokenPrefix,
         'refreshOnStatus': refreshOnStatus,
+        if (!enabled) 'enabled': false,
       };
 
   static List<int> _statusCodes(Object? value) {

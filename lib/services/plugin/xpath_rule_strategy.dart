@@ -18,6 +18,7 @@ enum XPathRuleField {
   searchName,
   searchResult,
   chapterRoads,
+  chapterRoadName,
   chapterResult,
   captchaDetectValue,
   captchaImage,
@@ -162,6 +163,27 @@ class XPathRuleStrategy {
       config.chapterRoads,
       () => root.queryXPath(config.chapterRoads).nodes,
     );
+    // Optional: road names live outside the road nodes on many sites (tab
+    // headers vs. tab panes), so they are queried separately and matched to
+    // the roads by index.
+    final roadNameExpression = config.chapterRoadName.trim();
+    // Starts as an empty list of the same element type, so the optional field
+    // can be skipped without a second type parameter.
+    var roadNameNodes = roadNodes.sublist(0, 0);
+    if (roadNameExpression.isNotEmpty) {
+      roadNameNodes = _runSelector(
+        XPathRuleField.chapterRoadName,
+        roadNameExpression,
+        () => root.queryXPath(roadNameExpression).nodes,
+      );
+    }
+    if (roadNameNodes.isNotEmpty &&
+        roadNameNodes.length != roadNodes.length) {
+      diagnostics.add(
+        '线路名称数量 ${roadNameNodes.length} 与线路数量 ${roadNodes.length} 不一致，'
+        '按顺序对齐',
+      );
+    }
     for (var roadIndex = 0; roadIndex < roadNodes.length; roadIndex++) {
       final roadNode = roadNodes[roadIndex];
       try {
@@ -197,9 +219,15 @@ class XPathRuleStrategy {
           diagnostics.add('线路 $roadIndex 没有有效剧集，已跳过');
           continue;
         }
+        final roadLabel = roadIndex < roadNameNodes.length
+            ? _roadNameText(
+                roadNameNodes[roadIndex].node,
+                roadNameNodes[roadIndex].text,
+              )
+            : '';
         roads.add(
           Road(
-            name: '播放线路${roads.length + 1}',
+            name: roadLabel.isEmpty ? '播放线路${roads.length + 1}' : roadLabel,
             data: urls,
             identifier: names,
           ),
@@ -214,6 +242,26 @@ class XPathRuleStrategy {
       roads: roads,
       diagnostics: diagnostics,
     );
+  }
+
+  /// 线路名只取节点的「直接文本子节点」，跳过子元素里的文字。
+  ///
+  /// 很多站点把集数放在线路名后面：`<a>天堂<span>3</span></a>`，
+  /// 直接取 `text` 会得到 `天堂3`。这里只拼 Text 子节点，
+  /// 得到 `天堂`；若没有直接文本（如 `<a><span>天堂</span></a>`），
+  /// 再回退到完整文本。
+  String _roadNameText(Node? element, String? fallbackText) {
+    if (element != null) {
+      final buffer = StringBuffer();
+      for (final child in element.nodes) {
+        if (child is Text) buffer.write(child.text);
+      }
+      final direct = buffer.toString().trim();
+      if (direct.isNotEmpty) {
+        return direct.replaceAll(RegExp(r'\s+'), ' ').trim();
+      }
+    }
+    return (fallbackText ?? '').replaceAll(RegExp(r'\s+'), ' ').trim();
   }
 
   bool detectsCaptchaChallenge(
@@ -320,6 +368,7 @@ class XPathRuleStrategy {
       XPathRuleField.searchName => '条目名称',
       XPathRuleField.searchResult => '条目链接',
       XPathRuleField.chapterRoads => '播放线路列表',
+      XPathRuleField.chapterRoadName => '线路名称列表',
       XPathRuleField.chapterResult => '剧集列表',
       XPathRuleField.captchaDetectValue => '验证页检测',
       XPathRuleField.captchaImage => '验证码图片',

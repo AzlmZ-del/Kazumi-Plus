@@ -13,6 +13,7 @@ import 'package:kazumi/plugins/plugins.dart';
 import 'package:kazumi/plugins/plugins_controller.dart';
 import 'package:kazumi/request/config/api_endpoints.dart';
 import 'package:kazumi/services/plugin/api_rule_engine.dart';
+import 'package:kazumi/services/plugin/plugin_credentials_store.dart';
 
 abstract final class _RuleEditorText {
   static const pageTitle = '规则编辑器';
@@ -66,7 +67,7 @@ abstract final class _RuleEditorText {
   static const sectionAuth = '登录';
   static const sectionAuthDesc = '定义如何用本机保存的账号换取令牌';
   static const authNotEnabledDesc =
-      '启用后，播放或检索时会先用账号登录，再把令牌附到请求头。账号在「规则账号」页填写，只保存在本机。';
+      '启用后，播放或检索时会先用账号登录，再把令牌附到请求头。账号填在本页最上方的「站点账号」里，只保存在本机。';
   static const authEnable = '启用登录';
   static const authEnableDesc = '声明该规则的登录流程';
   static const groupLoginRequest = '登录请求';
@@ -102,6 +103,9 @@ abstract final class _RuleEditorText {
   static const itemLinkXPath = '条目链接（XPath）';
   static const roadListXPath = '播放线路列表（XPath）';
   static const episodeListXPath = '剧集列表（XPath）';
+  static const roadNameXPath = '线路名称列表（XPath，可选）';
+  static const roadNameXPathHelper =
+      '按出现顺序对应上面的播放线路；留空则显示“播放线路1、2、3…”';
 
   static const searchMethod = '搜索请求方法';
   static const searchRequestUrl = '搜索请求地址（URL）';
@@ -193,6 +197,8 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
   final TextEditingController searchResultController = TextEditingController();
   final TextEditingController chapterRoadsController = TextEditingController();
   final TextEditingController chapterResultController = TextEditingController();
+  final TextEditingController chapterRoadNameController =
+      TextEditingController();
   final TextEditingController refererController = TextEditingController();
   final TextEditingController searchApiURLController = TextEditingController();
   final TextEditingController searchApiHeadersController =
@@ -260,6 +266,12 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
   bool authEnabled = false;
   bool _loginChecking = false;
   String? _loginResult;
+
+  /// 站点账号：每个规则各存一份，跟规则名绑定。
+  final PluginCredentialsStore _accountStore = PluginCredentialsStore.instance;
+  final TextEditingController accountController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+  bool _passwordObscured = true;
   String searchMode = RuleMode.xpath;
   String chapterMode = RuleMode.xpath;
   String searchApiMethod = 'GET';
@@ -331,6 +343,7 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
     searchResultController.text = plugin.searchResult;
     chapterRoadsController.text = plugin.chapterRoads;
     chapterResultController.text = plugin.chapterResult;
+    chapterRoadNameController.text = plugin.chapterRoadName;
     refererController.text = plugin.referer;
     searchMode = plugin.searchMode;
     chapterMode = plugin.chapterMode;
@@ -390,7 +403,7 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
     useLegacyParser = plugin.useLegacyParser;
     adBlocker = plugin.adBlocker;
     final auth = plugin.auth;
-    authEnabled = auth != null;
+    authEnabled = auth?.enabled ?? false;
     authLoginMethod = auth?.login.method ?? 'POST';
     authLoginBodyType = auth?.login.bodyType ?? ApiBodyType.json;
     authLoginURLController.text = auth?.login.url ?? '';
@@ -406,6 +419,8 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
     authTokenPrefixController.text = auth?.tokenPrefix ?? '';
     authRefreshOnStatusController.text =
         (auth?.refreshOnStatus ?? const [401]).join(',');
+    accountController.text = _accountStore.usernameFor(plugin.name) ?? '';
+    passwordController.text = _accountStore.passwordFor(plugin.name) ?? '';
     antiCrawlerEnabled = plugin.antiCrawlerConfig.enabled;
     captchaType = plugin.antiCrawlerConfig.captchaType;
     captchaImageController.text = plugin.antiCrawlerConfig.captchaImage;
@@ -430,6 +445,7 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
     searchResultController.dispose();
     chapterRoadsController.dispose();
     chapterResultController.dispose();
+    chapterRoadNameController.dispose();
     refererController.dispose();
     searchApiURLController.dispose();
     searchApiHeadersController.dispose();
@@ -464,6 +480,8 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
     authTokenHeaderController.dispose();
     authTokenPrefixController.dispose();
     authRefreshOnStatusController.dispose();
+    accountController.dispose();
+    passwordController.dispose();
     captchaImageController.dispose();
     captchaInputController.dispose();
     captchaButtonController.dispose();
@@ -488,6 +506,17 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
   /// can verify both the flow and the saved account before saving the rule.
   Future<void> _checkLogin() async {
     if (_loginChecking) return;
+    final ruleName = nameController.text.trim();
+    if (ruleName.isEmpty) {
+      setState(() => _loginResult = '请先在「基本」里填写规则名称');
+      return;
+    }
+    final username = accountController.text.trim();
+    final password = passwordController.text;
+    if (username.isEmpty || password.isEmpty) {
+      setState(() => _loginResult = '请先填写账号与密码');
+      return;
+    }
     Plugin? editedPlugin;
     try {
       editedPlugin = _buildEditedPlugin();
@@ -495,17 +524,25 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
       _showEditorError(error);
       return;
     }
-    if (editedPlugin.auth == null) return;
+    if (editedPlugin.auth == null || !editedPlugin.authEnabled) {
+      setState(() => _loginResult = '还没有登录流程，先把上面的「启用登录」打开');
+      return;
+    }
     setState(() {
       _loginChecking = true;
       _loginResult = null;
     });
     try {
+      // 登录接口是从 store 里按规则名取账号的，所以先落盘再登录。
+      await _accountStore.saveCredentials(ruleName,
+          username: username, password: password);
+      // 密码可能换过，旧令牌必须作废，否则「登录成功」只是拿到了旧令牌。
+      await _accountStore.clearToken(ruleName);
       await editedPlugin.login();
       if (mounted) setState(() => _loginResult = '登录成功，令牌已保存');
     } on RuleAuthRequiredException {
       if (mounted) {
-        setState(() => _loginResult = '还没有账号，请先到「规则账号」页填写');
+        setState(() => _loginResult = '请先填写账号与密码');
       }
     } on RuleAuthFailedException catch (error) {
       if (mounted) {
@@ -529,6 +566,16 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
       _editorError = null;
     });
     try {
+      // 账号跟规则分开存：即使这次是把「启用登录」关了再保存，
+      // 已经填好的账号也要留住，不能因为没点「点击登录」就丢掉。
+      final accountName = nameController.text.trim();
+      final accountUser = accountController.text.trim();
+      if (accountName.isNotEmpty &&
+          accountUser.isNotEmpty &&
+          passwordController.text.isNotEmpty) {
+        await _accountStore.saveCredentials(accountName,
+            username: accountUser, password: passwordController.text);
+      }
       await pluginsController.updatePlugin(editedPlugin);
       if (mounted) context.pop();
     } catch (error) {
@@ -709,8 +756,80 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
     );
   }
 
+  /// 站点账号：在「登录」里排在「登录请求」上方，账号密码和「点击登录」挨在一起。
+  ///
+  /// 账号按规则名存进 PluginCredentialsStore，一个站点一份，不跟别的规则串。
+  Widget _buildAccountFields() {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: accountController,
+            autocorrect: false,
+            enableSuggestions: false,
+            textInputAction: TextInputAction.next,
+            decoration: ruleInputDecoration(context, label: '账号'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: passwordController,
+            autocorrect: false,
+            enableSuggestions: false,
+            obscureText: _passwordObscured,
+            decoration: ruleInputDecoration(
+              context,
+              label: '密码',
+              suffix: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: _passwordObscured ? '显示密码' : '隐藏密码',
+                    icon: Icon(
+                      _passwordObscured
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      size: 20,
+                    ),
+                    onPressed: () =>
+                        setState(() => _passwordObscured = !_passwordObscured),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(children: [
+            FilledButton.tonalIcon(
+              style: FilledButton.styleFrom(minimumSize: const Size(132, 48)),
+              onPressed: _loginChecking ? null : _checkLogin,
+              icon: _loginChecking
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.login_rounded),
+              label: Text(_loginChecking ? '登录中' : '点击登录'),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                _loginResult ?? '保存账号后点这里，用该规则自己的登录接口实际试一次。',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: _loginResult == null
+                      ? colors.onSurfaceVariant
+                      : (_loginResult!.startsWith('登录成功')
+                          ? colors.primary
+                          : colors.error),
+                ),
+              ),
+            ),
+          ]),
+        ]);
+  }
+
   Widget _buildAuthSectionCard() {
-    final colors = Theme.of(context).colorScheme;
     return RuleSection(
       title: _RuleEditorText.sectionAuth,
       description: _RuleEditorText.sectionAuthDesc,
@@ -729,6 +848,7 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
               _loginResult = null;
             }),
           ),
+          // 账号跟登录开关一起折叠：停用时这块收起来，数据仍留在本地。
           EditorAnimatedSection(
             activeKey: authEnabled,
             child: authEnabled
@@ -738,39 +858,8 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
                       spacing: 20,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        _buildAccountFields(),
                         ..._buildAuthFields(),
-                        Row(children: [
-                          FilledButton.tonalIcon(
-                            style: FilledButton.styleFrom(
-                                minimumSize: const Size(132, 48)),
-                            onPressed:
-                                _loginChecking ? null : _checkLogin,
-                            icon: _loginChecking
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2))
-                                : const Icon(Icons.login_rounded),
-                            label: Text(_loginChecking ? '登录中' : '点击登录'),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              _loginResult ?? '用「规则账号」里保存的账号实际请求一次登录接口。',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color: _loginResult == null
-                                        ? colors.onSurfaceVariant
-                                        : (_loginResult!.startsWith('登录成功')
-                                            ? colors.primary
-                                            : colors.error),
-                                  ),
-                            ),
-                          ),
-                        ]),
                       ],
                     ),
                   )
@@ -845,7 +934,10 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
       ];
 
   ApiAuthConfig? _buildAuthConfig() {
-    if (!authEnabled) return null;
+    if (!authEnabled) {
+      // 关掉开关只是停用，模板原样留着，再打开还能接着用。
+      return widget.plugin.auth?.copyWith(enabled: false);
+    }
     final url = authLoginURLController.text.trim();
     if (url.isEmpty) {
       throw const FormatException('登录接口地址不能为空');
@@ -857,6 +949,7 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
         .where((code) => code >= 100 && code <= 599)
         .toList();
     return ApiAuthConfig(
+      enabled: true,
       login: ApiRequestConfig(
         method: authLoginMethod,
         url: url,
@@ -1079,6 +1172,11 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
           controller: chapterResultController,
           label: _RuleEditorText.episodeListXPath,
         ),
+        EditorTextField(
+          controller: chapterRoadNameController,
+          label: _RuleEditorText.roadNameXPath,
+          helper: _RuleEditorText.roadNameXPathHelper,
+        ),
       ];
 
   List<Widget> _buildApiSearchFields() => [
@@ -1286,6 +1384,7 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
       searchResult: searchResultController.text,
       chapterRoads: chapterRoadsController.text,
       chapterResult: chapterResultController.text,
+      chapterRoadName: chapterRoadNameController.text.trim(),
       referer: refererController.text,
       searchMode: searchMode,
       chapterMode: chapterMode,

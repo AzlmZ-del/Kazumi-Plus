@@ -47,6 +47,11 @@ class Plugin {
   String chapterRoads;
   String chapterResult;
   String referer;
+
+  /// Optional XPath list whose texts name each chapter road, index-aligned
+  /// with [chapterRoads]. Empty means the roads fall back to generated
+  /// "播放线路N" labels.
+  String chapterRoadName;
   String searchMode;
   String chapterMode;
   ApiSearchConfig searchApiConfig;
@@ -77,6 +82,7 @@ class Plugin {
     required this.chapterRoads,
     required this.chapterResult,
     required this.referer,
+    this.chapterRoadName = '',
     this.searchMode = RuleMode.xpath,
     this.chapterMode = RuleMode.xpath,
     ApiSearchConfig? searchApiConfig,
@@ -107,6 +113,7 @@ class Plugin {
       searchResult: json['searchResult'] as String? ?? '',
       chapterRoads: json['chapterRoads'] as String? ?? '',
       chapterResult: json['chapterResult'] as String? ?? '',
+      chapterRoadName: json['chapterRoadName'] as String? ?? '',
       referer: json['referer'] ?? '',
       searchMode: RuleMode.normalize(json['searchMode']),
       chapterMode: RuleMode.normalize(json['chapterMode']),
@@ -153,6 +160,7 @@ class Plugin {
       searchResult: '',
       chapterRoads: '',
       chapterResult: '',
+      chapterRoadName: '',
       referer: '',
       searchMode: RuleMode.xpath,
       chapterMode: RuleMode.xpath,
@@ -182,6 +190,7 @@ class Plugin {
       'searchResult': searchResult,
       'chapterRoads': chapterRoads,
       'chapterResult': chapterResult,
+      if (chapterRoadName.isNotEmpty) 'chapterRoadName': chapterRoadName,
       'referer': referer,
       'searchMode': searchMode,
       'chapterMode': chapterMode,
@@ -213,10 +222,12 @@ class Plugin {
         searchResult: searchResult,
         chapterRoads: chapterRoads,
         chapterResult: chapterResult,
+        chapterRoadName: chapterRoadName,
         searchApiConfig: searchApiConfig,
         chapterApiConfig: chapterApiConfig,
         antiCrawlerConfig: antiCrawlerConfig,
-        auth: auth,
+        // 停用的登录流程对运行时完全不可见，但配置本身留在规则里。
+        auth: authEnabled ? auth : null,
         play: chapterApiConfig.play,
       );
 
@@ -239,7 +250,11 @@ class Plugin {
   }
 
   /// Whether the rule declares a login flow at all.
-  bool get hasAuth => auth != null;
+  bool get hasAuth => authEnabled;
+
+  /// Whether the rule's login flow is actually used; a rule can keep its
+  /// login template around while the switch is off.
+  bool get authEnabled => auth?.enabled ?? false;
 
   /// Runs the rule's login flow now and caches the fresh token.
   ///

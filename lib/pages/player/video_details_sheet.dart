@@ -139,6 +139,13 @@ class _VideoDetailsSheetState extends State<_VideoDetailsSheet>
                 Expanded(
                     child: _metric(context, '音频码率', debug.playerAudioBitrate)),
               ]),
+              const SizedBox(height: 16),
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Expanded(child: _metric(context, '视频帧率', debug.playerFps)),
+                const SizedBox(width: 16),
+                Expanded(
+                    child: _metric(context, '实测帧率', debug.playerEstimatedFps)),
+              ]),
             ]),
           ),
           const SizedBox(height: 24),
@@ -146,6 +153,14 @@ class _VideoDetailsSheetState extends State<_VideoDetailsSheet>
             _statusField(context, '媒体地址', playerController.videoUrl,
                 compact: true),
             _statusField(context, '播放列表', debug.playerPlaylist, compact: true),
+            _statusField(
+              context,
+              playerController.danmaku.danmakuSourceName.isEmpty
+                  ? '弹幕来源'
+                  : '弹幕来源（${playerController.danmaku.danmakuSourceName}）',
+              playerController.danmaku.danmakuSourceUrl,
+              compact: true,
+            ),
           ]),
           const SizedBox(height: 24),
           ContentSection.group(title: '技术信息', children: [
@@ -175,14 +190,37 @@ class _VideoDetailsSheetState extends State<_VideoDetailsSheet>
     });
   }
 
+  /// media_kit 的 bitrate 是 bit/s，统一显示成 kbps（如 3705kbps）。
+  String _formatBitrate(String raw) {
+    final value = double.tryParse(raw);
+    if (raw.isEmpty || value == null || value <= 0) return raw;
+    return '${(value / 1000).toStringAsFixed(0)} Kbps';
+  }
+
+  /// mpv 的 fps / estimated-frame-rate 是浮点字符串，最多保留 3 位小数并去掉末尾 0
+  /// （如 23.976、30）。
+  String _formatFps(String raw) {
+    final value = double.tryParse(raw);
+    if (raw.isEmpty || value == null || value <= 0) return '';
+    return value
+        .toStringAsFixed(3)
+        .replaceAll(RegExp(r'0+$'), '')
+        .replaceAll(RegExp(r'\.$'), '');
+  }
+
   Widget _metric(BuildContext context, String label, String value) {
     final theme = Theme.of(context);
+    final display = switch (label) {
+      '视频码率' || '音频码率' => _formatBitrate(value),
+      '视频帧率' || '实测帧率' => _formatFps(value),
+      _ => value,
+    };
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(label,
           style: theme.textTheme.labelMedium
               ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
       const SizedBox(height: 4),
-      Text(value.isEmpty ? '—' : value, style: theme.textTheme.titleMedium),
+      Text(display.isEmpty ? '—' : display, style: theme.textTheme.titleMedium),
     ]);
   }
 

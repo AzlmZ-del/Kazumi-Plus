@@ -29,7 +29,7 @@ class _RuleAccountsPageState extends State<RuleAccountsPage> {
   final PluginCredentialsStore _store = PluginCredentialsStore.instance;
 
   List<Plugin> get _authRules =>
-      widget.controller.pluginList.where((rule) => rule.auth != null).toList();
+      widget.controller.pluginList.where((rule) => rule.authEnabled).toList();
 
   @override
   Widget build(BuildContext context) {

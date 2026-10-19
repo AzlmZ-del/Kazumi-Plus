@@ -41,6 +41,19 @@ class DanmakuApi {
     return DanmakuSearchResponse.fromJson(jsonData);
   }
 
+  /// 弹弹play 的集号拼法：bangumiId 后接集号补足 4 位（未公开约定）。
+  static String episodeIdOf(int bangumiID, int episode) =>
+      '$bangumiID${episode.toString().padLeft(4, '0')}';
+
+  /// 弹幕评论接口的完整地址，供播放信息页展示，与实际请求保持一致。
+  static String commentUrl(String episodeID) {
+    final conversion = DanmakuChConvert.fromValue(
+      GStorage.getSetting(SettingsKeys.danmakuChConvert),
+    );
+    return '${ApiEndpoints.dandanAPIDomain}${ApiEndpoints.dandanAPIComment}'
+        '$episodeID?withRelated=true&chConvert=${conversion.value}';
+  }
+
   static Future<List<DanmakuEntry>> getDanDanmaku(
     int bangumiID,
     int episode,
@@ -49,7 +62,7 @@ class DanmakuApi {
       return [];
     }
     // Automatic matching relies on an undocumented episode ID convention.
-    return _getComments('$bangumiID${episode.toString().padLeft(4, '0')}');
+    return _getComments(episodeIdOf(bangumiID, episode));
   }
 
   static Future<List<DanmakuEntry>> getDanDanmakuByEpisodeID(int episodeID) =>
