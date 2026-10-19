@@ -4,9 +4,11 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_modular/flutter_modular.dart';
 import 'package:kazumi/bean/dialog/dialog.dart';
 import 'package:kazumi/bean/widget/kazumi_menu.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
+import 'package:kazumi/pages/webview/internal_browser_page.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/utils/device.dart';
 import 'package:saver_gallery/saver_gallery.dart';
@@ -40,6 +42,16 @@ class _InfoActionsMenuState extends State<InfoActionsMenu> {
       KazumiLogger().w('InfoActionsMenu: failed to copy title', error: error);
       _notify('复制失败，请重试');
     }
+  }
+
+  Future<void> _openInternally() async {
+    await context.pushNamed(
+      '/info/browser',
+      arguments: InternalBrowserArgs(
+        url: 'https://bangumi.tv/subject/${widget.bangumiItem.id}',
+        title: _title,
+      ),
+    );
   }
 
   Future<void> _openExternally() async {
@@ -113,6 +125,10 @@ class _InfoActionsMenuState extends State<InfoActionsMenu> {
         KazumiMenuItem(
           onPressed: _title.trim().isEmpty ? null : _copyTitle,
           label: '复制标题',
+        ),
+        KazumiMenuItem(
+          onPressed: _openInternally,
+          label: '内部打开',
         ),
         KazumiMenuItem(
           onPressed: _openExternally,

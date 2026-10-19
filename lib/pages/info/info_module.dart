@@ -4,6 +4,7 @@ import 'package:kazumi/pages/info/episode_comments_page.dart';
 import 'package:kazumi/pages/info/info_controller.dart';
 import 'package:kazumi/pages/info/info_page.dart';
 import 'package:kazumi/pages/route_error_page.dart';
+import 'package:kazumi/pages/webview/internal_browser_page.dart';
 import 'package:kazumi/plugins/plugins_controller.dart';
 
 final infoModule = createModule(
@@ -37,6 +38,17 @@ final infoModule = createModule(
             subjectTitle: args.subjectTitle,
             episode: args.episode,
           );
+        },
+      )
+      // 内置浏览器：在应用内直接浏览网页。
+      ..route(
+        '/browser',
+        child: (context, state) {
+          final args = state.arguments;
+          if (args is! InternalBrowserArgs) {
+            return const RouteErrorPage(message: '浏览器参数无效，请返回后重试。');
+          }
+          return InternalBrowserPage(url: args.url, title: args.title);
         },
       );
   },
