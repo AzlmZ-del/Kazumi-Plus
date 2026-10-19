@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/bean/settings/settings_detail_scaffold.dart';
@@ -229,11 +230,35 @@ class _AccountDialogState extends State<_AccountDialog> {
   final TextEditingController _password = TextEditingController();
   String? _error;
 
+  // Plain text by default so the user can confirm what they typed before
+  // saving; the eye toggle hides it for over-the-shoulder privacy.
+  bool _obscured = false;
+
   @override
   void dispose() {
     _username.dispose();
     _password.dispose();
     super.dispose();
+  }
+
+  Future<void> _pastePassword() async {
+    try {
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      final text = data?.text?.trim() ?? '';
+      if (!mounted) return;
+      if (text.isEmpty) {
+        KazumiDialog.showToast(context: context, message: '剪贴板为空');
+        return;
+      }
+      setState(() {
+        _password.text = text;
+        _error = null;
+      });
+    } catch (_) {
+      if (mounted) {
+        KazumiDialog.showToast(context: context, message: '读取剪贴板失败');
+      }
+    }
   }
 
   void _submit() {
@@ -266,7 +291,7 @@ class _AccountDialogState extends State<_AccountDialog> {
             const SizedBox(height: 12),
             TextField(
               controller: _password,
-              obscureText: true,
+              obscureText: _obscured,
               onSubmitted: (_) => _submit(),
               onChanged: (_) {
                 if (_error != null) setState(() => _error = null);
@@ -275,7 +300,29 @@ class _AccountDialogState extends State<_AccountDialog> {
                 context,
                 label: '密码',
                 hint: widget.passwordOptional ? '留空则不修改' : null,
-              ).copyWith(errorText: _error),
+              ).copyWith(
+                errorText: _error,
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: '粘贴密码',
+                      icon: const Icon(Icons.content_paste_rounded, size: 20),
+                      onPressed: _pastePassword,
+                    ),
+                    IconButton(
+                      tooltip: _obscured ? '显示密码' : '隐藏密码',
+                      icon: Icon(
+                        _obscured
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        size: 20,
+                      ),
+                      onPressed: () => setState(() => _obscured = !_obscured),
+                    ),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(height: 8),
             Text(
