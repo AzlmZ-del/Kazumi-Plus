@@ -355,6 +355,14 @@ class _FakeExecutor implements RuleRequestExecutor {
     if (error != null) throw error!;
     return _responses.removeAt(0);
   }
+
+  @override
+  Future<String> login(
+    RuleExecutionConfig config, {
+    CancelToken? cancelToken,
+  }) async {
+    throw UnimplementedError('not exercised by these tests');
+  }
 }
 
 RuleExecutionConfig _config({

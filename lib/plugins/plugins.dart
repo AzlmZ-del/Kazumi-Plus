@@ -8,12 +8,16 @@ import 'package:kazumi/services/plugin/api_rule_engine.dart';
 import 'package:kazumi/utils/episode_url.dart';
 import 'package:kazumi/utils/http_headers.dart';
 
+export 'package:kazumi/plugins/api_auth_config.dart'
+    show ApiAuthConfig;
 export 'package:kazumi/services/plugin/rule_engine_models.dart'
     show
         CaptchaRequiredException,
         NoResultException,
         SearchErrorException,
-        ChapterErrorException;
+        ChapterErrorException,
+        RuleAuthRequiredException,
+        RuleAuthFailedException;
 
 String pluginNameKey(String name) => name.toLowerCase();
 
@@ -232,6 +236,18 @@ class Plugin {
       episodeUrl,
       cancelToken: cancelToken,
     );
+  }
+
+  /// Whether the rule declares a login flow at all.
+  bool get hasAuth => auth != null;
+
+  /// Runs the rule's login flow now and caches the fresh token.
+  ///
+  /// Throws [ApiRuleFormatException] when the rule declares no login flow,
+  /// [RuleAuthRequiredException] when no account is saved and
+  /// [RuleAuthFailedException] when the login endpoint rejects the request.
+  Future<String> login({RuleCancelToken? cancelToken}) {
+    return _ruleEngine.login(_executionConfig, cancelToken: cancelToken);
   }
 
   Future<RuleSearchTrace> traceSearch(

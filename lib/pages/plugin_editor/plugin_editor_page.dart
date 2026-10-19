@@ -8,7 +8,6 @@ import 'package:kazumi/bean/widget/loading_indicator.dart';
 import 'package:kazumi/pages/plugin_editor/rule_management_widgets.dart';
 import 'package:kazumi/pages/plugin_editor/editor_form_widgets.dart';
 import 'package:kazumi/plugins/anti_crawler_config.dart';
-import 'package:kazumi/plugins/api_auth_config.dart';
 import 'package:kazumi/plugins/api_rule_config.dart';
 import 'package:kazumi/plugins/plugins.dart';
 import 'package:kazumi/plugins/plugins_controller.dart';
@@ -259,6 +258,8 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
   String authLoginMethod = 'POST';
   String authLoginBodyType = ApiBodyType.json;
   bool authEnabled = false;
+  bool _loginChecking = false;
+  String? _loginResult;
   String searchMode = RuleMode.xpath;
   String chapterMode = RuleMode.xpath;
   String searchApiMethod = 'GET';
@@ -483,6 +484,42 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
     context.pushNamed('/settings/plugin/test', arguments: editedPlugin);
   }
 
+  /// Runs the login flow of the plugin **as currently edited**, so the user
+  /// can verify both the flow and the saved account before saving the rule.
+  Future<void> _checkLogin() async {
+    if (_loginChecking) return;
+    Plugin? editedPlugin;
+    try {
+      editedPlugin = _buildEditedPlugin();
+    } catch (error) {
+      _showEditorError(error);
+      return;
+    }
+    if (editedPlugin.auth == null) return;
+    setState(() {
+      _loginChecking = true;
+      _loginResult = null;
+    });
+    try {
+      await editedPlugin.login();
+      if (mounted) setState(() => _loginResult = '登录成功，令牌已保存');
+    } on RuleAuthRequiredException {
+      if (mounted) {
+        setState(() => _loginResult = '还没有账号，请先到「规则账号」页填写');
+      }
+    } on RuleAuthFailedException catch (error) {
+      if (mounted) {
+        setState(() => _loginResult = error.badCredentials
+            ? '账号或密码不正确'
+            : '登录失败：${error.cause ?? '未知错误'}');
+      }
+    } catch (error) {
+      if (mounted) setState(() => _loginResult = '登录失败：$error');
+    } finally {
+      if (mounted) setState(() => _loginChecking = false);
+    }
+  }
+
   Future<void> _save() async {
     if (_saving) return;
     final editedPlugin = _tryBuildEditedPlugin();
@@ -673,6 +710,7 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
   }
 
   Widget _buildAuthSectionCard() {
+    final colors = Theme.of(context).colorScheme;
     return RuleSection(
       title: _RuleEditorText.sectionAuth,
       description: _RuleEditorText.sectionAuthDesc,
@@ -686,7 +724,10 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
             title: const Text(_RuleEditorText.authEnable),
             subtitle: const Text(_RuleEditorText.authEnableDesc),
             value: authEnabled,
-            onChanged: (value) => setState(() => authEnabled = value),
+            onChanged: (value) => setState(() {
+              authEnabled = value;
+              _loginResult = null;
+            }),
           ),
           EditorAnimatedSection(
             activeKey: authEnabled,
@@ -696,7 +737,41 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
                     child: Column(
                       spacing: 20,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: _buildAuthFields(),
+                      children: [
+                        ..._buildAuthFields(),
+                        Row(children: [
+                          FilledButton.tonalIcon(
+                            style: FilledButton.styleFrom(
+                                minimumSize: const Size(132, 48)),
+                            onPressed:
+                                _loginChecking ? null : _checkLogin,
+                            icon: _loginChecking
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2))
+                                : const Icon(Icons.login_rounded),
+                            label: Text(_loginChecking ? '登录中' : '点击登录'),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _loginResult ?? '用「规则账号」里保存的账号实际请求一次登录接口。',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: _loginResult == null
+                                        ? colors.onSurfaceVariant
+                                        : (_loginResult!.startsWith('登录成功')
+                                            ? colors.primary
+                                            : colors.error),
+                                  ),
+                            ),
+                          ),
+                        ]),
+                      ],
                     ),
                   )
                 : Padding(

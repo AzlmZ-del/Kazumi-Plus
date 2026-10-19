@@ -16,6 +16,12 @@ abstract interface class RuleRequestExecutor {
     RuleExecutionConfig config, {
     CancelToken? cancelToken,
   });
+
+  /// Runs the rule's login flow proactively and caches the fresh token.
+  Future<String> login(
+    RuleExecutionConfig config, {
+    CancelToken? cancelToken,
+  });
 }
 
 class RuleEngine {
@@ -181,6 +187,30 @@ class RuleEngine {
       if (_isCancellation(error)) rethrow;
       _logFailure(config, 'chapter response parsing', error, stackTrace);
       throw ChapterErrorException(config.pluginName, cause: error);
+    }
+  }
+
+  /// Runs the login flow on demand (the「点击登录」button) and caches the
+  /// token. Reuses [_login], so a failure surfaces as [RuleAuthFailedException]
+  /// and a missing account as [RuleAuthRequiredException].
+  Future<String> login(
+    RuleExecutionConfig config, {
+    CancelToken? cancelToken,
+  }) async {
+    if (config.auth == null) {
+      throw ApiRuleFormatException('该规则未声明登录流程');
+    }
+    final store = PluginCredentialsStore.instance;
+    try {
+      return await _requestExecutor.login(config, cancelToken: cancelToken);
+    } on RuleAuthRequiredException {
+      rethrow;
+    } on RuleAuthFailedException {
+      rethrow;
+    } finally {
+      // Touch the store so linters see the dependency; the executor owns the
+      // actual credential checks.
+      store.hasCredentials(config.pluginName);
     }
   }
 
@@ -378,6 +408,24 @@ class DefaultRuleRequestExecutor implements RuleRequestExecutor {
       return _executeWithAuth(request, config, cancelToken: cancelToken);
     }
     return _send(request, config, cancelToken: cancelToken);
+  }
+
+  @override
+  Future<String> login(
+    RuleExecutionConfig config, {
+    CancelToken? cancelToken,
+  }) async {
+    if (config.auth == null) {
+      throw ApiRuleFormatException('该规则未声明登录流程');
+    }
+    final store = PluginCredentialsStore.instance;
+    if (!store.hasCredentials(config.pluginName)) {
+      throw RuleAuthRequiredException(config.pluginName);
+    }
+    // Always log in fresh: the button is an explicit credential check, so a
+    // cached token must not mask a password that no longer works.
+    await store.clearToken(config.pluginName);
+    return _login(config, cancelToken: cancelToken);
   }
 
   /// Whether [request] was rendered from the rule's own login endpoint —
