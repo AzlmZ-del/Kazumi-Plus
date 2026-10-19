@@ -8,6 +8,7 @@ import 'package:kazumi/bean/widget/loading_indicator.dart';
 import 'package:kazumi/pages/plugin_editor/rule_management_widgets.dart';
 import 'package:kazumi/pages/plugin_editor/editor_form_widgets.dart';
 import 'package:kazumi/plugins/anti_crawler_config.dart';
+import 'package:kazumi/plugins/api_auth_config.dart';
 import 'package:kazumi/plugins/api_rule_config.dart';
 import 'package:kazumi/plugins/plugins.dart';
 import 'package:kazumi/plugins/plugins_controller.dart';
@@ -63,6 +64,27 @@ abstract final class _RuleEditorText {
   static const sectionSearchDesc = '定义如何在站点内检索条目';
   static const sectionChapter = '选集规则';
   static const sectionChapterDesc = '定义如何获取播放线路与剧集列表';
+  static const sectionAuth = '登录';
+  static const sectionAuthDesc = '定义如何用本机保存的账号换取令牌';
+  static const authNotEnabledDesc =
+      '启用后，播放或检索时会先用账号登录，再把令牌附到请求头。账号在「规则账号」页填写，只保存在本机。';
+  static const authEnable = '启用登录';
+  static const authEnableDesc = '声明该规则的登录流程';
+  static const groupLoginRequest = '登录请求';
+  static const groupToken = '令牌';
+  static const authLoginUrl = '登录接口地址（URL）';
+  static const authLoginHeaders = '登录请求头（JSON）';
+  static const authLoginQuery = '登录查询参数（JSON）';
+  static const authLoginBodyType = '登录请求体类型';
+  static const authLoginBody = '登录请求体（JSON）';
+  static const authLoginBodyHelper = '可用变量：@username、@password。';
+  static const authTokenPath = '令牌路径（JSONPath）';
+  static const authTokenPathHelper = '从登录响应中读取令牌的位置，如 \$.data.token。';
+  static const authTokenHeader = '令牌请求头名称';
+  static const authTokenPrefix = '令牌前缀';
+  static const authTokenPrefixHelper = '如 Bearer；站点返回的令牌已自带前缀时留空。';
+  static const authRefreshOnStatus = '刷新令牌的状态码（逗号分隔）';
+  static const authRefreshOnStatusHelper = '响应返回这些状态码时清空令牌并重新登录一次，默认 401。';
   static const advancedOptions = '高级选项';
   static const advancedOptionsDesc = '行为、网络与反反爬虫配置';
   static const groupBehavior = '行为设置';
@@ -124,6 +146,8 @@ abstract final class _RuleEditorText {
   static const userAgentHelper = '仅用于播放器和下载器。';
   static const referer = '播放请求来源（Referer）';
   static const refererHelper = '仅用于播放器和下载器。';
+
+  static const authLoginMethod = '登录请求方法';
 
   static const captchaDetectValue = '验证页检测值';
   static const captchaDetectValueHelper = '留空时使用验证码图片或验证按钮的 XPath 进行检测。';
@@ -218,6 +242,23 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
       TextEditingController();
   final TextEditingController chapterApiPageQueryController =
       TextEditingController();
+  final TextEditingController authLoginURLController = TextEditingController();
+  final TextEditingController authLoginHeadersController =
+      TextEditingController();
+  final TextEditingController authLoginQueryController =
+      TextEditingController();
+  final TextEditingController authLoginBodyController = TextEditingController();
+  final TextEditingController authTokenPathController =
+      TextEditingController(text: ApiAuthConfig.defaultTokenPath);
+  final TextEditingController authTokenHeaderController =
+      TextEditingController(text: ApiAuthConfig.defaultHeaderName);
+  final TextEditingController authTokenPrefixController =
+      TextEditingController();
+  final TextEditingController authRefreshOnStatusController =
+      TextEditingController(text: '401');
+  String authLoginMethod = 'POST';
+  String authLoginBodyType = ApiBodyType.json;
+  bool authEnabled = false;
   String searchMode = RuleMode.xpath;
   String chapterMode = RuleMode.xpath;
   String searchApiMethod = 'GET';
@@ -347,6 +388,23 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
     usePost = plugin.usePost;
     useLegacyParser = plugin.useLegacyParser;
     adBlocker = plugin.adBlocker;
+    final auth = plugin.auth;
+    authEnabled = auth != null;
+    authLoginMethod = auth?.login.method ?? 'POST';
+    authLoginBodyType = auth?.login.bodyType ?? ApiBodyType.json;
+    authLoginURLController.text = auth?.login.url ?? '';
+    authLoginHeadersController.text =
+        _prettyJson(auth?.login.headers ?? const <String, dynamic>{});
+    authLoginQueryController.text =
+        _prettyJson(auth?.login.query ?? const <String, dynamic>{});
+    authLoginBodyController.text = _prettyJson(auth?.login.body);
+    authTokenPathController.text =
+        auth?.tokenPath ?? ApiAuthConfig.defaultTokenPath;
+    authTokenHeaderController.text =
+        auth?.headerName ?? ApiAuthConfig.defaultHeaderName;
+    authTokenPrefixController.text = auth?.tokenPrefix ?? '';
+    authRefreshOnStatusController.text =
+        (auth?.refreshOnStatus ?? const [401]).join(',');
     antiCrawlerEnabled = plugin.antiCrawlerConfig.enabled;
     captchaType = plugin.antiCrawlerConfig.captchaType;
     captchaImageController.text = plugin.antiCrawlerConfig.captchaImage;
@@ -397,6 +455,14 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
     chapterApiVariablesController.dispose();
     chapterApiPageURLController.dispose();
     chapterApiPageQueryController.dispose();
+    authLoginURLController.dispose();
+    authLoginHeadersController.dispose();
+    authLoginQueryController.dispose();
+    authLoginBodyController.dispose();
+    authTokenPathController.dispose();
+    authTokenHeaderController.dispose();
+    authTokenPrefixController.dispose();
+    authRefreshOnStatusController.dispose();
     captchaImageController.dispose();
     captchaInputController.dispose();
     captchaButtonController.dispose();
@@ -481,6 +547,7 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
                       ButtonSegment(value: 1, label: Text('搜索')),
                       ButtonSegment(value: 2, label: Text('选集')),
                       ButtonSegment(value: 3, label: Text('高级')),
+                      ButtonSegment(value: 4, label: Text('登录')),
                     ],
                     onChanged: (value) => setState(() => _section = value),
                   ),
@@ -534,6 +601,7 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
 
   Widget _buildCurrentSection() {
     if (_section == 3) return _buildAdvancedOptionsCard();
+    if (_section == 4) return _buildAuthSectionCard();
     final isSearch = _section == 1;
     return RuleSection(
       key: ValueKey(_section),
@@ -601,6 +669,139 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
                 ),
               ],
       ),
+    );
+  }
+
+  Widget _buildAuthSectionCard() {
+    return RuleSection(
+      title: _RuleEditorText.sectionAuth,
+      description: _RuleEditorText.sectionAuthDesc,
+      icon: Icons.key_rounded,
+      child: Column(
+        spacing: 20,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text(_RuleEditorText.authEnable),
+            subtitle: const Text(_RuleEditorText.authEnableDesc),
+            value: authEnabled,
+            onChanged: (value) => setState(() => authEnabled = value),
+          ),
+          EditorAnimatedSection(
+            activeKey: authEnabled,
+            child: authEnabled
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Column(
+                      spacing: 20,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: _buildAuthFields(),
+                    ),
+                  )
+                : Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      _RuleEditorText.authNotEnabledDesc,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildAuthFields() => [
+        const EditorSubheader(label: _RuleEditorText.groupLoginRequest),
+        EditorSegmentedField<String>(
+          label: _RuleEditorText.authLoginMethod,
+          value: authLoginMethod,
+          segments: _methodSegments,
+          onChanged: (value) => setState(() => authLoginMethod = value),
+        ),
+        EditorTextField(
+          controller: authLoginURLController,
+          label: _RuleEditorText.authLoginUrl,
+        ),
+        EditorTextField(
+          controller: authLoginHeadersController,
+          label: _RuleEditorText.authLoginHeaders,
+          maxLines: 4,
+        ),
+        EditorTextField(
+          controller: authLoginQueryController,
+          label: _RuleEditorText.authLoginQuery,
+          maxLines: 4,
+        ),
+        EditorSegmentedField<String>(
+          label: _RuleEditorText.authLoginBodyType,
+          value: authLoginBodyType,
+          segments: _bodyTypeSegments,
+          onChanged: (value) => setState(() => authLoginBodyType = value),
+        ),
+        if (authLoginBodyType != ApiBodyType.none)
+          EditorTextField(
+            controller: authLoginBodyController,
+            label: _RuleEditorText.authLoginBody,
+            helper: _RuleEditorText.authLoginBodyHelper,
+            maxLines: 5,
+          ),
+        const EditorSubheader(label: _RuleEditorText.groupToken),
+        EditorTextField(
+          controller: authTokenPathController,
+          label: _RuleEditorText.authTokenPath,
+          helper: _RuleEditorText.authTokenPathHelper,
+        ),
+        EditorTextField(
+          controller: authTokenHeaderController,
+          label: _RuleEditorText.authTokenHeader,
+        ),
+        EditorTextField(
+          controller: authTokenPrefixController,
+          label: _RuleEditorText.authTokenPrefix,
+          helper: _RuleEditorText.authTokenPrefixHelper,
+        ),
+        EditorTextField(
+          controller: authRefreshOnStatusController,
+          label: _RuleEditorText.authRefreshOnStatus,
+          helper: _RuleEditorText.authRefreshOnStatusHelper,
+        ),
+      ];
+
+  ApiAuthConfig? _buildAuthConfig() {
+    if (!authEnabled) return null;
+    final url = authLoginURLController.text.trim();
+    if (url.isEmpty) {
+      throw const FormatException('登录接口地址不能为空');
+    }
+    final statuses = authRefreshOnStatusController.text
+        .split(',')
+        .map((entry) => int.tryParse(entry.trim()))
+        .whereType<int>()
+        .where((code) => code >= 100 && code <= 599)
+        .toList();
+    return ApiAuthConfig(
+      login: ApiRequestConfig(
+        method: authLoginMethod,
+        url: url,
+        headers: _parseJsonMap(authLoginHeadersController, '登录请求头'),
+        query: _parseJsonMap(authLoginQueryController, '登录查询参数'),
+        bodyType: authLoginBodyType,
+        body: _parseBody(
+          authLoginBodyController,
+          authLoginBodyType,
+          '登录请求体',
+        ),
+      ),
+      tokenPath: authTokenPathController.text.trim().isEmpty
+          ? ApiAuthConfig.defaultTokenPath
+          : authTokenPathController.text.trim(),
+      headerName: authTokenHeaderController.text.trim().isEmpty
+          ? ApiAuthConfig.defaultHeaderName
+          : authTokenHeaderController.text.trim(),
+      tokenPrefix: authTokenPrefixController.text.trim(),
+      refreshOnStatus: statuses.isEmpty ? const [401] : statuses,
     );
   }
 
@@ -988,6 +1189,7 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
   Plugin _buildEditedPlugin() {
     final searchConfig = _buildSearchApiConfig();
     final chapterConfig = _buildChapterApiConfig();
+    final authConfig = _buildAuthConfig();
     return Plugin(
       api: searchMode == RuleMode.api || chapterMode == RuleMode.api
           ? ApiEndpoints.apiLevel.toString()
@@ -1024,9 +1226,9 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
         captchaDetectValue: captchaDetectValueController.text,
         captchaScript: captchaScriptController.text,
       ),
-      // The editor has no fields for the login flow yet, but rebuilding the
-      // plugin from the form must not silently drop it.
-      auth: widget.plugin.auth,
+      // Built from the 登录 tab; null when login is not enabled. A null here
+      // still means "the user turned it off", not "silently dropped".
+      auth: authConfig,
     );
   }
 
