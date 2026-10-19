@@ -62,15 +62,24 @@ class RuleAuthRequiredException implements Exception {
 
 /// Login ran but did not yield a token (bad credentials or changed API).
 class RuleAuthFailedException implements Exception {
-  const RuleAuthFailedException(this.pluginName, {this.cause});
+  const RuleAuthFailedException(
+    this.pluginName, {
+    this.cause,
+    this.badCredentials = false,
+  });
 
   final String pluginName;
   final Object? cause;
 
+  /// True when the login endpoint rejected the account itself (HTTP 401/403)
+  /// rather than failing for another reason such as a network error.
+  final bool badCredentials;
+
   @override
-  String toString() =>
-      'RuleAuthFailedException: $pluginName login failed'
-      '${cause != null ? ' ($cause)' : ''}';
+  String toString() => badCredentials
+      ? 'RuleAuthFailedException: $pluginName 账号或密码不正确'
+      : 'RuleAuthFailedException: $pluginName login failed'
+          '${cause != null ? ' ($cause)' : ''}';
 }
 
 /// Immutable runtime snapshot built from a plugin rule.
