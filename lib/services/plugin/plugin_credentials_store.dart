@@ -98,6 +98,17 @@ class PluginCredentialsStore {
     await _putEntry(pluginName, entry);
   }
 
+  /// Replaces only the username, keeping the stored password.
+  ///
+  /// Returns false when there is no password to keep, in which case the
+  /// caller must ask the user for one.
+  Future<bool> saveUsername(String pluginName, String username) async {
+    final existing = _entryFor(pluginName);
+    if (existing == null || existing.password.isEmpty) return false;
+    await _putEntry(pluginName, existing.copyWith(username: username.trim()));
+    return true;
+  }
+
   /// Cached token for [pluginName], or null.
   String? tokenFor(String pluginName) => _entryFor(pluginName)?.token;
 

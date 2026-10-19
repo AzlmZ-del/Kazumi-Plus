@@ -93,20 +93,29 @@ class _AccountCard extends StatelessWidget {
   bool get _configured => store.hasCredentials(plugin.name);
 
   Future<void> _edit(BuildContext context) async {
+    final hadPassword = store.hasCredentials(plugin.name);
     final result = await KazumiDialog.show<_AccountResult>(
       builder: (context) => _AccountDialog(
         pluginName: plugin.name,
         initialUsername: store.usernameFor(plugin.name) ?? '',
+        passwordOptional: hadPassword,
       ),
     );
     if (result == null) return;
-    await store.saveCredentials(
-      plugin.name,
-      username: result.username,
-      password: result.password,
-    );
-    // A new password invalidates the token obtained with the old one.
-    await store.clearToken(plugin.name);
+    if (result.password.isEmpty) {
+      // The dialog only allows an empty password when one is already stored,
+      // and then it means "keep the current one".
+      final saved = await store.saveUsername(plugin.name, result.username);
+      if (!saved) return;
+    } else {
+      await store.saveCredentials(
+        plugin.name,
+        username: result.username,
+        password: result.password,
+      );
+      // A new password invalidates the token obtained with the old one.
+      await store.clearToken(plugin.name);
+    }
     onChanged();
     if (context.mounted) {
       KazumiDialog.showToast(context: context, message: '账号已保存');
@@ -200,10 +209,15 @@ class _AccountDialog extends StatefulWidget {
   const _AccountDialog({
     required this.pluginName,
     required this.initialUsername,
+    this.passwordOptional = false,
   });
 
   final String pluginName;
   final String initialUsername;
+
+  /// When true the password field may be left empty, meaning "keep the
+  /// password that is already stored".
+  final bool passwordOptional;
 
   @override
   State<_AccountDialog> createState() => _AccountDialogState();
@@ -225,7 +239,7 @@ class _AccountDialogState extends State<_AccountDialog> {
   void _submit() {
     final username = _username.text.trim();
     final password = _password.text;
-    if (username.isEmpty || password.isEmpty) {
+    if (username.isEmpty || (password.isEmpty && !widget.passwordOptional)) {
       setState(() => _error = '请填写账号与密码');
       return;
     }
@@ -257,8 +271,11 @@ class _AccountDialogState extends State<_AccountDialog> {
               onChanged: (_) {
                 if (_error != null) setState(() => _error = null);
               },
-              decoration: ruleInputDecoration(context, label: '密码')
-                  .copyWith(errorText: _error),
+              decoration: ruleInputDecoration(
+                context,
+                label: '密码',
+                hint: widget.passwordOptional ? '留空则不修改' : null,
+              ).copyWith(errorText: _error),
             ),
             const SizedBox(height: 8),
             Text(

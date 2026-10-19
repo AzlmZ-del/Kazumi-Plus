@@ -452,7 +452,14 @@ class DefaultRuleRequestExecutor implements RuleRequestExecutor {
     } on ApiRuleFormatException catch (error) {
       throw RuleAuthFailedException(config.pluginName, cause: error);
     } on NetworkException catch (error) {
-      throw RuleAuthFailedException(config.pluginName, cause: error);
+      // 401/403 from the login endpoint means the account itself was
+      // rejected; anything else (timeout, DNS, 5xx) is a different problem.
+      final status = error.statusCode;
+      throw RuleAuthFailedException(
+        config.pluginName,
+        cause: error,
+        badCredentials: status == 401 || status == 403,
+      );
     }
   }
 
