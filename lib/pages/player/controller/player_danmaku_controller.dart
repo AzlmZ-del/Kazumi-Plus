@@ -100,6 +100,20 @@ abstract class _PlayerDanmakuController with Store {
   @observable
   bool danmakuLoading = false;
 
+  /// 当前弹幕的来源名称（弹弹play / 本地缓存），供播放信息页展示。
+  @observable
+  String danmakuSourceName = '';
+
+  /// 当前弹幕的请求地址，供播放信息页展示。
+  @observable
+  String danmakuSourceUrl = '';
+
+  @action
+  void recordDanmakuSource({required String name, required String url}) {
+    danmakuSourceName = name;
+    danmakuSourceUrl = url;
+  }
+
   int bangumiID = 0;
   int _scheduledDanmakuGeneration = 0;
 
@@ -203,6 +217,7 @@ abstract class _PlayerDanmakuController with Store {
       if (cachedDanmakus != null && cachedDanmakus.isNotEmpty) {
         KazumiLogger().i(
             'PlayerController: loaded ${cachedDanmakus.length} cached danmakus');
+        recordDanmakuSource(name: '本地缓存', url: '');
         return DanmakuLoadResult.success(
           danmakus: cachedDanmakus,
           bangumiID: nextBangumiID,
@@ -214,6 +229,11 @@ abstract class _PlayerDanmakuController with Store {
           nextBangumiID =
               await DanmakuApi.getDanDanBangumiIDByBgmBangumiID(bangumiId);
           if (nextBangumiID != 0) {
+            final episodeId = DanmakuApi.episodeIdOf(nextBangumiID, episode);
+            recordDanmakuSource(
+              name: '弹弹play',
+              url: DanmakuApi.commentUrl(episodeId),
+            );
             var res = await DanmakuApi.getDanDanmaku(nextBangumiID, episode);
             if (res.isNotEmpty) {
               KazumiLogger()
@@ -281,6 +301,11 @@ abstract class _PlayerDanmakuController with Store {
           bangumiID: nextBangumiID,
         );
       }
+      final episodeId = DanmakuApi.episodeIdOf(nextBangumiID, episode);
+      recordDanmakuSource(
+        name: '弹弹play',
+        url: DanmakuApi.commentUrl(episodeId),
+      );
       var res = await DanmakuApi.getDanDanmaku(nextBangumiID, episode);
       return DanmakuLoadResult.success(
         danmakus: res,
@@ -300,6 +325,10 @@ abstract class _PlayerDanmakuController with Store {
     danmakuLoading = true;
     try {
       danDanmakus.clear();
+      recordDanmakuSource(
+        name: '弹弹play',
+        url: DanmakuApi.commentUrl(episodeID.toString()),
+      );
       var res = await DanmakuApi.getDanDanmakuByEpisodeID(episodeID);
       addDanmakus(res);
       return res.isNotEmpty;

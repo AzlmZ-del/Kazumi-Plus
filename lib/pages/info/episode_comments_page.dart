@@ -121,10 +121,7 @@ class _EpisodeCommentsPageState extends State<EpisodeCommentsPage> {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final episode = widget.episode;
-    final meta = [
-      if (episode.airDate.trim().isNotEmpty) episode.airDate.trim(),
-      if (episode.duration.trim().isNotEmpty) episode.duration.trim(),
-    ].join(' · ');
+    final meta = episode.metaLine();
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),

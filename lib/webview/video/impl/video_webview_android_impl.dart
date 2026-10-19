@@ -14,6 +14,7 @@ class VideoWebviewAndroidImpl
   PlatformHeadlessInAppWebView? headlessWebView;
   bool hasInjectedScripts = false;
   bool shouldInjectIframeRedirect = false;
+  bool useLegacyParser = false;
 
   @override
   Future<void> init() async {
@@ -42,6 +43,24 @@ class VideoWebviewAndroidImpl
         onLoadStop: (controller, url) {
           logEventController.add('loading completed: $url');
         },
+        // 网络层兜底：注入脚本只能看到主文档，跨域 iframe 里的播放器
+        // 抓不到 video 标签，这里直接拦截所有 frame 的媒体请求。
+        shouldInterceptRequest: (controller, request) async {
+          if (useLegacyParser || isVideoSourceLoaded) return null;
+          final url = request.url.toString();
+          final lower = url.toLowerCase();
+          if (_isAdUrl(lower)) return null;
+          if (_isM3U8Url(lower) ||
+              _isRangeVideoRequest(lower, request.headers)) {
+            logEventController.add('Native intercepted video URL: $url');
+            isIframeLoaded = true;
+            isVideoSourceLoaded = true;
+            videoLoadingEventController.add(false);
+            unloadPage();
+            notifyVideoSourceResolved(url);
+          }
+          return null;
+        },
       ),
     );
     await headlessWebView?.run();
@@ -51,6 +70,7 @@ class VideoWebviewAndroidImpl
   Future<void> loadUrl(String url, bool useLegacyParser,
       {int offset = 0}) async {
     await unloadPage();
+    this.useLegacyParser = useLegacyParser;
     if (!hasInjectedScripts) {
       addJavaScriptHandlers(useLegacyParser);
       await addUserScripts(useLegacyParser);
@@ -286,6 +306,41 @@ class VideoWebviewAndroidImpl
     headlessWebView = null;
     webviewController = null;
     disposeEventControllers();
+  }
+
+  bool _isM3U8Url(String lower) {
+    final uri = Uri.tryParse(lower);
+    if (uri == null) return false;
+    return uri.path.endsWith('.m3u8');
+  }
+
+  bool _isRangeVideoRequest(String lower, Map<String, String>? headers) {
+    if (headers == null) return false;
+    final range = headers['Range'] ?? headers['range'];
+    if (range == null || !range.startsWith('bytes=')) return false;
+    if (lower.endsWith('.js') ||
+        lower.endsWith('.css') ||
+        lower.endsWith('.html') ||
+        lower.endsWith('.json') ||
+        lower.endsWith('.png') ||
+        lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.webp') ||
+        lower.endsWith('.gif') ||
+        lower.endsWith('.svg') ||
+        lower.endsWith('.woff') ||
+        lower.endsWith('.woff2') ||
+        lower.endsWith('.wasm')) {
+      return false;
+    }
+    return true;
+  }
+
+  bool _isAdUrl(String lower) {
+    return lower.contains('googleads') ||
+        lower.contains('googlesyndication') ||
+        lower.contains('adtrafficquality') ||
+        lower.contains('doubleclick');
   }
 
   Future<void> _setupProxy() async {

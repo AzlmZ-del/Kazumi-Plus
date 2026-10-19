@@ -63,7 +63,7 @@ class EditorChoiceGroup<T> extends StatelessWidget {
       LayoutBuilder(builder: (context, constraints) {
         final colors = Theme.of(context).colorScheme;
         final wrap = constraints.maxWidth <
-            segments.length * MediaQuery.textScalerOf(context).scale(76);
+            segments.length * MediaQuery.textScalerOf(context).scale(52);
         Widget button(int index) {
           final segment = segments[index];
           final selected = segment.value == value;
@@ -74,9 +74,9 @@ class EditorChoiceGroup<T> extends StatelessWidget {
             inMutuallyExclusiveGroup: true,
             child: FilledButton(
               style: FilledButton.styleFrom(
-                minimumSize: const Size(64, 48),
+                minimumSize: const Size(0, 48),
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
                 backgroundColor: selected
                     ? colors.secondaryContainer
                     : colors.surfaceContainerHighest,

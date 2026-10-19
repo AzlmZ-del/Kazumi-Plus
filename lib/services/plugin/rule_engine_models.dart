@@ -99,6 +99,7 @@ class RuleExecutionConfig {
     required this.searchResult,
     required this.chapterRoads,
     required this.chapterResult,
+    this.chapterRoadName = '',
     required this.searchApiConfig,
     required this.chapterApiConfig,
     required this.antiCrawlerConfig,
@@ -117,6 +118,10 @@ class RuleExecutionConfig {
   final String searchResult;
   final String chapterRoads;
   final String chapterResult;
+
+  /// Optional XPath list naming each chapter road, index-aligned with
+  /// [chapterRoads]. Empty keeps the generated "播放线路N" labels.
+  final String chapterRoadName;
   final ApiSearchConfig searchApiConfig;
   final ApiChapterConfig chapterApiConfig;
   final AntiCrawlerConfig antiCrawlerConfig;

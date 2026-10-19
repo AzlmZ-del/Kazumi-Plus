@@ -71,6 +71,17 @@ class EpisodeInfo {
     return episodeLabel();
   }
 
+  /// 元信息行，沿用 Bangumi 网页的写法：`时长:00:23:45 / 首播:2026-10-01`。
+  ///
+  /// 日期与时长各自带标签：裸的 `2026-10-01 · 00:23:45` 两段都是数字加冒号，
+  /// 很容易被读成一个时间点。缺失的项直接省略，不留空标签。
+  String metaLine() {
+    final parts = <String>[];
+    if (airDate.trim().isNotEmpty) parts.add('首播:${airDate.trim()}');
+    if (duration.trim().isNotEmpty) parts.add('时长:${duration.trim()}');
+    return parts.join(' / ');
+  }
+
   /// 正片显示为 `01`，其余类型带上类型前缀。
   String episodeLabel() {
     final number = episode is int

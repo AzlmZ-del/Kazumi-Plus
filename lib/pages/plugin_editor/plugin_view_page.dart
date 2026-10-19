@@ -402,6 +402,12 @@ class _PluginViewPageState extends State<PluginViewPage> {
                               label: plugin.version,
                               background: colors.surfaceContainerHighest,
                               foreground: colors.onSurfaceVariant),
+                          // 有登录流程才标，没登录的不打扰。
+                          if (plugin.authEnabled)
+                            RuleTag(
+                                label: '启用登录',
+                                background: colors.primaryContainer,
+                                foreground: colors.onPrimaryContainer),
                           if (updatable)
                             RuleTag(
                                 label: '可更新',
