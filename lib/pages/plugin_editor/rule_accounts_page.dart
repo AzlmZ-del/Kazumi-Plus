@@ -101,6 +101,9 @@ class _AccountCard extends StatelessWidget {
         initialUsername: store.usernameFor(plugin.name) ?? '',
         passwordOptional: hadPassword,
         hasStoredPassword: hadPassword,
+        initialPassword: hadPassword
+            ? (store.passwordFor(plugin.name) ?? '')
+            : '',
       ),
     );
     if (result == null) return;
@@ -211,6 +214,7 @@ class _AccountDialog extends StatefulWidget {
   const _AccountDialog({
     required this.pluginName,
     required this.initialUsername,
+    this.initialPassword = '',
     this.passwordOptional = false,
     this.hasStoredPassword = false,
   });
@@ -222,9 +226,12 @@ class _AccountDialog extends StatefulWidget {
   /// password that is already stored".
   final bool passwordOptional;
 
-  /// Whether a password is already stored; when true the masked placeholder
-  /// is shown so the field never reads as empty.
+  /// Whether a password is already stored; when true the stored password is
+  /// pre-filled so the user can confirm what is saved.
   final bool hasStoredPassword;
+
+  /// The stored password to pre-fill, empty when none is saved.
+  final String initialPassword;
 
   @override
   State<_AccountDialog> createState() => _AccountDialogState();
@@ -233,7 +240,8 @@ class _AccountDialog extends StatefulWidget {
 class _AccountDialogState extends State<_AccountDialog> {
   late final TextEditingController _username =
       TextEditingController(text: widget.initialUsername);
-  final TextEditingController _password = TextEditingController();
+  late final TextEditingController _password =
+      TextEditingController(text: widget.initialPassword);
   String? _error;
 
   // The field starts empty; while typing it shows plain text so the user can
