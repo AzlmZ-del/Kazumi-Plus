@@ -20,11 +20,11 @@ class RuleCard extends StatelessWidget {
 
   final String title;
 
-  /// Chip rendered right before [title] on the heading line.
+  /// Chip docked at the heading line's trailing end, level with [title].
   ///
-  /// Identity-adjacent facts (such as the rule version) read better beside the
-  /// name than in the chip row under the URLs, so they get their own slot and
-  /// stay put while the [tags] row changes.
+  /// Sits in the card's top-right corner so identity-adjacent facts (such as
+  /// the rule version) line up with the name instead of crowding the chip row
+  /// under the URLs, and stay put while the [tags] row changes.
   final Widget? titleTag;
 
   final List<Widget> tags;
@@ -126,12 +126,8 @@ class RuleCard extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                if (titleTag != null) ...[
-                                  titleTag!,
-                                  const SizedBox(width: 8),
-                                ],
                                 Expanded(
                                   child: Text(title,
                                       style: text.titleMedium?.copyWith(
@@ -139,6 +135,10 @@ class RuleCard extends StatelessWidget {
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis),
                                 ),
+                                if (titleTag != null) ...[
+                                  const SizedBox(width: 8),
+                                  titleTag!,
+                                ],
                               ],
                             ),
                             if (subtitle != null && subtitle!.isNotEmpty) ...[
