@@ -46,9 +46,10 @@ if ($cred['MIRROR_APPID'] -and $cred['MIRROR_KEY']) {
 }
 $def = $defines -join ' '
 
-# 单架构 arm64：splits.abi 只留 arm64-v8a（见 android/app/build.gradle）。
-# 开了 splits 之后产物名是 app-arm64-v8a-release.apk，不再是 app-release.apk。
-cmd /c "flutter build apk --release --target-platform android-arm64 $def > build_apk_log.txt 2>&1"
+# 单架构 arm64：--split-per-abi 让 Gradle 只产出含 arm64-v8a 的那个 APK。
+# 注意这个标志是必须的 —— 没有它，flutter 工具链会去找 app-release.apk，
+# 而 ABI 分裂后的产物叫 app-arm64-v8a-release.apk，找不到就判定构建失败。
+cmd /c "flutter build apk --release --split-per-abi --target-platform android-arm64 $def > build_apk_log.txt 2>&1"
 if ($LASTEXITCODE -ne 0) {
     Write-Error 'APK 构建失败，日志见 build_apk_log.txt'
     exit 1
