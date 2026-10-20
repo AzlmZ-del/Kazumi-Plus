@@ -4,6 +4,13 @@
     # 个人自用：只出 Android APK，并挂到 tag 对应的 Release 上。
     # App 内的「检查更新」读 /releases/latest，所以 tag 必须是裸版本号
     # （2.4.0 这种），不能带 v 前缀 —— needUpdate() 按 '.' 分段 int.parse。
+    #
+    # 速度优化（相比最初的 8 分半）：
+    #   1. 只出 arm64 —— 三个 ABI 各编一遍 C++ bridge 和 AOT，单架构省掉 2/3
+    #   2. 缓存 Gradle 发行包 + 依赖 —— 冷启动那 119 秒的空档全在这里
+    #   3. 缓存 PUB_CACHE —— build 步骤内隐式 pub get 不再重新下载
+    #   4. 缓存 Flutter SDK
+    #   5. concurrency 会取消同一 tag 的重复触发
     on:
       push:
         tags:
@@ -14,16 +21,27 @@
             description: '要发布的版本号，必须与 pubspec.yaml 的 version 一致，如 2.4.0'
             required: true
 
+    # 同一个 tag 重复触发时，取消旧的那次，避免排队
+    concurrency:
+      group: android-release-${{ github.event.inputs.tag || github.ref_name }}
+      cancel-in-progress: true
+
     env:
       DANDANAPI_APPID: ${{ secrets.DANDANAPI_APPID }}
       DANDANAPI_KEY: ${{ secrets.DANDANAPI_KEY }}
       KAZUMI_APPID: ${{ secrets.KAZUMI_APPID }}
       KAZUMI_KEY: ${{ secrets.KAZUMI_KEY }}
+      # 关掉 daemon：一次性构建用不着，能省几百 MB 内存
+      GRADLE_OPTS: >-
+        -Dorg.gradle.daemon=false
+        -Dorg.gradle.parallel=true
+        -Dorg.gradle.caching=true
 
     jobs:
       build-android:
         name: "build & release apk"
         runs-on: "ubuntu-latest"
+        timeout-minutes: 25
         permissions:
           contents: write
         steps:
@@ -60,6 +78,36 @@
             with:
               channel: stable
               flutter-version-file: pubspec.yaml
+              cache: true
+
+          # Gradle 发行包 + 依赖缓存。首次仍然要下，之后命中就跳过那 119 秒空档。
+          # key 里带上 wrapper 与 gradle 文件的 hash，改了依赖会自动换一套。
+          - name: Cache Gradle
+            uses: actions/cache@v4
+            with:
+              path: |
+                ~/.gradle/caches
+                ~/.gradle/wrapper
+              key: gradle-${{ runner.os }}-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'android/**/*.gradle', 'android/gradle.properties', 'pubspec.lock') }}
+              restore-keys: |
+                gradle-${{ runner.os }}-
+
+          - name: Cache pub
+            uses: actions/cache@v4
+            with:
+              path: ~/.pub-cache
+              key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
+              restore-keys: |
+                pub-${{ runner.os }}-
+
+          # NDK 28.2 不在 runner 预装列表里（预装 27.3 / 29.0 / 30.0），
+          # 每次都要现下 20 多秒。单独缓存这个目录就能跳过。
+          - name: Cache NDK 28.2
+            id: ndk-cache
+            uses: actions/cache@v4
+            with:
+              path: /usr/local/lib/android/sdk/ndk/28.2.13676358
+              key: ndk-28.2.13676358-${{ runner.os }}
 
           - name: Restore release keystore
             env:
@@ -81,15 +129,20 @@
             run: flutter pub get
             shell: bash
 
+          # 只出 arm64：手机是 arm64，三架构那两套纯属白编。
+          # 产物仍是 app-release.apk（单架构不触发 split-per-abi），32 MB 左右。
           - name: Build APK
             run: >-
               flutter build apk --release
+              --target-platform android-arm64
               --dart-define=DANDANAPI_APPID=$DANDANAPI_APPID
               --dart-define=DANDANAPI_KEY=$DANDANAPI_KEY
               --dart-define=KAZUMI_APPID=$KAZUMI_APPID
               --dart-define=KAZUMI_KEY=$KAZUMI_KEY
             shell: bash
 
+          # 资产名必须同时含 "android" 和 ".apk"：
+          # getUpdateFilePatterns(androidApk) == ['android', '.apk']
           - name: Package APK
             run: cp build/app/outputs/flutter-apk/app-release.apk Kazumi_android_${{ steps.tag.outputs.tag }}.apk
             shell: bash
@@ -107,7 +160,8 @@
               body: |
                 Kazumi Plus ${{ steps.tag.outputs.tag }}（个人自用，非官方）
 
-                APK 已用正式 release 签名，可直接覆盖安装旧版本。
-                首次从 debug 签名的旧版升级会失败，需先卸载旧版。
+                - 仅 arm64（`arm64-v8a`），32 位老设备装不了
+                - APK 用正式 release 签名，可直接覆盖安装
+                - 首次从 debug 签名的旧版升级会失败，需先卸载旧版
               files: Kazumi_android_${{ steps.tag.outputs.tag }}.apk
               fail_on_unmatched_files: true

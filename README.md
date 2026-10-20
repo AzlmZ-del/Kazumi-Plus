@@ -158,6 +158,19 @@ git push --no-verify fork 2.4.1
 **tag 不能带 `v` 前缀**：`needUpdate()` 按 `.` 分段 `int.parse`，`v2.4.0` 会直接抛异常。
 版本号只能往上抬（`2.4.1`、`2.5.0`…），发布后不能重发同一个 tag。
 
+### 构建速度
+
+首次冷缓存约 4～5 分钟，命中缓存后 2 分钟左右。几处刻意的取舍：
+
+- **只出 arm64**。原来的三架构（arm / arm64 / x64）各编一遍 C++ bridge 和 AOT，
+  多花 3 分钟给一台用不上的设备。产物约 32 MB，比之前全架构的 74 MB 小一半多。
+- **Gradle 发行包 + 依赖走 `actions/cache`**。第一次跑会在 `Gradle 8.14.5-all.zip`
+  下载和 AGP 依赖解析上空等约 2 分钟，缓存命中后跳过。
+- **NDK 28.2 单独缓存**。runner 预装 27.3 / 29.0 / 30.0，偏偏没有项目声明的 28.2，
+  不缓存就得每次现下约 24 秒。
+- **`PUB_CACHE` 缓存**。`flutter build` 内部自己会跑一次 `pub get`，不缓存要多下 76 秒。
+- **`concurrency` 取消重复触发**。同一 tag 连推两次不会并行排队。
+
 上游那份 `release.yaml` 是全平台流水线，依赖 SignPath 签名、iOS 证书等本仓库没有的
 secrets，已改成只保留 `workflow_dispatch` 手动触发，不再响应 tag。
 
