@@ -63,7 +63,7 @@ Android 侧产物是单架构 arm64 的 release APK，`adb install -r` 即可。
 |---|---|
 | Flutter | 3.47.7（stable） |
 | Dart SDK | `>=3.10.0 <4.0.0` |
-| 当前版本号 | 2.3.9+20309（`pubspec.yaml`） |
+| 当前版本号 | 2.4.0+20400（`pubspec.yaml`） |
 
 其余平台工具链按 [Flutter 官方文档](https://docs.flutter.dev/get-started/install) 准备。
 上游作者提醒过：本项目除了 Google 托管的 Flutter 依赖，还依赖 MavenCentral / GitHub /
@@ -150,9 +150,10 @@ tools/sync-upstream.sh --abort   # 重放中途出问题，退回重放前
 ## 已知限制
 
 - **自动更新指向官方源**，没有跟着改：`ApiEndpoints.latestAppMirror` 仍然是
-  `api.kazumi.fyi`。本仓库不发 Releases，所以开着自动更新会提示你升级到**官方版**
+  `api.kazumi.fyi`。本仓库不发 Releases，版本号是 `2.4.0`，高于上游当前的 `2.3.9`，
+  所以眼下不会弹升级提示；**等上游发到 2.4.x 就会又开始提示升级到官方版**
   （因为 applicationId 不同，装出来是另一个应用，不会覆盖本版）。
-  建议在 **设置 → 更新 → 自动更新** 里关掉。
+  届时要么继续抬高 `pubspec.yaml` 的版本号，要么在 **设置 → 更新 → 自动更新** 里关掉。
 - `ApiEndpoints.pluginShop` 与 `pluginShopMirror` 仍指向上游的 `Predidit/KazumiRules`，
   自用规则要自己在**规则仓库管理**里加 `AzlmZ-del/KazumiRules` 的地址。
 - 上游的 UA 串、`MethodChannel('com.predidit.kazumi/...')`、`BINARY_NAME`/`OriginalFilename`
