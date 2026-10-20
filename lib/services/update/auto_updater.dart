@@ -159,12 +159,26 @@ class AutoUpdater {
   }
 
   Future<Map<String, dynamic>> _latestRelease() async {
-    final raw = await _downloadClient.getPlain(ApiEndpoints.latestAppMirror);
-    final data = json.decode(raw);
-    if (data is! Map) {
-      throw Exception('Invalid update response');
+    // Prefer the proxy first so the check works without direct GitHub access,
+    // then fall back to the canonical API.
+    Object? lastError;
+    for (final url in [
+      ApiEndpoints.latestAppMirror,
+      ApiEndpoints.latestApp,
+    ]) {
+      try {
+        final raw = await _downloadClient.getPlain(url);
+        final data = json.decode(raw);
+        if (data is! Map) {
+          throw Exception('Invalid update response');
+        }
+        return Map<String, dynamic>.from(data);
+      } catch (e) {
+        lastError = e;
+        KazumiLogger().w('Update: latest release from $url failed', error: e);
+      }
     }
-    return Map<String, dynamic>.from(data);
+    throw lastError ?? Exception('Invalid update response');
   }
 
   Future<void> autoCheckForUpdates() async {

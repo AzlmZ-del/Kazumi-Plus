@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:kazumi/request/clients/download_http_client.dart';
+import 'package:kazumi/request/config/api_endpoints.dart';
 import 'package:kazumi/request/core/network_exception.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/services/update/update_download_source.dart';
@@ -9,11 +10,21 @@ import 'package:kazumi/utils/crypto.dart';
 
 String getUpdateDownloadUrlFromAsset(
     Map<String, dynamic>? asset, UpdateDownloadSource source) {
-  final url = asset?[switch (source) {
-    UpdateDownloadSource.mirror => 'mirror_download_url',
-    UpdateDownloadSource.github => 'browser_download_url',
-  }];
-  return url is String ? url.trim() : '';
+  if (asset == null) return '';
+  final browser = asset['browser_download_url'];
+  final browserUrl = browser is String ? browser.trim() : '';
+  switch (source) {
+    case UpdateDownloadSource.mirror:
+      // Releases published from this fork carry no mirror_download_url, so the
+      // "mirror" source is served by prefixing the GitHub URL with a proxy.
+      final mirrored = asset['mirror_download_url'];
+      final mirroredUrl = mirrored is String ? mirrored.trim() : '';
+      if (mirroredUrl.isNotEmpty) return mirroredUrl;
+      if (browserUrl.isEmpty) return '';
+      return ApiEndpoints.releaseDownloadProxy + browserUrl;
+    case UpdateDownloadSource.github:
+      return browserUrl;
+  }
 }
 
 class UpdateIntegrityException implements Exception {

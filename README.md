@@ -50,10 +50,16 @@
 
 ## 安装
 
-本仓库**不发 Releases**，请自行构建，见下一节。
+Android 走本仓库的 [Releases](../../releases)，附件名形如 `Kazumi_android_2.4.0.apk`。
+装好后 **设置 → 更新 → 检查更新** 会读本仓库的最新 Release，有新版本就在应用内下载覆盖安装。
 
-Android 侧产物是单架构 arm64 的 release APK，`adb install -r` 即可。因为 `applicationId`
-和官方版不同，装在一起互不影响，设置与数据也是各自独立的。
+因为 `applicationId` 是 `com.patch.kazumi`、和官方版不同，两者可以装在一起互不影响，
+设置与数据也是各自独立的。
+
+> 从早期 **debug 签名**的构建升级会失败（`INSTALL_FAILED_UPDATE_INCOMPATIBLE`），
+> 需要先卸载旧版再装这个正式签名的 APK。之后同签名的版本都能直接覆盖升级。
+
+其余平台仍需自行构建，见下一节。
 
 ## 构建
 
@@ -136,6 +142,25 @@ flutter analyze   # upstream 既有 17 条 info，error / warning 应为 0
 flutter test      # 362 passed / 2 skipped
 ```
 
+## 发布
+
+打 tag 就会出 Release —— tag 必须是**裸版本号**且与 `pubspec.yaml` 的 `version` 一致：
+
+```bash
+git tag 2.4.0
+git push --no-verify fork 2.4.0
+```
+
+`.github/workflows/android-release.yaml` 会校验 tag 与 `pubspec.yaml` 是否相等，然后用
+`KEYSTORE_BASE64` / `KEYSTORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD` 四个 secrets 还原
+正式签名，产出 `Kazumi_android_<tag>.apk` 挂到 Release 上。
+
+**tag 不能带 `v` 前缀**：`needUpdate()` 按 `.` 分段 `int.parse`，`v2.4.0` 会直接抛异常。
+版本号只能往上抬（`2.4.1`、`2.5.0`…），发布后不能重发同一个 tag。
+
+上游那份 `release.yaml` 是全平台流水线，依赖 SignPath 签名、iOS 证书等本仓库没有的
+secrets，已改成只保留 `workflow_dispatch` 手动触发，不再响应 tag。
+
 ## 与上游同步
 
 ```bash
@@ -149,18 +174,18 @@ tools/sync-upstream.sh --abort   # 重放中途出问题，退回重放前
 
 ## 已知限制
 
-- **自动更新指向官方源**，没有跟着改：`ApiEndpoints.latestAppMirror` 仍然是
-  `api.kazumi.fyi`。本仓库不发 Releases，版本号是 `2.4.0`，高于上游当前的 `2.3.9`，
-  所以眼下不会弹升级提示；**等上游发到 2.4.x 就会又开始提示升级到官方版**
-  （因为 applicationId 不同，装出来是另一个应用，不会覆盖本版）。
-  届时要么继续抬高 `pubspec.yaml` 的版本号，要么在 **设置 → 更新 → 自动更新** 里关掉。
+- **自动更新指向本仓库**：`ApiEndpoints.latestApp` / `latestAppMirror` 都改成读
+  `AzlmZ-del/Kazumi-Plus` 的 `/releases/latest`。镜像走
+  `https://cdn.gh-proxy.org/` 前缀转发，国内可直连；拉不到会回落到 `api.github.com`。
+  下载源的「镜像」选项同样用这个前缀拼 GitHub 的 `browser_download_url`，
+  默认选中 **GitHub**。
+- 本仓库只出 Android。Windows / Linux / macOS / iOS 的构建路径没有 CI，也未验证。
 - `ApiEndpoints.pluginShop` 与 `pluginShopMirror` 仍指向上游的 `Predidit/KazumiRules`，
   自用规则要自己在**规则仓库管理**里加 `AzlmZ-del/KazumiRules` 的地址。
 - 上游的 UA 串、`MethodChannel('com.predidit.kazumi/...')`、`BINARY_NAME`/`OriginalFilename`
   等标识按原样保留 —— 改它们会破坏构建或与官方行为不一致，属于有意为之。
 - 只有 Android 与 Windows 的构建路径在本机跑通过；Linux / macOS / iOS 未验证。
-- 上游的 CI workflow（`.github/workflows/`）原样保留，但本仓库没有配置 secrets，
-  也没有打过 tag，所以不会自动出包。
+- 上游的 `pr.yaml` 原样保留；上游那份多平台 `release.yaml` 已限制为手动触发。
 
 ## 平台
 
