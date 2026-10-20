@@ -113,6 +113,7 @@ class KazumiLogOutput extends LogOutput {
   @override
   void output(OutputEvent event) {
     for (var line in event.lines) {
+      // ignore: avoid_print
       print(line);
     }
 
@@ -140,6 +141,7 @@ class KazumiLogOutput extends LogOutput {
           mode: FileMode.writeOnlyAppend,
         );
       } catch (e) {
+        // ignore: avoid_print
         print('Failed to write log to file: ${_singleLineLogText(e)}');
       }
     });
@@ -247,6 +249,7 @@ Future<bool> clearLogs() async {
     });
     return true;
   } catch (e) {
+    // ignore: avoid_print
     print('Error clearing file: ${_singleLineLogText(e)}');
     return false;
   }
