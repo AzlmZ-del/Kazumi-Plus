@@ -21,7 +21,7 @@ class _InterfaceSettingsPageState extends State<InterfaceSettingsPage> {
   late String defaultPage;
   late CollectLayout _defaultCollectLayout;
   bool _savingCollectLayout = false;
-  static const _exitBehaviorTitles = ['退出 Kazumi', '最小化至托盘', '每次都询问'];
+  static const _exitBehaviorTitles = ['退出 Kazumi Plus', '最小化至托盘', '每次都询问'];
   int _exitBehavior = GStorage.getSetting(SettingsKeys.exitBehavior)
       .clamp(0, _exitBehaviorTitles.length - 1);
 

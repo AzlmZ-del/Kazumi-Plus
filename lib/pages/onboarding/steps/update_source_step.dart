@@ -18,7 +18,7 @@ class UpdateSourceStep extends StatelessWidget {
           shape: OnboardingIconShape.cookie,
         ),
         title: '以你的方式更新',
-        subtitle: '选择适合你的更新来源，让 Kazumi 保持最新。',
+        subtitle: '选择适合你的更新来源，让 Kazumi Plus 保持最新。',
         child: RadioGroup<bool>(
           groupValue: useGithubUpdate,
           onChanged: (value) {

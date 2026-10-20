@@ -47,7 +47,7 @@ class _DisclaimerStepState extends State<DisclaimerStep> {
     final textTheme = Theme.of(context).textTheme;
     return OnboardingStepLayout(
       leading: const OnboardingStepIcon(icon: Icons.waving_hand_rounded),
-      title: '欢迎来到 Kazumi',
+      title: '欢迎来到 Kazumi Plus',
       child: TonalCard(
         padding: const EdgeInsets.all(24),
         child: _statementsText == null

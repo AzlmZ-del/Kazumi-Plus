@@ -5,7 +5,11 @@
 // 'flutter create' template.
 
 // The application's name. By default this is also the title of the Flutter window.
-PRODUCT_NAME = kazumi
+PRODUCT_NAME = "Kazumi Plus"
+
+// Keep the Swift module name stable: MainMenu.xib references customModule="Kazumi".
+// Without this, Xcode derives the module from PRODUCT_NAME and the nib fails to load.
+PRODUCT_MODULE_NAME = Kazumi
 
 // The application's bundle identifier
 PRODUCT_BUNDLE_IDENTIFIER = com.example.kazumi

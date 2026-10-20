@@ -93,7 +93,7 @@ final indexModule = createModule(
       ..route(
         '/error',
         child: (context, state) => Scaffold(
-          appBar: AppBar(title: const Text('Kazumi')),
+          appBar: AppBar(title: const Text('Kazumi Plus')),
           body: const GeneralErrorWidget(
             title: '初始化失败',
             errMsg: '请重新启动应用后再试。',
