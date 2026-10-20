@@ -130,7 +130,8 @@
             shell: bash
 
           # 只出 arm64：手机是 arm64，三架构那两套纯属白编。
-          # 产物仍是 app-release.apk（单架构不触发 split-per-abi），32 MB 左右。
+          # android/app/build.gradle 的 splits.abi 会把产物裁成真正的单 ABI
+          # （aapt2 badging 只报 native-code armeabi 一项），产物名带 ABI 后缀。
           - name: Build APK
             run: >-
               flutter build apk --release
@@ -141,10 +142,17 @@
               --dart-define=KAZUMI_KEY=$KAZUMI_KEY
             shell: bash
 
-          # 资产名必须同时含 "android" 和 ".apk"：
-          # getUpdateFilePatterns(androidApk) == ['android', '.apk']
+          # getUpdateFilePatterns(androidApk) == ['android', '.apk']：资产名必须
+          # 同时含 "android" 与 ".apk"，否则 App 内更新找不到资产。
+          # 校验文件特意不带 "android"，不然它也会命中同一组 pattern，
+          # firstWhere 取到它就会把 .sha256 当成 APK 下载。
+          #
+          # splits.abi 开启后产物名是 app-arm64-v8a-release.apk。
           - name: Package APK
-            run: cp build/app/outputs/flutter-apk/app-release.apk Kazumi_android_${{ steps.tag.outputs.tag }}.apk
+            run: |
+              name="KazumiPlus-${{ steps.tag.outputs.tag }}-android-arm64-v8a.apk"
+              cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk "$name"
+              sha256sum "$name" | tee "KazumiPlus-${{ steps.tag.outputs.tag }}-arm64-v8a.apk.sha256"
             shell: bash
 
           - name: Remove signing material
@@ -160,8 +168,10 @@
               body: |
                 Kazumi Plus ${{ steps.tag.outputs.tag }}（个人自用，非官方）
 
-                - 仅 arm64（`arm64-v8a`），32 位老设备装不了
-                - APK 用正式 release 签名，可直接覆盖安装
+                - `arm64-v8a`，只这一种；32 位老设备（armeabi-v7a / x86）装不了
+                - APK 用正式 release 签名，可覆盖安装
                 - 首次从 debug 签名的旧版升级会失败，需先卸载旧版
-              files: Kazumi_android_${{ steps.tag.outputs.tag }}.apk
+              files: |
+                KazumiPlus-${{ steps.tag.outputs.tag }}-android-arm64-v8a.apk
+                KazumiPlus-${{ steps.tag.outputs.tag }}-arm64-v8a.apk.sha256
               fail_on_unmatched_files: true

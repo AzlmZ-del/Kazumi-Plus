@@ -66,6 +66,30 @@ android {
         versionName flutterVersionName
     }
 
+    // 本版只发 arm64。
+    //
+    // 不能靠 defaultConfig.ndk.abiFilters —— Flutter 的 Gradle 插件在没开
+    // --split-per-abi 时会无条件 abiFilters.clear() 再填上全部 ABI
+    //（FlutterPlugin.kt configureAbiWithoutSplits，注释说用户配置优先，代码是反的）。
+    // 绕法是 android/gradle.properties 里的 disable-abi-filtering=true，
+    // 让插件跳过那段，交给下面的 splits 决定装哪些 ABI。
+    //
+    // 用 splits 而不是 --split-per-abi：两者产物都叫 app-arm64-v8a-release.apk，
+    // 但命令行参数只对本次构建生效，splits 写在这里对所有入口一致
+    //（IDE、CI、build_apk.ps1 都一样）。
+    //
+    // 副作用：文件末尾的 abiCodes 会生效，arm64 的 versionCode 变成
+    // versionCode * 10 + 2（2.4.1 -> 204012）。升级比较仍然单调递增，无影响。
+    splits {
+        abi {
+            enable true
+            reset()
+            include "arm64-v8a"
+            // 不额外产出 universal apk，只留单独的那个
+            universalApk false
+        }
+    }
+
     signingConfigs {
         if (hasReleaseKeystore) {
             release {
