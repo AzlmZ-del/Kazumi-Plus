@@ -24,16 +24,23 @@ class ApiEndpoints {
   static const String pluginShopMirror =
       'https://raw.gitcode.com/gh_mirrors/ka/KazumiRules/raw/main/';
 
-  /// 在线升级
+  /// 本版 Releases 所在仓库
+  static const String releasesRepo =
+      'https://github.com/AzlmZ-del/Kazumi-Plus';
+
+  /// 在线升级：读本仓库的最新 Release
   static const String latestApp =
-      'https://api.github.com/repos/Predidit/Kazumi/releases/latest';
+      'https://api.github.com/repos/AzlmZ-del/Kazumi-Plus/releases/latest';
+
+  /// 在线升级镜像：用 gh-proxy 转发 api.github.com，国内可直连
+  static const String latestAppMirror =
+      'https://cdn.gh-proxy.org/https://api.github.com/repos/AzlmZ-del/Kazumi-Plus/releases/latest';
+
+  /// Release 附件下载加速前缀（直接拼在完整 URL 前）
+  static const String releaseDownloadProxy = 'https://cdn.gh-proxy.org/';
 
   /// Bangumi 镜像测试后端
   static const String bangumiMirrorDomain = 'https://api.kazumi.fyi';
-
-  /// Kazumi 镜像后端应用更新
-  static const String latestAppMirror =
-      '$bangumiMirrorDomain/kazumi/v1/app/latest';
 
   /// 弹弹官网
   static const String dandanIndex = 'https://www.dandanplay.com/';

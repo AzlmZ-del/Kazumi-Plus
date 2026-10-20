@@ -22,6 +22,18 @@ if (flutterVersionName == null) {
     flutterVersionName = '1.0'
 }
 
+// Release signing material. Kept outside version control; CI writes it from
+// secrets before building. Without it we fall back to the debug key so that a
+// plain `flutter run --release` keeps working.
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('key.properties')
+def hasReleaseKeystore = keystorePropertiesFile.exists()
+if (hasReleaseKeystore) {
+    keystorePropertiesFile.withReader('UTF-8') { reader ->
+        keystoreProperties.load(reader)
+    }
+}
+
 android {
     namespace "com.example.kazumi"
     compileSdk flutter.compileSdkVersion
@@ -54,11 +66,25 @@ android {
         versionName flutterVersionName
     }
 
+    signingConfigs {
+        if (hasReleaseKeystore) {
+            release {
+                storeFile rootProject.file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig signingConfigs.debug
+            // Sign with the local release key when it is present so in-app
+            // updates can upgrade over an installed build. CI provides the same
+            // key from secrets; without it we fall back to the debug key.
+            signingConfig hasReleaseKeystore
+                ? signingConfigs.release
+                : signingConfigs.debug
         }
     }
 }

@@ -2,9 +2,8 @@
     name: "release"
     
     on:
-      push:
-        tags:
-          - "*"
+      # 上游是全平台发布流程，需要 SignPath / iOS 证书等本 fork 没有的 secrets。
+      # 本仓库改用 android-release.yaml 只出 Android，这里仅保留手动触发。
       workflow_dispatch:
         inputs:
           logLevel:

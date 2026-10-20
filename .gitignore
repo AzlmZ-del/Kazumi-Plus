@@ -54,6 +54,11 @@ android/build/reports/problems/
 /build_local.env
 /build_apk_log.txt
 
+# Android release signing (mirrors the SIGNING_KEY_BASE64 / KEY_* secrets)
+/android/key.properties
+/android/*.jks
+/android/*.keystore
+
 # 拆解视频源：逆向用的 APK 与临时解包，体积巨大，不进版本库
 /拆解视频源/
 
