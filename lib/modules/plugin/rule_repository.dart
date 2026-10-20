@@ -24,14 +24,66 @@ class RuleRepository {
 
   bool get isOfficial => url == RuleRepositoryList.officialUrl;
 
-  /// Host portion of [url], used as the compact subtitle and as the fallback
+  /// The built-in repository that ships alongside the official one.
+  bool get isPersonal => url == RuleRepositoryList.personalUrl;
+
+  /// Built-in repositories are always present and can only be switched off.
+  bool get isBuiltIn => isOfficial || isPersonal;
+
+  /// Display name of a built-in repository the user has not renamed.
+  ///
+  /// Kept out of [displayLabel] so that failure messages and other places that
+  /// only know the address keep using the plain host/repository name.
+  String? get builtInLabel => RuleRepositoryList.builtInLabelOf(url);
+
+  /// Host portion of [url], used as the compact subtitle and as the last-resort
   /// display name.
   String get hostLabel {
     final host = Uri.tryParse(url)?.host ?? '';
     return host.isEmpty ? url : host;
   }
 
-  String get displayLabel => label.isNotEmpty ? label : hostLabel;
+  /// Repository name read out of the URL path.
+  ///
+  /// Repository hosts put the name a fixed number of segments in
+  /// (`/<owner>/<repo>/<ref>/...` on GitHub's raw host, for instance), so those
+  /// are handled by [_repositoryNameIndex]. Any other layout falls back to the
+  /// last segment that is not a ref name, then to the host when the URL has no
+  /// path at all.
+  String get inferredLabel {
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      return url;
+    }
+    final segments = <String>[
+      for (final segment in uri.pathSegments)
+        if (segment.isNotEmpty) segment,
+    ];
+    if (segments.isEmpty) {
+      return hostLabel;
+    }
+
+    final index = _repositoryNameIndex(uri.host.toLowerCase(), segments.length);
+    if (index != null) {
+      final name = _stripRefSuffix(segments[index]);
+      if (name.isNotEmpty) {
+        return name;
+      }
+    }
+
+    // Unknown layout: the tail is usually the directory the user meant, unless
+    // a deep link left a ref such as `main` behind.
+    for (var i = segments.length - 1; i >= 0; i--) {
+      final segment = segments[i];
+      if (_refNames.contains(segment.toLowerCase())) {
+        continue;
+      }
+      return segment;
+    }
+    return hostLabel;
+  }
+
+  String get displayLabel => label.isNotEmpty ? label : inferredLabel;
 
   RuleRepository copyWith({String? label, bool? enabled}) {
     return RuleRepository(
@@ -60,6 +112,53 @@ class RuleRepository {
 
   @override
   String toString() => 'RuleRepository($url, label: $label, enabled: $enabled)';
+
+  /// Known branch and tag names that can appear as a path segment.
+  ///
+  /// Only used to skip a segment when a URL layout is unrecognized, so the list
+  /// stays deliberately short — a repository actually named `main` is far
+  /// rarer than a ref segment, and the known hosts below never consult it.
+  static const Set<String> _refNames = {
+    'main',
+    'master',
+    'develop',
+    'dev',
+    'gh-pages',
+    'latest',
+  };
+
+  /// Index of the repository-name segment for [host], or null when the host has
+  /// no known layout.
+  ///
+  /// GitHub's raw host serves `/<owner>/<repo>/<ref>/<path>`; GitLab's raw host
+  /// serves `/<owner>/<repo>/-/raw/<ref>/<path>`. Everything else is layout-free
+  /// and goes through the generic tail scan.
+  static int? _repositoryNameIndex(String host, int segmentCount) {
+    if (segmentCount < 2) {
+      return null;
+    }
+    if (host == 'raw.githubusercontent.com' || host == 'raw.gitmirror.com') {
+      return 1;
+    }
+    if (host == 'raw.gitcode.com') {
+      // `gh_mirrors/ka/KazumiRules/raw/main/`
+      return segmentCount >= 3 ? 2 : null;
+    }
+    if (host == 'gitlab.com' || host.endsWith('.gitlab.com')) {
+      return 1;
+    }
+    // jsDelivr: `/gh/<owner>/<repo>@<ref>/<path>` and `/gl/<owner>/<repo>@..`.
+    if (host == 'cdn.jsdelivr.net' || host == 'fastly.jsdelivr.net') {
+      return segmentCount >= 3 ? 2 : null;
+    }
+    return null;
+  }
+
+  /// Drops a `@<ref>` suffix that some hosts fold into the name segment.
+  static String _stripRefSuffix(String segment) {
+    final at = segment.indexOf('@');
+    return at > 0 ? segment.substring(0, at) : segment;
+  }
 }
 
 /// Persisted as a single JSON string under `SettingsKeys.ruleRepositories`.
@@ -74,8 +173,26 @@ class RuleRepositoryList {
   /// mirror interceptor still keys off the same constant.
   static String get officialUrl => ApiEndpoints.pluginShop;
 
+  /// The second built-in repository, kept next to the official one.
+  static String get personalUrl => ApiEndpoints.personalPluginShop;
+
+  /// Short name of a built-in repository address, null for anything else.
+  ///
+  /// Takes an address rather than a [RuleRepository] because catalog entries
+  /// only carry the URL they came from.
+  static String? builtInLabelOf(String url) {
+    if (url == officialUrl) {
+      return '官方仓库';
+    }
+    if (url == personalUrl) {
+      return '个人仓库';
+    }
+    return null;
+  }
+
   static List<RuleRepository> defaults() => <RuleRepository>[
     RuleRepository(url: officialUrl),
+    RuleRepository(url: personalUrl),
   ];
 
   static String encode(List<RuleRepository> repositories) {
@@ -90,7 +207,7 @@ class RuleRepositoryList {
   /// instead of discarding the whole configuration, because otherwise one bad
   /// row would silently reset every repository the user added.
   ///
-  /// The official repository is always present and always first; see the
+  /// The built-in repositories are always present and always first; see the
   /// "official is fixed at index 0" invariant in the design document.
   static List<RuleRepository> decode(String raw) {
     if (raw.trim().isEmpty) {
@@ -114,37 +231,64 @@ class RuleRepositoryList {
       if (repository == null) {
         continue;
       }
-      if (!seenUrls.add(repository.url)) {
+      final migrated = _migrateLegacyUrl(repository);
+      if (!seenUrls.add(migrated.url)) {
         continue;
       }
-      repositories.add(repository);
+      repositories.add(migrated);
     }
 
     if (repositories.isEmpty) {
       return defaults();
     }
 
-    return _withOfficialFirst(repositories);
+    return _withBuiltIns(repositories);
   }
 
-  /// Restores the "official first, never missing" invariant.
-  static List<RuleRepository> _withOfficialFirst(
+  /// Restores the "built-ins first, never missing" invariant.
+  ///
+  /// The official repository is pinned at index 0 because the update path falls
+  /// back to it, and the personal repository sits right behind it. Both come
+  /// back when the stored value has lost them, so an older configuration picks
+  /// them up without asking the user to add anything.
+  static List<RuleRepository> _withBuiltIns(
     List<RuleRepository> repositories,
   ) {
-    final officialIndex = repositories.indexWhere((repo) => repo.isOfficial);
-    if (officialIndex == 0) {
-      return repositories;
-    }
-    if (officialIndex < 0) {
-      return <RuleRepository>[
-        RuleRepository(url: officialUrl),
-        ...repositories,
-      ];
-    }
     final reordered = <RuleRepository>[...repositories];
-    final official = reordered.removeAt(officialIndex);
-    reordered.insert(0, official);
+
+    final officialIndex = reordered.indexWhere((repo) => repo.isOfficial);
+    if (officialIndex < 0) {
+      reordered.insert(0, RuleRepository(url: officialUrl));
+    } else if (officialIndex != 0) {
+      reordered.insert(0, reordered.removeAt(officialIndex));
+    }
+
+    final personalIndex = reordered.indexWhere((repo) => repo.isPersonal);
+    if (personalIndex < 0) {
+      reordered.insert(1, RuleRepository(url: personalUrl));
+    } else if (personalIndex != 1) {
+      reordered.insert(1, reordered.removeAt(personalIndex));
+    }
+
     return reordered;
+  }
+
+  /// Points a repository saved under the personal repository's old address at
+  /// the current one.
+  ///
+  /// The repository was renamed, and old configurations still carry the old
+  /// URL. Migrating instead of coexisting keeps one personal repository in the
+  /// list: without it the stale entry survives *and* [_withBuiltIns] adds the
+  /// new address right next to it.
+  static RuleRepository _migrateLegacyUrl(RuleRepository repository) {
+    if (repository.url != ApiEndpoints.legacyPersonalPluginShop) {
+      return repository;
+    }
+    return RuleRepository(
+      url: personalUrl,
+      label: repository.label,
+      enabled: repository.enabled,
+    );
   }
 
   static RuleRepository? _decodeEntry(Object? entry) {

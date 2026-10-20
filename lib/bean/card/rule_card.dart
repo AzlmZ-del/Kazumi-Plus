@@ -7,6 +7,8 @@ class RuleCard extends StatelessWidget {
     this.tags = const [],
     this.caption,
     this.subtitle,
+    this.source,
+    this.onSourceTap,
     this.trailing,
     this.onTap,
     this.onLongPress,
@@ -18,6 +20,16 @@ class RuleCard extends StatelessWidget {
   final List<Widget> tags;
   final String? caption;
   final String? subtitle;
+
+  /// Where this rule came from, rendered right under [subtitle].
+  ///
+  /// A separate line rather than another chip: the source is identity, not a
+  /// property of the rule, so it stays put while chips come and go.
+  final String? source;
+
+  /// Tapping the source line usually reveals the same-name rules it shadowed.
+  final VoidCallback? onSourceTap;
+
   final Widget? trailing;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
@@ -109,6 +121,25 @@ class RuleCard extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                   style: text.bodySmall?.copyWith(
                                       color: colors.onSurfaceVariant)),
+                            ],
+                            if (source != null && source!.isNotEmpty) ...[
+                              const SizedBox(height: 3),
+                              GestureDetector(
+                                onTap: onSourceTap,
+                                child: Text(
+                                  '来源 · $source',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: text.bodySmall?.copyWith(
+                                    color: colors.onSurfaceVariant,
+                                    decoration: onSourceTap == null
+                                        ? null
+                                        : TextDecoration.underline,
+                                    decorationStyle:
+                                        TextDecorationStyle.dotted,
+                                  ),
+                                ),
+                              ),
                             ],
                             if (tags.isNotEmpty) ...[
                               const SizedBox(height: 8),

@@ -24,6 +24,19 @@ class ApiEndpoints {
   static const String pluginShopMirror =
       'https://raw.gitcode.com/gh_mirrors/ka/KazumiRules/raw/main/';
 
+  /// 个人规则仓库，与官方仓库并列内置
+  static const String personalPluginShop =
+      'https://raw.githubusercontent.com/AzlmZ-del/Kazumi-Plus-Rules/main/';
+
+  /// 个人规则仓库镜像：gh-proxy 转发 raw.githubusercontent.com
+  static const String personalPluginShopMirror =
+      'https://cdn.gh-proxy.org/https://raw.githubusercontent.com/AzlmZ-del/Kazumi-Plus-Rules/main/';
+
+  /// 个人规则仓库的旧地址。仓库改名为 Kazumi-Plus-Rules 之前内置的是这个，
+  /// 老安装里存着它，解码时迁移掉，否则列表里会多出一条重复的个人仓库。
+  static const String legacyPersonalPluginShop =
+      'https://raw.githubusercontent.com/AzlmZ-del/KazumiRules/main/';
+
   /// 本版 Releases 所在仓库
   static const String releasesRepo =
       'https://github.com/AzlmZ-del/Kazumi-Plus';

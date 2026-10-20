@@ -369,29 +369,28 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
     );
   }
 
-  /// Source badge for a catalog card.
+  /// Where a rule came from, as a single line under the author.
   ///
-  /// Official rules keep the neutral tag every other badge uses; third-party
-  /// rules get a tinted one so "this is not from the built-in repository" is
-  /// visible at a glance. `+N` marks rules hidden behind a same-name conflict.
-  Widget _sourceTag(PluginHTTPItem item) {
-    final colors = Theme.of(context).colorScheme;
-    final official = item.repositoryUrl == RuleRepositoryList.officialUrl;
+  /// Repository name wins; otherwise the host of the repository URL; the
+  /// built-in repositories are always named rather than spelled out as a host.
+  /// `+N` marks rules hidden behind a same-name conflict, and tapping the line
+  /// opens them — the source line replaced the chip that used to carry both.
+  String _sourceLabel(PluginHTTPItem item) {
+    final base = _repositoryName(item);
     final shadowedCount = _controller.shadowedRulesFor(item.name).length;
-    final label = item.repositoryLabel.isEmpty
-        ? (Uri.tryParse(item.repositoryUrl)?.host ?? '未知来源')
-        : item.repositoryLabel;
-    return GestureDetector(
-      onTap: shadowedCount == 0 ? null : () => _showShadowedSources(item),
-      child: RuleTag(
-        label: shadowedCount == 0 ? label : '$label +$shadowedCount',
-        background:
-            official ? colors.surfaceContainerHighest : colors.secondaryContainer,
-        foreground: official
-            ? colors.onSurfaceVariant
-            : colors.onSecondaryContainer,
-      ),
-    );
+    return shadowedCount == 0 ? base : '$base +$shadowedCount';
+  }
+
+  /// Name of the repository a catalog entry came from.
+  String _repositoryName(PluginHTTPItem item) {
+    final builtIn = RuleRepositoryList.builtInLabelOf(item.repositoryUrl);
+    if (builtIn != null) {
+      return builtIn;
+    }
+    if (item.repositoryLabel.isNotEmpty) {
+      return item.repositoryLabel;
+    }
+    return Uri.tryParse(item.repositoryUrl)?.host ?? '未知来源';
   }
 
   void _showShadowedSources(PluginHTTPItem item) {
@@ -425,9 +424,7 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        source.repositoryLabel.isEmpty
-                            ? source.repositoryUrl
-                            : source.repositoryLabel,
+                        _repositoryName(source),
                         style: theme.textTheme.bodyMedium,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -572,17 +569,18 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
                       installed: status == PluginCatalogItemStatus.installed,
                       subtitle:
                           item.author.isEmpty ? null : '作者 · ${item.author}',
+                      source: item.repositoryUrl.isEmpty
+                          ? null
+                          : _sourceLabel(item),
+                      onSourceTap:
+                          _controller.shadowedRulesFor(item.name).isEmpty
+                              ? null
+                              : () => _showShadowedSources(item),
                       tags: [
                         RuleTag(
                             label: item.version,
                             background: colors.surfaceContainerHighest,
                             foreground: colors.onSurfaceVariant),
-                        if (item.antiCrawlerEnabled)
-                          RuleTag(
-                              label: '含验证支持',
-                              background: colors.tertiaryContainer,
-                              foreground: colors.onTertiaryContainer),
-                        if (item.repositoryUrl.isNotEmpty) _sourceTag(item),
                       ],
                       caption: item.lastUpdate > 0
                           ? '更新于 ${DateTime.fromMillisecondsSinceEpoch(item.lastUpdate).toString().split(' ').first}'
