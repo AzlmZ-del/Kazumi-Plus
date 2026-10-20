@@ -51,7 +51,7 @@
 ## 安装
 
 Android 走本仓库的 [Releases](../../releases)，附件名形如
-`KazumiPlus-2.4.1-android-arm64-v8a.apk`。**只有 arm64-v8a**，armeabi-v7a / x86_64 的机器装不了。
+`KazumiPlus-2.4.2-android-arm64-v8a.apk`。**只有 arm64-v8a**，armeabi-v7a / x86_64 的机器装不了。
 装好后 **设置 → 更新 → 检查更新** 会读本仓库的最新 Release，有新版本就在应用内下载覆盖安装。
 
 因为 `applicationId` 是 `com.patch.kazumi`、和官方版不同，两者可以装在一起互不影响，
@@ -70,7 +70,7 @@ Android 走本仓库的 [Releases](../../releases)，附件名形如
 |---|---|
 | Flutter | 3.47.7（stable） |
 | Dart SDK | `>=3.10.0 <4.0.0` |
-| 当前版本号 | 2.4.1+20401（`pubspec.yaml`） |
+| 当前版本号 | 2.4.2+20402（`pubspec.yaml`） |
 
 其余平台工具链按 [Flutter 官方文档](https://docs.flutter.dev/get-started/install) 准备。
 上游作者提醒过：本项目除了 Google 托管的 Flutter 依赖，还依赖 MavenCentral / GitHub /
@@ -148,8 +148,8 @@ flutter test      # 362 passed / 2 skipped
 打 tag 就会出 Release —— tag 必须是**裸版本号**且与 `pubspec.yaml` 的 `version` 一致：
 
 ```bash
-git tag 2.4.1
-git push --no-verify fork 2.4.1
+git tag 2.4.2
+git push --no-verify fork 2.4.2
 ```
 
 `.github/workflows/android-release.yaml` 会校验 tag 与 `pubspec.yaml` 是否相等，然后用
@@ -158,7 +158,7 @@ git push --no-verify fork 2.4.1
 同时附一个 `KazumiPlus-<tag>-arm64-v8a.apk.sha256` 校验文件。
 
 **tag 不能带 `v` 前缀**：`needUpdate()` 按 `.` 分段 `int.parse`，`v2.4.0` 会直接抛异常。
-版本号只能往上抬（`2.4.1`、`2.5.0`…），发布后不能重发同一个 tag。
+版本号只能往上抬（`2.4.2`、`2.5.0`…），发布后不能重发同一个 tag。
 
 ### 构建速度
 
