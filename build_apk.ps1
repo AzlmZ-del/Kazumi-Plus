@@ -46,14 +46,15 @@ if ($cred['MIRROR_APPID'] -and $cred['MIRROR_KEY']) {
 }
 $def = $defines -join ' '
 
-# 单架构 arm64：砍掉 v7a / x86_64，构建量省 2/3
+# 单架构 arm64：splits.abi 只留 arm64-v8a（见 android/app/build.gradle）。
+# 开了 splits 之后产物名是 app-arm64-v8a-release.apk，不再是 app-release.apk。
 cmd /c "flutter build apk --release --target-platform android-arm64 $def > build_apk_log.txt 2>&1"
 if ($LASTEXITCODE -ne 0) {
     Write-Error 'APK 构建失败，日志见 build_apk_log.txt'
     exit 1
 }
 
-$apk = 'D:\Kazumi\build\app\outputs\flutter-apk\app-release.apk'
+$apk = 'D:\Kazumi\build\app\outputs\flutter-apk\app-arm64-v8a-release.apk'
 if (-not (Test-Path -LiteralPath $apk)) {
     Write-Error "构建产物不存在: $apk"
     exit 1

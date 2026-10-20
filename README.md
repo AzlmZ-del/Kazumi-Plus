@@ -50,7 +50,8 @@
 
 ## 安装
 
-Android 走本仓库的 [Releases](../../releases)，附件名形如 `Kazumi_android_2.4.1.apk`。
+Android 走本仓库的 [Releases](../../releases)，附件名形如
+`KazumiPlus-2.4.1-android-arm64-v8a.apk`。**只有 arm64-v8a**，armeabi-v7a / x86_64 的机器装不了。
 装好后 **设置 → 更新 → 检查更新** 会读本仓库的最新 Release，有新版本就在应用内下载覆盖安装。
 
 因为 `applicationId` 是 `com.patch.kazumi`、和官方版不同，两者可以装在一起互不影响，
@@ -119,7 +120,7 @@ const Map<String, String> bangumiMirrorCredentials = {
 
 # Android：只出包
 .\build_apk.ps1 -NoInstall
-# 产物 -> build\app\outputs\flutter-apk\app-release.apk
+# 产物 -> build\app\outputs\flutter-apk\app-arm64-v8a-release.apk
 
 # Windows 桌面
 .\build_local.ps1
@@ -153,7 +154,8 @@ git push --no-verify fork 2.4.1
 
 `.github/workflows/android-release.yaml` 会校验 tag 与 `pubspec.yaml` 是否相等，然后用
 `KEYSTORE_BASE64` / `KEYSTORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD` 四个 secrets 还原
-正式签名，产出 `Kazumi_android_<tag>.apk` 挂到 Release 上。
+正式签名，产出 `KazumiPlus-<tag>-android-arm64-v8a.apk` 挂到 Release 上，
+同时附一个 `KazumiPlus-<tag>-arm64-v8a.apk.sha256` 校验文件。
 
 **tag 不能带 `v` 前缀**：`needUpdate()` 按 `.` 分段 `int.parse`，`v2.4.0` 会直接抛异常。
 版本号只能往上抬（`2.4.1`、`2.5.0`…），发布后不能重发同一个 tag。
@@ -172,7 +174,7 @@ git push --no-verify fork 2.4.1
 （三个 cache 存 47 秒、下一轮恢复 47 秒）。收益从第二次构建才开始兑现。
 
 - **只出 arm64**。原来的三架构（arm / arm64 / x64）各编一遍 C++ bridge 和 AOT，
-  多花约 3 分钟给一台用不上的设备。产物 31.97 MB，比全架构的 74.4 MB 小一半多。
+  多花约 3 分钟给一台用不上的设备。产物 31.9 MB，比全架构的 74.4 MB 小一半多。
 - **Gradle 发行包 + 依赖走 `actions/cache`**。第一次跑会在 `Gradle 8.14.5-all.zip`
   下载和 AGP 依赖解析上空等约 2 分钟，缓存命中后跳过。
 - **NDK 28.2 单独缓存**。runner 预装 27.3 / 29.0 / 30.0，偏偏没有项目声明的 28.2，
