@@ -382,6 +382,10 @@ class _PluginViewPageState extends State<PluginViewPage> {
                       return RuleCard(
                         key: ValueKey(plugin.name),
                         title: plugin.name,
+                        titleTag: RuleTag(
+                            label: plugin.version,
+                            background: colors.primaryContainer,
+                            foreground: colors.onPrimaryContainer),
                         subtitle: Uri.tryParse(plugin.baseUrl)?.host ??
                             plugin.baseUrl,
                         selected: _selected.contains(plugin.name),
@@ -398,10 +402,6 @@ class _PluginViewPageState extends State<PluginViewPage> {
                           _selected.add(plugin.name);
                         }),
                         tags: [
-                          RuleTag(
-                              label: plugin.version,
-                              background: colors.surfaceContainerHighest,
-                              foreground: colors.onSurfaceVariant),
                           // 有登录流程才标，没登录的不打扰。
                           if (plugin.authEnabled)
                             RuleTag(
