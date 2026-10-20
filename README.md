@@ -154,8 +154,8 @@ git push --no-verify fork 2.4.2
 
 `.github/workflows/android-release.yaml` 会校验 tag 与 `pubspec.yaml` 是否相等，然后用
 `KEYSTORE_BASE64` / `KEYSTORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD` 四个 secrets 还原
-正式签名，产出 `KazumiPlus-<tag>-android-arm64-v8a.apk` 挂到 Release 上，
-同时附一个 `KazumiPlus-<tag>-arm64-v8a.apk.sha256` 校验文件。
+正式签名，产出唯一一个附件 `KazumiPlus-<tag>-android-arm64-v8a.apk` 挂到 Release 上。
+（App 内更新的完整性校验读的是 GitHub 自动生成的 `asset.digest`，不需要额外的校验文件。）
 
 **tag 不能带 `v` 前缀**：`needUpdate()` 按 `.` 分段 `int.parse`，`v2.4.0` 会直接抛异常。
 版本号只能往上抬（`2.4.2`、`2.5.0`…），发布后不能重发同一个 tag。

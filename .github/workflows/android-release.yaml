@@ -146,13 +146,12 @@
 
           # getUpdateFilePatterns(androidApk) == ['android', '.apk']：资产名必须
           # 同时含 "android" 与 ".apk"，否则 App 内更新找不到资产。
-          # 校验文件特意不带 "android"，不然它也会命中同一组 pattern，
-          # firstWhere 取到它就会把 .sha256 当成 APK 下载。
+          # 只上传这一个附件 —— App 内更新校验用的是 GitHub 自动生成的
+          # asset.digest，不需要额外的 .sha256 文件。
           - name: Package APK
             run: |
-              name="KazumiPlus-${{ steps.tag.outputs.tag }}-android-arm64-v8a.apk"
-              cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk "$name"
-              sha256sum "$name" | tee "KazumiPlus-${{ steps.tag.outputs.tag }}-arm64-v8a.apk.sha256"
+              cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+                "KazumiPlus-${{ steps.tag.outputs.tag }}-android-arm64-v8a.apk"
             shell: bash
 
           - name: Remove signing material
@@ -171,7 +170,5 @@
                 - `arm64-v8a`，只这一种；32 位老设备（armeabi-v7a / x86）装不了
                 - APK 用正式 release 签名，可覆盖安装
                 - 首次从 debug 签名的旧版升级会失败，需先卸载旧版
-              files: |
-                KazumiPlus-${{ steps.tag.outputs.tag }}-android-arm64-v8a.apk
-                KazumiPlus-${{ steps.tag.outputs.tag }}-arm64-v8a.apk.sha256
+              files: KazumiPlus-${{ steps.tag.outputs.tag }}-android-arm64-v8a.apk
               fail_on_unmatched_files: true
