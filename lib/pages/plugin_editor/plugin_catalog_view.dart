@@ -571,6 +571,10 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
                       builder: (context, snapshot) => RuleCard(
                       key: ValueKey(item.name),
                       title: item.name,
+                      titleTag: RuleTag(
+                          label: item.version,
+                          background: colors.primaryContainer,
+                          foreground: colors.onPrimaryContainer),
                       installed: status == PluginCatalogItemStatus.installed,
                       subtitle:
                           item.author.isEmpty ? null : '作者 · ${item.author}',
@@ -582,12 +586,6 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
                               ? null
                               : () => _showShadowedSources(item),
                       webUrl: snapshot.data,
-                      tags: [
-                        RuleTag(
-                            label: item.version,
-                            background: colors.surfaceContainerHighest,
-                            foreground: colors.onSurfaceVariant),
-                      ],
                       caption: item.lastUpdate > 0
                           ? '更新于 ${DateTime.fromMillisecondsSinceEpoch(item.lastUpdate).toString().split(' ').first}'
                           : null,

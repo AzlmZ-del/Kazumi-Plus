@@ -4,6 +4,7 @@ class RuleCard extends StatelessWidget {
   const RuleCard({
     super.key,
     required this.title,
+    this.titleTag,
     this.tags = const [],
     this.caption,
     this.subtitle,
@@ -18,6 +19,14 @@ class RuleCard extends StatelessWidget {
   });
 
   final String title;
+
+  /// Chip rendered right before [title] on the heading line.
+  ///
+  /// Identity-adjacent facts (such as the rule version) read better beside the
+  /// name than in the chip row under the URLs, so they get their own slot and
+  /// stay put while the [tags] row changes.
+  final Widget? titleTag;
+
   final List<Widget> tags;
   final String? caption;
   final String? subtitle;
@@ -116,11 +125,22 @@ class RuleCard extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(title,
-                                style: text.titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.w700),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                if (titleTag != null) ...[
+                                  titleTag!,
+                                  const SizedBox(width: 8),
+                                ],
+                                Expanded(
+                                  child: Text(title,
+                                      style: text.titleMedium?.copyWith(
+                                          fontWeight: FontWeight.w700),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis),
+                                ),
+                              ],
+                            ),
                             if (subtitle != null && subtitle!.isNotEmpty) ...[
                               const SizedBox(height: 3),
                               Text(subtitle!,
