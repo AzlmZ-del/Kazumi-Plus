@@ -121,3 +121,15 @@ String formatDateTime(DateTime date) {
       '${date.month.toString().padLeft(2, '0')}-'
       '${date.day.toString().padLeft(2, '0')}';
 }
+
+/// 精确到秒的日期时间，形如 `2026-10-21 02:51:44`。
+///
+/// 规则仓库的 `lastUpdate` 是毫秒时间戳，秒级精度才能区分同一天里
+/// 先后更新的规则，所以单独给一个带秒的格式化，而不是复用只到日的
+/// [formatDateTime]。
+String formatDateTimeWithSeconds(DateTime date) {
+  String two(int value) => value.toString().padLeft(2, '0');
+  return '${date.year.toString().padLeft(4, '0')}-'
+      '${two(date.month)}-${two(date.day)} '
+      '${two(date.hour)}:${two(date.minute)}:${two(date.second)}';
+}

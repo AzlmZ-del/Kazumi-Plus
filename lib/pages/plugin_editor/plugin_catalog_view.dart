@@ -16,6 +16,7 @@ import 'package:kazumi/pages/plugin_editor/rule_management_widgets.dart';
 import 'package:kazumi/plugins/plugins_controller.dart';
 import 'package:kazumi/request/config/rules_repository_config.dart';
 import 'package:kazumi/services/storage/storage.dart';
+import 'package:kazumi/utils/date_time.dart';
 
 enum _CatalogSort { lastUpdate, name }
 
@@ -587,7 +588,7 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
                               : () => _showShadowedSources(item),
                       webUrl: snapshot.data,
                       caption: item.lastUpdate > 0
-                          ? '更新于 ${DateTime.fromMillisecondsSinceEpoch(item.lastUpdate).toString().split(' ').first}'
+                          ? '更新·${formatDateTimeWithSeconds(DateTime.fromMillisecondsSinceEpoch(item.lastUpdate))}'
                           : null,
                         trailing: _CatalogRuleAction(
                           status: status,
