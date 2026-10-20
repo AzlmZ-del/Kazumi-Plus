@@ -20,11 +20,12 @@ class RuleCard extends StatelessWidget {
 
   final String title;
 
-  /// Chip docked at the heading line's trailing end, level with [title].
+  /// Chip docked in the card's top-right corner, sharing the heading line with
+  /// [title] and right-aligned with [trailing].
   ///
-  /// Sits in the card's top-right corner so identity-adjacent facts (such as
-  /// the rule version) line up with the name instead of crowding the chip row
-  /// under the URLs, and stay put while the [tags] row changes.
+  /// Identity-adjacent facts (such as the rule version) read better level with
+  /// the name than in the chip row under the URLs, so they get their own slot
+  /// and stay put while the [tags] row changes.
   final Widget? titleTag;
 
   final List<Widget> tags;
@@ -68,6 +69,26 @@ class RuleCard extends StatelessWidget {
     final duration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
         : const Duration(milliseconds: 220);
+    // The version chip and the trailing action share one right-aligned column;
+    // the 16px inset puts the chip's edge on the action's label edge instead of
+    // floating out to the card border (both action variants pad their labels
+    // by 16).
+    final side = (titleTag == null && actions == null)
+        ? null
+        : Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (titleTag != null)
+                Padding(
+                  padding: const EdgeInsets.only(right: 16),
+                  child: titleTag!,
+                ),
+              if (titleTag != null && actions != null)
+                const SizedBox(height: 6),
+              ?actions,
+            ],
+          );
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Semantics(
@@ -125,22 +146,11 @@ class RuleCard extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: Text(title,
-                                      style: text.titleMedium?.copyWith(
-                                          fontWeight: FontWeight.w700),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis),
-                                ),
-                                if (titleTag != null) ...[
-                                  const SizedBox(width: 8),
-                                  titleTag!,
-                                ],
-                              ],
-                            ),
+                            Text(title,
+                                style: text.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w700),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis),
                             if (subtitle != null && subtitle!.isNotEmpty) ...[
                               const SizedBox(height: 3),
                               Text(subtitle!,
@@ -196,20 +206,20 @@ class RuleCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         identity,
-                        if (actions != null) ...[
+                        if (side != null) ...[
                           const SizedBox(height: 8),
                           Align(
                               alignment: AlignmentDirectional.centerEnd,
-                              child: actions),
+                              child: side),
                         ],
                       ],
                     );
                   }
                   return Row(children: [
                     Expanded(child: identity),
-                    if (actions != null) ...[
+                    if (side != null) ...[
                       const SizedBox(width: 12),
-                      actions
+                      side
                     ],
                   ]);
                 }),
