@@ -494,6 +494,55 @@ abstract class _PluginsController with Store {
   /// Repositories that failed during the last successful refresh.
   List<RuleRepositoryFailure> get repositoryFailures => _repositoryFailures;
 
+  /// `baseURL` of a catalog rule, for the card's address line.
+  ///
+  /// The catalog file only carries name/version/author, so the address has to
+  /// come from the rule itself. An installed copy already knows it and answers
+  /// without a request, which covers the common case; the rest are downloaded
+  /// once per (repository, name, version) and cached — including failures, so
+  /// scrolling the list cannot hammer the repositories.
+  final Map<String, Future<String?>> _ruleBaseUrlFutures = {};
+
+  Future<String?> ruleBaseUrl(PluginHTTPItem item) {
+    final key = pluginNameKey(item.name);
+    for (final plugin in pluginList) {
+      if (pluginNameKey(plugin.name) == key &&
+          plugin.baseUrl.trim().isNotEmpty) {
+        // Cached like the downloads below: a fresh Future on every build would
+        // make FutureBuilder resolve forever.
+        return _ruleBaseUrlFutures.putIfAbsent(
+          'installed|$key|${plugin.baseUrl}',
+          () => Future.value(plugin.baseUrl),
+        );
+      }
+    }
+    final cacheKey = '${item.repositoryUrl}|$key|${item.version}';
+    return _ruleBaseUrlFutures.putIfAbsent(cacheKey, () async {
+      try {
+        final wholeLoader = _pluginLoader;
+        final Plugin remote;
+        if (wholeLoader != null) {
+          remote = await wholeLoader(item.name);
+        } else if (item.repositoryUrl.isEmpty) {
+          // Untagged entries only reach here through a whole-catalog loader;
+          // guessing the official repository would be a surprise request.
+          return null;
+        } else {
+          remote = await _repositoryLoader(item.repositoryUrl, item.name);
+        }
+        final baseUrl = remote.baseUrl.trim();
+        return baseUrl.isEmpty ? null : baseUrl;
+      } catch (error, stackTrace) {
+        _errorReporter(
+          'Plugin: failed to read the address of rule ${item.name}',
+          error,
+          stackTrace,
+        );
+        return null;
+      }
+    });
+  }
+
   Future<List<PluginHTTPItem>> ensurePluginCatalog() {
     if (isPluginCatalogFresh) {
       return Future.value(
