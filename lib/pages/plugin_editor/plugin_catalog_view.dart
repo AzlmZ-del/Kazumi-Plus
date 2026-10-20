@@ -576,6 +576,9 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
                           _controller.shadowedRulesFor(item.name).isEmpty
                               ? null
                               : () => _showShadowedSources(item),
+                      webUrl: item.repositoryUrl.isEmpty
+                          ? null
+                          : item.repositoryUrl,
                       tags: [
                         RuleTag(
                             label: item.version,

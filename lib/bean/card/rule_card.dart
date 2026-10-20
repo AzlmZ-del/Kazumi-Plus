@@ -9,6 +9,7 @@ class RuleCard extends StatelessWidget {
     this.subtitle,
     this.source,
     this.onSourceTap,
+    this.webUrl,
     this.trailing,
     this.onTap,
     this.onLongPress,
@@ -29,6 +30,12 @@ class RuleCard extends StatelessWidget {
 
   /// Tapping the source line usually reveals the same-name rules it shadowed.
   final VoidCallback? onSourceTap;
+
+  /// The address the source resolves to, rendered under the source line.
+  ///
+  /// Wraps instead of ellipsizing on purpose: a truncated base URL is useless
+  /// for spotting which host a rule actually comes from.
+  final String? webUrl;
 
   final Widget? trailing;
   final VoidCallback? onTap;
@@ -139,6 +146,14 @@ class RuleCard extends StatelessWidget {
                                         TextDecorationStyle.dotted,
                                   ),
                                 ),
+                              ),
+                            ],
+                            if (webUrl != null && webUrl!.isNotEmpty) ...[
+                              const SizedBox(height: 3),
+                              Text(
+                                '网址 · $webUrl',
+                                style: text.bodySmall?.copyWith(
+                                    color: colors.onSurfaceVariant),
                               ),
                             ],
                             if (tags.isNotEmpty) ...[
