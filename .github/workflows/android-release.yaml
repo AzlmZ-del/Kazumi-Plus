@@ -129,12 +129,14 @@
             run: flutter pub get
             shell: bash
 
-          # 只出 arm64：手机是 arm64，三架构那两套纯属白编。
-          # android/app/build.gradle 的 splits.abi 会把产物裁成真正的单 ABI
-          # （aapt2 badging 只报 native-code armeabi 一项），产物名带 ABI 后缀。
+          # 只出 arm64：--split-per-abi 让 Gradle 只产出 arm64-v8a 那个 APK，
+          # 产物名变成 app-arm64-v8a-release.apk。
+          # 这个标志不能省 —— 没有它 flutter 工具链还是去找 app-release.apk，
+          # 找不到就报 "Gradle build failed to produce an .apk file"。
           - name: Build APK
             run: >-
               flutter build apk --release
+              --split-per-abi
               --target-platform android-arm64
               --dart-define=DANDANAPI_APPID=$DANDANAPI_APPID
               --dart-define=DANDANAPI_KEY=$DANDANAPI_KEY
@@ -146,8 +148,6 @@
           # 同时含 "android" 与 ".apk"，否则 App 内更新找不到资产。
           # 校验文件特意不带 "android"，不然它也会命中同一组 pattern，
           # firstWhere 取到它就会把 .sha256 当成 APK 下载。
-          #
-          # splits.abi 开启后产物名是 app-arm64-v8a-release.apk。
           - name: Package APK
             run: |
               name="KazumiPlus-${{ steps.tag.outputs.tag }}-android-arm64-v8a.apk"

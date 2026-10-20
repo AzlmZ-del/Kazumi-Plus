@@ -129,7 +129,7 @@ const Map<String, String> bangumiMirrorCredentials = {
 手工构建等价于：
 
 ```bash
-flutter build apk --release --target-platform android-arm64 \
+flutter build apk --release --split-per-abi --target-platform android-arm64 \
   --dart-define=DANDANAPI_APPID=... \
   --dart-define=DANDANAPI_KEY=... \
   --dart-define=KAZUMI_APPID=... \
@@ -173,8 +173,9 @@ git push --no-verify fork 2.4.2
 注意冷缓存那轮**比优化前还慢 28 秒** —— 省下的编译时间被缓存的上传开销吃掉了
 （三个 cache 存 47 秒、下一轮恢复 47 秒）。收益从第二次构建才开始兑现。
 
-- **只出 arm64**。原来的三架构（arm / arm64 / x64）各编一遍 C++ bridge 和 AOT，
-  多花约 3 分钟给一台用不上的设备。产物 31.9 MB，比全架构的 74.4 MB 小一半多。
+- **只出 arm64**。加 `--split-per-abi` 后 Gradle 只产出 `app-arm64-v8a-release.apk`，
+  另外两个架构既不编译也不打进包（`aapt2` 只报 `native-code: 'arm64-v8a'`）。
+  产物 31.9 MB，比全架构的 74.4 MB 小一半多，构建时间省约 3 分钟。
 - **Gradle 发行包 + 依赖走 `actions/cache`**。第一次跑会在 `Gradle 8.14.5-all.zip`
   下载和 AGP 依赖解析上空等约 2 分钟，缓存命中后跳过。
 - **NDK 28.2 单独缓存**。runner 预装 27.3 / 29.0 / 30.0，偏偏没有项目声明的 28.2，
