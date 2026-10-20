@@ -198,14 +198,15 @@ class _VideoDetailsSheetState extends State<_VideoDetailsSheet>
   }
 
   /// mpv 的 fps / estimated-frame-rate 是浮点字符串，最多保留 3 位小数并去掉末尾 0
-  /// （如 23.976、30）。
+  /// （如 23.976 fps、30 fps）。
   String _formatFps(String raw) {
     final value = double.tryParse(raw);
     if (raw.isEmpty || value == null || value <= 0) return '';
-    return value
+    final text = value
         .toStringAsFixed(3)
         .replaceAll(RegExp(r'0+$'), '')
         .replaceAll(RegExp(r'\.$'), '');
+    return '$text fps';
   }
 
   Widget _metric(BuildContext context, String label, String value) {
