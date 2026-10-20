@@ -104,7 +104,7 @@ void main() {
     expect(find.text('03 讨论'), findsOneWidget);
     expect(find.text('芙莉莲'), findsOneWidget);
     expect(find.text('第三集'), findsOneWidget);
-    expect(find.text('2026-10-15 · 00:23:45'), findsOneWidget);
+    expect(find.text('首播:2026-10-15 / 时长:00:23:45'), findsOneWidget);
     expect(find.text('第一条讨论', findRichText: true), findsOneWidget);
     expect(find.text('第二条讨论', findRichText: true), findsOneWidget);
     expect(find.text('已显示全部 2 条讨论 · 来自 Bangumi'), findsOneWidget);
