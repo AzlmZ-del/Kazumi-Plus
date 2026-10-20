@@ -97,11 +97,12 @@ flutter build apk --release --split-per-abi --target-platform android-arm64 \
 打裸版本号 tag（与 `pubspec.yaml` 的 `version` 一致，**不能带 `v` 前缀**），CI 自动出包并发布：
 
 ```bash
-git tag 2.4.2
+git tag -a 2.4.2 -m "更新说明写在这里"
 git push --no-verify fork 2.4.2
 ```
 
-更新内容写在 tag 消息里，会原样成为 Release 正文。
+**更新内容就写在 tag 消息里**，CI 会把 `%(contents)` 原样放进 Release 正文。
+必须是 annotated tag（`-a`）；轻量 tag 会被判为「没有消息」而回落到一句默认说明。
 
 ## 免责声明
 
