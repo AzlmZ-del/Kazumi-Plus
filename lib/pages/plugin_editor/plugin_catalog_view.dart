@@ -588,7 +588,7 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
                               : () => _showShadowedSources(item),
                       webUrl: snapshot.data,
                       caption: item.lastUpdate > 0
-                          ? '更新·${formatDateTimeWithSeconds(DateTime.fromMillisecondsSinceEpoch(item.lastUpdate))}'
+                          ? '更新 · ${formatDateTimeWithSeconds(DateTime.fromMillisecondsSinceEpoch(item.lastUpdate))}'
                           : null,
                         trailing: _CatalogRuleAction(
                           status: status,
