@@ -159,16 +159,27 @@
             run: rm -f android/kazumi-release.jks android/key.properties
             shell: bash
 
+          # 更新内容写在 annotated tag 的消息里，这里原样取出来当 Release 正文。
+          # 轻量 tag 的 %(contents) 是它指向那个 commit 的提交信息，会混进无关内容，
+          # 所以先确认 cat-file -t 是 "tag" 才采用。
+          - name: Read release notes from tag
+            run: |
+              tag="${{ steps.tag.outputs.tag }}"
+              git fetch --tags --force --quiet origin "refs/tags/$tag:refs/tags/$tag" || true
+              if [ "$(git cat-file -t "refs/tags/$tag" 2>/dev/null || true)" = "tag" ]; then
+                git tag -l --format='%(contents)' "$tag" > release-notes.md
+              fi
+              if [ ! -s release-notes.md ]; then
+                printf '个人自用，非官方。安装包只出 `arm64-v8a`。\n' > release-notes.md
+              fi
+              cat release-notes.md
+            shell: bash
+
           - name: Create release
             uses: softprops/action-gh-release@v2
             with:
               tag_name: ${{ steps.tag.outputs.tag }}
               name: ${{ steps.tag.outputs.tag }}
-              body: |
-                Kazumi Plus ${{ steps.tag.outputs.tag }}（个人自用，非官方）
-
-                - `arm64-v8a`，只这一种；32 位老设备（armeabi-v7a / x86）装不了
-                - APK 用正式 release 签名，可覆盖安装
-                - 首次从 debug 签名的旧版升级会失败，需先卸载旧版
+              body_path: release-notes.md
               files: KazumiPlus-${{ steps.tag.outputs.tag }}-android-arm64-v8a.apk
               fail_on_unmatched_files: true
