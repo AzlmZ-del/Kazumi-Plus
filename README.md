@@ -23,13 +23,14 @@
 应用显示名是 **Kazumi Plus**，`applicationId` 为 `com.patch.kazumi`，与官方版
 `com.predidit.kazumi` 不冲突，**两个版本可以同时装在一台机器上**。
 
-配套的规则仓库在 [**AzlmZ-del/KazumiRules**](https://github.com/AzlmZ-del/KazumiRules)。
+配套的规则仓库在 [**AzlmZ-del/Kazumi-Plus-Rules**](https://github.com/AzlmZ-del/Kazumi-Plus-Rules)。
 
 ## 相对官方版多了什么
 
 | 功能 | 说明 |
 |---|---|
 | **多规则仓库** | 可同时挂多个第三方仓库，规则条目记录来源；目录聚合、同名去重、按仓库地址路由下载，另有独立管理页 |
+| **内置个人仓库** | 除官方仓库外，`AzlmZ-del/Kazumi-Plus-Rules` 也作为内置仓库常驻列表第二位（可关闭、不可删除），规则请求可走 gh-proxy 镜像 |
 | **规则登录与令牌** | 规则可声明登录接口，凭据本地保存、令牌缓存，401 自动重登；规则还能声明播放接口，绕开 WebView 直接取直链 |
 | **详情页增强** | 剧集页签、已播出/未播出区分、讨论行内展开或独立页面、「内部打开」 |
 | **Bangumi** | R18 条目搜索、无中文名条目可选保留、镜像取不到时回落到官方接口 |

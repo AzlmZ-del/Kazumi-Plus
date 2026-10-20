@@ -43,7 +43,7 @@ void main() {
   });
 
   group('catalog aggregation', () {
-    test('loads only the official repository by default', () async {
+    test('loads the built-in repositories by default', () async {
       final requested = <String>[];
       final controller = _controller(
         catalogLoader: (url) async {
@@ -54,7 +54,11 @@ void main() {
 
       final catalog = await controller.refreshPluginCatalog();
 
-      expect(requested, [ApiEndpoints.pluginShop]);
+      expect(requested, [
+        ApiEndpoints.pluginShop,
+        ApiEndpoints.personalPluginShop,
+      ]);
+      // Both list "alpha", so the earlier built-in keeps it.
       expect(catalog.map((item) => item.name), ['alpha']);
       expect(catalog.single.repositoryUrl, ApiEndpoints.pluginShop);
     });
@@ -138,13 +142,21 @@ void main() {
 
       await controller.refreshPluginCatalog();
 
-      expect(requested, [ApiEndpoints.pluginShop, 'https://a.example.com/rules/']);
+      expect(requested, [
+        ApiEndpoints.pluginShop,
+        ApiEndpoints.personalPluginShop,
+        'https://a.example.com/rules/',
+      ]);
     });
 
     test('returns an empty catalog when every repository is disabled', () async {
       await RulesRepositoryConfig.save([
         const RuleRepository(
           url: ApiEndpoints.pluginShop,
+          enabled: false,
+        ),
+        const RuleRepository(
+          url: ApiEndpoints.personalPluginShop,
           enabled: false,
         ),
       ]);
@@ -202,7 +214,7 @@ void main() {
         throwsA(isA<StateError>()),
       );
 
-      expect(controller.repositoryFailures, hasLength(3));
+      expect(controller.repositoryFailures, hasLength(4));
       expect(controller.isPluginCatalogFresh, isFalse);
       expect(controller.pluginHTTPList, isEmpty);
     });
@@ -235,7 +247,8 @@ void main() {
       var customCalls = 0;
       final controller = _controller(
         catalogLoader: (url) async {
-          if (url == ApiEndpoints.pluginShop) {
+          if (url == ApiEndpoints.pluginShop ||
+              url == ApiEndpoints.personalPluginShop) {
             return const [];
           }
           customCalls++;
@@ -275,9 +288,10 @@ void main() {
       ]);
       final downloads = <String>[];
       final controller = _controller(
-        // The official repository stays empty so "alpha" is unambiguously
+        // The built-in repositories stay empty so "alpha" is unambiguously
         // sourced from the custom repository.
-        catalogLoader: (url) async => url == ApiEndpoints.pluginShop
+        catalogLoader: (url) async => url == ApiEndpoints.pluginShop ||
+                url == ApiEndpoints.personalPluginShop
             ? const []
             : [_item('alpha', '2.0')],
         ruleLoader: (url, name) async {
@@ -368,11 +382,18 @@ List<String> _catalogFor(String url) {
   if (url == ApiEndpoints.pluginShop) {
     return ['official'];
   }
+  // The personal repository has no rules in these fixtures, so it stays silent
+  // and cannot shadow the custom repositories under test.
+  if (url == ApiEndpoints.personalPluginShop) {
+    return const [];
+  }
   if (url.contains('a.example.com')) {
     return ['alpha'];
   }
   return ['beta'];
-}PluginHTTPItem _item(String name, String version, {String author = 'a'}) {
+}
+
+PluginHTTPItem _item(String name, String version, {String author = 'a'}) {
   return PluginHTTPItem(
     name: name,
     version: version,

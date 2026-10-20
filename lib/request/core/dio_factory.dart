@@ -101,6 +101,14 @@ class DioFactory {
 }
 
 class _RulesMirrorInterceptor extends Interceptor {
+  /// Prefix of every built-in repository and the mirror that can stand in for
+  /// it. Both are plain string prefixes, so appending the rest of the request
+  /// path keeps `index.json` and `<rule>.json` addresses working unchanged.
+  static const Map<String, String> _mirrors = <String, String>{
+    ApiEndpoints.pluginShop: ApiEndpoints.pluginShopMirror,
+    ApiEndpoints.personalPluginShop: ApiEndpoints.personalPluginShopMirror,
+  };
+
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     final enableGitProxy = GStorage.getSetting(SettingsKeys.enableGitProxy);
@@ -110,16 +118,15 @@ class _RulesMirrorInterceptor extends Interceptor {
     }
 
     final url = options.uri.toString();
-    if (!url.startsWith(ApiEndpoints.pluginShop)) {
-      handler.next(options);
-      return;
+    for (final entry in _mirrors.entries) {
+      if (!url.startsWith(entry.key)) {
+        continue;
+      }
+      final mirrored = entry.value + url.substring(entry.key.length);
+      KazumiLogger().d('Rules mirror: $mirrored');
+      options.path = mirrored;
+      break;
     }
-
-    final mirrored =
-        ApiEndpoints.pluginShopMirror +
-        url.substring(ApiEndpoints.pluginShop.length);
-    KazumiLogger().d('Rules mirror: $mirrored');
-    options.path = mirrored;
     handler.next(options);
   }
 }

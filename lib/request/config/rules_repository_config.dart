@@ -188,11 +188,16 @@ class RulesRepositoryConfig {
     return next;
   }
 
-  /// Removes the entry at [url]. The official repository cannot be removed.
+  /// Removes the entry at [url]. Built-in repositories cannot be removed.
   static Future<List<RuleRepository>> remove(String url) async {
     final current = repositories();
-    if (current.any((repo) => repo.url == url && repo.isOfficial)) {
-      throw const FormatException('官方仓库不能删除，可以关闭它');
+    for (final repo in current) {
+      if (repo.url != url || !repo.isBuiltIn) {
+        continue;
+      }
+      throw FormatException(
+        repo.isOfficial ? '官方仓库不能删除，可以关闭它' : '个人仓库不能删除，可以关闭它',
+      );
     }
     final next = [
       for (final existing in current)

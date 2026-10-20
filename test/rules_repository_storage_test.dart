@@ -37,12 +37,13 @@ void main() {
   });
 
   group('RulesRepositoryConfig.repositories', () {
-    test('returns the official repository when nothing is stored', () {
+    test('returns the built-in repositories when nothing is stored', () {
       final repositories = RulesRepositoryConfig.repositories();
 
-      expect(repositories, hasLength(1));
-      expect(repositories.single.isOfficial, isTrue);
-      expect(repositories.single.enabled, isTrue);
+      expect(repositories, hasLength(2));
+      expect(repositories.first.isOfficial, isTrue);
+      expect(repositories.last.isPersonal, isTrue);
+      expect(repositories.every((repository) => repository.enabled), isTrue);
     });
 
     test('reads what save() wrote', () async {
@@ -57,7 +58,7 @@ void main() {
 
       final repositories = RulesRepositoryConfig.repositories();
 
-      expect(repositories, hasLength(2));
+      expect(repositories, hasLength(3));
       expect(repositories.last.label, '我的镜像');
       expect(repositories.last.enabled, isFalse);
     });
@@ -67,8 +68,9 @@ void main() {
 
       final repositories = RulesRepositoryConfig.repositories();
 
-      expect(repositories, hasLength(1));
-      expect(repositories.single.isOfficial, isTrue);
+      expect(repositories, hasLength(2));
+      expect(repositories.first.isOfficial, isTrue);
+      expect(repositories.last.isPersonal, isTrue);
     });
   });
 
@@ -76,6 +78,7 @@ void main() {
     test('keeps list order and drops disabled entries', () async {
       await RulesRepositoryConfig.save([
         RuleRepository(url: ApiEndpoints.pluginShop, enabled: false),
+        RuleRepository(url: ApiEndpoints.personalPluginShop, enabled: false),
         const RuleRepository(url: 'https://a.example/', enabled: true),
         const RuleRepository(url: 'https://b.example/', enabled: false),
         const RuleRepository(url: 'https://c.example/', enabled: true),
@@ -92,6 +95,7 @@ void main() {
     test('returns an empty list when everything is turned off', () async {
       await RulesRepositoryConfig.save([
         RuleRepository(url: ApiEndpoints.pluginShop, enabled: false),
+        RuleRepository(url: ApiEndpoints.personalPluginShop, enabled: false),
       ]);
 
       expect(RulesRepositoryConfig.enabledRepositories(), isEmpty);
@@ -104,7 +108,7 @@ void main() {
         const RuleRepository(url: 'https://example.com/rules/', label: '镜像'),
       );
 
-      expect(updated, hasLength(2));
+      expect(updated, hasLength(3));
       expect(updated.last.url, 'https://example.com/rules/');
       expect(RulesRepositoryConfig.repositories(), updated);
     });
@@ -163,10 +167,11 @@ void main() {
 
       expect(updated.map((repository) => repository.url), [
         ApiEndpoints.pluginShop,
+        ApiEndpoints.personalPluginShop,
         'https://a.example/',
         'https://b.example/',
       ]);
-      expect(updated[1].label, 'new');
+      expect(updated[2].label, 'new');
     });
 
     test('rejects a url already used by another entry', () async {
@@ -217,8 +222,9 @@ void main() {
 
       final updated = await RulesRepositoryConfig.remove('https://a.example/');
 
-      expect(updated, hasLength(1));
-      expect(updated.single.isOfficial, isTrue);
+      expect(updated, hasLength(2));
+      expect(updated.first.isOfficial, isTrue);
+      expect(updated.last.isPersonal, isTrue);
     });
 
     test('refuses to remove the official repository', () async {
@@ -234,7 +240,20 @@ void main() {
       );
     });
 
-    test('keeps the official repository present after removing everything else',
+    test('refuses to remove the personal repository', () async {
+      await expectLater(
+        RulesRepositoryConfig.remove(ApiEndpoints.personalPluginShop),
+        throwsA(
+          isA<FormatException>().having(
+            (error) => error.message,
+            'message',
+            '个人仓库不能删除，可以关闭它',
+          ),
+        ),
+      );
+    });
+
+    test('keeps the built-in repositories present after removing everything else',
         () async {
       await RulesRepositoryConfig.save([
         RuleRepository(url: ApiEndpoints.pluginShop),
@@ -245,8 +264,9 @@ void main() {
       await RulesRepositoryConfig.remove('https://a.example/');
       final updated = await RulesRepositoryConfig.remove('https://b.example/');
 
-      expect(updated, hasLength(1));
-      expect(updated.single.isOfficial, isTrue);
+      expect(updated, hasLength(2));
+      expect(updated.first.isOfficial, isTrue);
+      expect(updated.last.isPersonal, isTrue);
     });
   });
 }

@@ -109,8 +109,10 @@ void main() {
     await pumpPage(tester, buildController());
 
     expect(find.text('官方规则仓库'), findsOneWidget);
-    // The scheme is stripped so long addresses stay readable in one line.
-    expect(find.textContaining('raw.githubusercontent.com'), findsOneWidget);
+    expect(find.text('个人规则仓库'), findsOneWidget);
+    // The scheme is stripped so long addresses stay readable in one line. Both
+    // built-ins live on the same raw host.
+    expect(find.textContaining('raw.githubusercontent.com'), findsNWidgets(2));
     expect(find.text('1 条规则'), findsOneWidget);
   });
 
@@ -118,10 +120,20 @@ void main() {
       (tester) async {
     await pumpPage(tester, buildController());
 
-    // It is pinned to index 0, so it renders no drag handle.
+    // Both built-ins are pinned to the front, so neither renders a drag handle.
     expect(find.byIcon(Icons.drag_handle_rounded), findsNothing);
 
-    await tester.tap(find.byIcon(Icons.more_vert_rounded));
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+    await tester.pumpAndSettle();
+    expect(find.text('编辑'), findsOneWidget);
+    expect(find.text('删除'), findsNothing);
+  });
+
+  testWidgets('the personal repository cannot be dragged or deleted',
+      (tester) async {
+    await pumpPage(tester, buildController());
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).last);
     await tester.pumpAndSettle();
     expect(find.text('编辑'), findsOneWidget);
     expect(find.text('删除'), findsNothing);

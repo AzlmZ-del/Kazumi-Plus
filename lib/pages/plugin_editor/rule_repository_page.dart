@@ -113,13 +113,15 @@ class _RuleRepositoryPageState extends State<RuleRepositoryPage> {
   }
 
   Future<void> _reorder(int oldIndex, int newIndex) async {
-    // The official repository is pinned first: it is the address the mirror
-    // interceptor and [ApiEndpoints] constants still point at, so letting it
-    // move would make "official is index 0" false everywhere else.
-    if (oldIndex == 0) return;
+    // The built-in repositories are pinned at the front: the official address is
+    // what the mirror interceptor and [ApiEndpoints] constants still point at,
+    // and the personal one is defined to sit right behind it. Letting either
+    // move would make the two listed first a lie on the next decode.
+    final pinned = _repositories.takeWhile((repo) => repo.isBuiltIn).length;
+    if (oldIndex < pinned) return;
     // [ReorderableListView.onReorderItem] hands over an index that is already
     // adjusted for the removal, so no offset fix-up is needed here.
-    final target = newIndex < 1 ? 1 : newIndex;
+    final target = newIndex < pinned ? pinned : newIndex;
     if (target == oldIndex) return;
     final next = [..._repositories];
     final moved = next.removeAt(oldIndex);
@@ -212,9 +214,9 @@ class _RuleRepositoryPageState extends State<RuleRepositoryPage> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 1000),
             // The list is never empty: [RuleRepositoryList.decode] restores the
-            // official repository whenever storage holds nothing, and the
-            // official entry cannot be deleted. Reordering is therefore always
-            // meaningful and no empty state is needed here.
+            // built-in repositories whenever storage holds nothing, and they
+            // cannot be deleted. Reordering is therefore always meaningful and
+            // no empty state is needed here.
             child: Observer(builder: (context) {
               // Reading the observable list here is what subscribes this
               // Observer to catalog changes; [repositoryFailures] is set in the
@@ -244,7 +246,7 @@ class _RuleRepositoryPageState extends State<RuleRepositoryPage> {
                     failed: failures.containsKey(repository.url),
                     onToggle: (enabled) => _toggle(repository, enabled),
                     onEdit: () => _edit(repository),
-                    onDelete: repository.isOfficial
+                    onDelete: repository.isBuiltIn
                         ? null
                         : () => _remove(repository),
                   );
@@ -294,10 +296,13 @@ class _RepositoryTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final official = repository.isOfficial;
-    final title = official && repository.label.isEmpty
-        ? '官方规则仓库'
-        : repository.displayLabel;
+    final title = repository.label.isNotEmpty
+        ? repository.label
+        : repository.isOfficial
+            ? '官方规则仓库'
+            : repository.isPersonal
+                ? '个人规则仓库'
+                : repository.displayLabel;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
@@ -307,7 +312,7 @@ class _RepositoryTile extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
           child: Row(children: [
-            if (index == 0)
+            if (repository.isBuiltIn)
               const SizedBox(width: 12)
             else
               ReorderableDragStartListener(
@@ -560,37 +565,37 @@ class _RepositoryEditorDialogState extends State<_RepositoryEditorDialog> {
               decoration: ruleInputDecoration(context, label: '名称（可选）'),
             ),
             const SizedBox(height: 12),
+            Text(
+              '填写包含 index.json 的目录，或直接粘贴 index.json 的完整地址',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 8),
+            // A tall fixed box rather than a one-line field: long repository
+            // addresses wrap inside it, and the height stays put so the
+            // dialog does not jump around while typing.
             TextField(
               controller: _url,
               autofocus: true,
-              keyboardType: TextInputType.multiline,
-              textInputAction: TextInputAction.done,
-              // One line until the text wraps, then as many lines as it needs:
-              // a repository address is long enough that a single-line field
-              // hides its head behind the cursor.
-              minLines: 1,
-              maxLines: null,
-              onSubmitted: (_) => _submit(),
+              minLines: 4,
+              maxLines: 8,
               onChanged: (_) {
                 if (_error != null) setState(() => _error = null);
               },
               decoration: ruleInputDecoration(
                 context,
                 label: '仓库地址',
+                hint: '在这里粘贴仓库地址',
               ).copyWith(
+                alignLabelWithHint: true,
                 errorText: _error,
+                errorMaxLines: 4,
                 suffixIcon: IconButton(
                   tooltip: '粘贴',
                   icon: const Icon(Icons.content_paste_rounded, size: 20),
                   onPressed: _pasteAddress,
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '填写包含 index.json 的目录，或直接粘贴 index.json 的完整地址',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
           ],
         ),

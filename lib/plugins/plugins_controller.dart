@@ -440,7 +440,20 @@ abstract class _PluginsController with Store {
   Future<_RepositoryLoad> _loadOneRepository(RuleRepository repository) async {
     try {
       final items = await _repositoryCatalogLoader(repository.url);
-      return (repository: repository, items: items, error: null);
+      // The catalog API cannot know how the user named the repository, so it
+      // always tags items with an empty label. Stamp the configured display
+      // name here instead: this is the layer that has the setting in hand, and
+      // the rule cards read `repositoryLabel` to show where a rule came from.
+      final labelled = [
+        for (final item in items)
+          item.withRepository(
+            url: item.repositoryUrl.isEmpty
+                ? repository.url
+                : item.repositoryUrl,
+            label: repository.displayLabel,
+          ),
+      ];
+      return (repository: repository, items: labelled, error: null);
     } catch (error, stackTrace) {
       _errorReporter(
         'Plugin: failed to load rules from ${repository.url}',

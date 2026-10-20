@@ -6,8 +6,18 @@ import 'package:kazumi/request/config/api_endpoints.dart';
 
 void main() {
   group('RuleRepository', () {
-    test('falls back to the host when no label is set', () {
+    test('falls back to the repository name in the URL when no label is set',
+        () {
       const repository = RuleRepository(url: 'https://example.com/rules/');
+
+      // The path segment beats the host: a user who pasted a repository URL
+      // wants to see which repository it is, not which CDN serves it.
+      expect(repository.displayLabel, 'rules');
+      expect(repository.label, isEmpty);
+    });
+
+    test('falls back to the host when the URL has no usable path', () {
+      const repository = RuleRepository(url: 'https://example.com/');
 
       expect(repository.displayLabel, 'example.com');
       expect(repository.label, isEmpty);
@@ -45,12 +55,13 @@ void main() {
   });
 
   group('RuleRepositoryList.defaults', () {
-    test('contains only the enabled official repository', () {
+    test('contains the enabled built-in repositories', () {
       final repositories = RuleRepositoryList.defaults();
 
-      expect(repositories, hasLength(1));
-      expect(repositories.single.isOfficial, isTrue);
-      expect(repositories.single.enabled, isTrue);
+      expect(repositories, hasLength(2));
+      expect(repositories.first.isOfficial, isTrue);
+      expect(repositories.last.isPersonal, isTrue);
+      expect(repositories.every((repository) => repository.enabled), isTrue);
     });
   });
 
@@ -58,23 +69,26 @@ void main() {
     test('treats an empty value as never configured', () {
       for (final raw in ['', '   ', '\n']) {
         final repositories = RuleRepositoryList.decode(raw);
-        expect(repositories, hasLength(1));
-        expect(repositories.single.isOfficial, isTrue);
-        expect(repositories.single.enabled, isTrue);
+        expect(repositories, hasLength(2));
+        expect(repositories.first.isOfficial, isTrue);
+        expect(repositories.last.isPersonal, isTrue);
+        expect(repositories.every((repository) => repository.enabled), isTrue);
       }
     });
 
     test('falls back to defaults on malformed JSON', () {
       for (final raw in ['not json', '{}', '[1,2,3]', '"text"']) {
         final repositories = RuleRepositoryList.decode(raw);
-        expect(repositories, hasLength(1));
-        expect(repositories.single.isOfficial, isTrue);
+        expect(repositories, hasLength(2));
+        expect(repositories.first.isOfficial, isTrue);
+        expect(repositories.last.isPersonal, isTrue);
       }
     });
 
     test('decodes a round-tripped list', () {
       final source = <RuleRepository>[
         RuleRepository(url: RuleRepositoryList.officialUrl),
+        RuleRepository(url: RuleRepositoryList.personalUrl),
         const RuleRepository(
           url: 'https://cdn.example.com/gh/me/Rules/',
           label: '我的镜像',
@@ -99,9 +113,10 @@ void main() {
         ]),
       );
 
-      expect(decoded, hasLength(1));
-      expect(decoded.single.label, '官方（备用）');
-      expect(decoded.single.enabled, isFalse);
+      expect(decoded, hasLength(2));
+      expect(decoded.first.label, '官方（备用）');
+      expect(decoded.first.enabled, isFalse);
+      expect(decoded.last.isPersonal, isTrue);
     });
 
     test('skips a single corrupt entry instead of dropping everything', () {
@@ -115,7 +130,7 @@ void main() {
         ]),
       );
 
-      expect(decoded, hasLength(2));
+      expect(decoded, hasLength(3));
       expect(decoded.first.isOfficial, isTrue);
       expect(decoded.last.url, 'https://example.com/rules/');
     });
@@ -128,8 +143,8 @@ void main() {
         ]),
       );
 
-      expect(decoded, hasLength(1));
-      expect(decoded.single.label, 'first');
+      expect(decoded, hasLength(2));
+      expect(decoded.first.label, 'first');
     });
 
     test('defaults missing or non-boolean enabled to true', () {
@@ -140,11 +155,12 @@ void main() {
         ]),
       );
 
-      // Official is re-inserted at the front, so three entries are expected.
-      expect(decoded, hasLength(3));
+      // Both built-ins are re-inserted at the front, so four entries expected.
+      expect(decoded, hasLength(4));
       expect(decoded.every((repository) => repository.enabled), isTrue);
       expect(decoded.map((repository) => repository.url), [
         RuleRepositoryList.officialUrl,
+        RuleRepositoryList.personalUrl,
         'https://example.com/a/',
         'https://example.com/b/',
       ]);
@@ -168,7 +184,7 @@ void main() {
         ]),
       );
 
-      expect(decoded, hasLength(2));
+      expect(decoded, hasLength(3));
       expect(decoded.first.isOfficial, isTrue);
       expect(decoded.first.enabled, isFalse);
       expect(decoded.last.url, 'https://example.com/a/');
@@ -182,7 +198,7 @@ void main() {
         ]),
       );
 
-      expect(decoded, hasLength(2));
+      expect(decoded, hasLength(3));
       expect(decoded.first.isOfficial, isTrue);
       expect(decoded.first.enabled, isTrue);
       expect(decoded.last.url, 'https://example.com/a/');
@@ -193,12 +209,34 @@ void main() {
       final decoded = RuleRepositoryList.decode(
         jsonEncode([
           {'url': RuleRepositoryList.officialUrl, 'enabled': false},
+          {'url': RuleRepositoryList.personalUrl, 'enabled': false},
           {'url': 'https://example.com/a/', 'enabled': false},
         ]),
       );
 
-      expect(decoded, hasLength(2));
+      expect(decoded, hasLength(3));
       expect(decoded.every((repository) => !repository.enabled), isTrue);
+    });
+
+    test('moves a personal repository saved under its old address', () {
+      final decoded = RuleRepositoryList.decode(
+        jsonEncode([
+          {'url': RuleRepositoryList.officialUrl, 'enabled': true},
+          {
+            'url':
+                'https://raw.githubusercontent.com/AzlmZ-del/KazumiRules/main/',
+            'label': '个人仓库',
+            'enabled': false,
+          },
+        ]),
+      );
+
+      // One personal repository, not two: the stale address is rewritten
+      // instead of being kept next to the built-in one.
+      expect(decoded, hasLength(2));
+      expect(decoded[1].url, RuleRepositoryList.personalUrl);
+      expect(decoded[1].label, '个人仓库');
+      expect(decoded[1].enabled, isFalse);
     });
   });
 
@@ -223,7 +261,7 @@ void main() {
       expect(RuleRepositoryList.encode(const []), '[]');
       // Decoding an empty array restores the defaults rather than yielding an
       // unusable empty repository list.
-      expect(RuleRepositoryList.decode('[]'), hasLength(1));
+      expect(RuleRepositoryList.decode('[]'), hasLength(2));
     });
   });
 }
