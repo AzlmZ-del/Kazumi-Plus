@@ -485,7 +485,15 @@ class _RepositoryEditorDialogState extends State<_RepositoryEditorDialog> {
   void initState() {
     super.initState();
     _label = TextEditingController(text: widget.initial?.label ?? '');
-    _url = TextEditingController(text: widget.initial?.url ?? '');
+    // Pre-fill the full catalog address rather than the stored directory, so the
+    // field shows the URL the user actually pasted (`.../main/index.json`) and
+    // it can be copied straight into a browser. [baseUri] trims it back to the
+    // directory on submit.
+    _url = TextEditingController(
+      text: widget.initial == null
+          ? ''
+          : RulesRepositoryConfig.catalogUri(widget.initial!.url),
+    );
   }
 
   @override
@@ -537,6 +545,9 @@ class _RepositoryEditorDialogState extends State<_RepositoryEditorDialog> {
     final theme = Theme.of(context);
     return AlertDialog(
       title: Text(widget.title),
+      // The address field grows with its content, so a long URL can push the
+      // dialog past the screen. Scrolling keeps the actions reachable.
+      scrollable: true,
       content: SizedBox(
         width: 420,
         child: Column(
@@ -552,8 +563,13 @@ class _RepositoryEditorDialogState extends State<_RepositoryEditorDialog> {
             TextField(
               controller: _url,
               autofocus: true,
-              keyboardType: TextInputType.url,
+              keyboardType: TextInputType.multiline,
               textInputAction: TextInputAction.done,
+              // One line until the text wraps, then as many lines as it needs:
+              // a repository address is long enough that a single-line field
+              // hides its head behind the cursor.
+              minLines: 1,
+              maxLines: null,
               onSubmitted: (_) => _submit(),
               onChanged: (_) {
                 if (_error != null) setState(() => _error = null);
