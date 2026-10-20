@@ -50,7 +50,7 @@
 
 ## 安装
 
-Android 走本仓库的 [Releases](../../releases)，附件名形如 `Kazumi_android_2.4.0.apk`。
+Android 走本仓库的 [Releases](../../releases)，附件名形如 `Kazumi_android_2.4.1.apk`。
 装好后 **设置 → 更新 → 检查更新** 会读本仓库的最新 Release，有新版本就在应用内下载覆盖安装。
 
 因为 `applicationId` 是 `com.patch.kazumi`、和官方版不同，两者可以装在一起互不影响，
@@ -69,7 +69,7 @@ Android 走本仓库的 [Releases](../../releases)，附件名形如 `Kazumi_and
 |---|---|
 | Flutter | 3.47.7（stable） |
 | Dart SDK | `>=3.10.0 <4.0.0` |
-| 当前版本号 | 2.4.0+20400（`pubspec.yaml`） |
+| 当前版本号 | 2.4.1+20401（`pubspec.yaml`） |
 
 其余平台工具链按 [Flutter 官方文档](https://docs.flutter.dev/get-started/install) 准备。
 上游作者提醒过：本项目除了 Google 托管的 Flutter 依赖，还依赖 MavenCentral / GitHub /
@@ -147,8 +147,8 @@ flutter test      # 362 passed / 2 skipped
 打 tag 就会出 Release —— tag 必须是**裸版本号**且与 `pubspec.yaml` 的 `version` 一致：
 
 ```bash
-git tag 2.4.0
-git push --no-verify fork 2.4.0
+git tag 2.4.1
+git push --no-verify fork 2.4.1
 ```
 
 `.github/workflows/android-release.yaml` 会校验 tag 与 `pubspec.yaml` 是否相等，然后用
