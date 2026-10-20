@@ -215,13 +215,16 @@ class RuleCard extends StatelessWidget {
                       ],
                     );
                   }
-                  return Row(children: [
-                    Expanded(child: identity),
-                    if (side != null) ...[
-                      const SizedBox(width: 12),
-                      side
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: identity),
+                      if (side != null) ...[
+                        const SizedBox(width: 12),
+                        side
+                      ],
                     ],
-                  ]);
+                  );
                 }),
               ),
             ),
