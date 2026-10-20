@@ -563,7 +563,12 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
                     final item = items[index];
                     final status = _controller.pluginStatus(item);
                     final busy = _installing.contains(item.name);
-                    return RuleCard(
+                    // The address line shows the rule's own baseURL, which the
+                    // catalog file does not carry; it resolves asynchronously
+                    // and the line simply stays hidden until then.
+                    return FutureBuilder<String?>(
+                      future: _controller.ruleBaseUrl(item),
+                      builder: (context, snapshot) => RuleCard(
                       key: ValueKey(item.name),
                       title: item.name,
                       installed: status == PluginCatalogItemStatus.installed,
@@ -576,9 +581,7 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
                           _controller.shadowedRulesFor(item.name).isEmpty
                               ? null
                               : () => _showShadowedSources(item),
-                      webUrl: item.repositoryUrl.isEmpty
-                          ? null
-                          : item.repositoryUrl,
+                      webUrl: snapshot.data,
                       tags: [
                         RuleTag(
                             label: item.version,
@@ -588,10 +591,11 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
                       caption: item.lastUpdate > 0
                           ? '更新于 ${DateTime.fromMillisecondsSinceEpoch(item.lastUpdate).toString().split(' ').first}'
                           : null,
-                      trailing: _CatalogRuleAction(
-                        status: status,
-                        busy: busy,
-                        onPressed: () => _install(item, status),
+                        trailing: _CatalogRuleAction(
+                          status: status,
+                          busy: busy,
+                          onPressed: () => _install(item, status),
+                        ),
                       ),
                     );
                   },
