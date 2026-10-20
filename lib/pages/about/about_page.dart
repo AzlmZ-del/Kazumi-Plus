@@ -128,7 +128,7 @@ class _ProjectHeader extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            '基于自定义规则的开源番剧应用',
+            '基于 Predidit/Kazumi 的自用魔改版',
             style: theme.textTheme.bodyLarge,
           ),
           const SizedBox(height: 20),
