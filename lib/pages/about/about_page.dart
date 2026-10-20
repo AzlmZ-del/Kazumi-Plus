@@ -23,8 +23,13 @@ class AboutPage extends StatelessWidget {
                   title: '项目',
                   children: const [
                     AboutLinkTile(
+                      icon: Icons.fork_right_rounded,
+                      title: '源代码（魔改）',
+                      url: ApiEndpoints.releasesRepo,
+                    ),
+                    AboutLinkTile(
                       icon: Icons.code_rounded,
-                      title: '源代码',
+                      title: '源代码（原版）',
                       url: ApiEndpoints.sourceUrl,
                     ),
                     AboutLinkTile(
@@ -142,7 +147,7 @@ class _ProjectHeader extends StatelessWidget {
                 style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
                 onPressed: () => openAboutLink(
                   context,
-                  '${ApiEndpoints.sourceUrl}/releases',
+                  '${ApiEndpoints.releasesRepo}/releases',
                 ),
                 child: const Text('更新日志'),
               ),
