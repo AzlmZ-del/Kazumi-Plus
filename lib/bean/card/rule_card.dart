@@ -69,26 +69,6 @@ class RuleCard extends StatelessWidget {
     final duration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
         : const Duration(milliseconds: 220);
-    // The version chip and the trailing action share one right-aligned column;
-    // the 16px inset puts the chip's edge on the action's label edge instead of
-    // floating out to the card border (both action variants pad their labels
-    // by 16).
-    final side = (titleTag == null && actions == null)
-        ? null
-        : Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              if (titleTag != null)
-                Padding(
-                  padding: const EdgeInsets.only(right: 16),
-                  child: titleTag!,
-                ),
-              if (titleTag != null && actions != null)
-                const SizedBox(height: 6),
-              ?actions,
-            ],
-          );
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Semantics(
@@ -146,11 +126,28 @@ class RuleCard extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(title,
-                                style: text.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w700),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Text(title,
+                                      style: text.titleMedium?.copyWith(
+                                          fontWeight: FontWeight.w700),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis),
+                                ),
+                                if (titleTag != null) ...[
+                                  const SizedBox(width: 8),
+                                  // 16px keeps the chip's edge on the trailing
+                                  // action's label edge (both variants pad their
+                                  // labels by 16), instead of the card border.
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 16),
+                                    child: titleTag!,
+                                  ),
+                                ],
+                              ],
+                            ),
                             if (subtitle != null && subtitle!.isNotEmpty) ...[
                               const SizedBox(height: 3),
                               Text(subtitle!,
@@ -206,25 +203,22 @@ class RuleCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         identity,
-                        if (side != null) ...[
+                        if (actions != null) ...[
                           const SizedBox(height: 8),
                           Align(
                               alignment: AlignmentDirectional.centerEnd,
-                              child: side),
+                              child: actions),
                         ],
                       ],
                     );
                   }
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(child: identity),
-                      if (side != null) ...[
-                        const SizedBox(width: 12),
-                        side
-                      ],
+                  return Row(children: [
+                    Expanded(child: identity),
+                    if (actions != null) ...[
+                      const SizedBox(width: 12),
+                      actions
                     ],
-                  );
+                  ]);
                 }),
               ),
             ),
