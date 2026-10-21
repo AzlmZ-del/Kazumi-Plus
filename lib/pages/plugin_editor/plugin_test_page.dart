@@ -48,6 +48,15 @@ class _PluginTestPageState extends State<PluginTestPage> {
   final Map<int, String> _itemFragmentMap = {};
   int? _shownFragmentIndex;
 
+  /// 当前正在查看播放线路的搜索结果下标（0 基）。
+  int _selectedItemIndex = 0;
+
+  /// 章节请求序号，用来丢弃被后一次点击取代的旧响应。
+  int _chapterRunId = 0;
+
+  /// 章节请求是否进行中（点选其他结果时用）。
+  bool _chapterLoading = false;
+
   bool get _hasSearchRaw => searchRaw.isNotEmpty;
 
   bool get _hasSearchData => searchRes?.data.isNotEmpty ?? false;
@@ -92,6 +101,9 @@ class _PluginTestPageState extends State<PluginTestPage> {
         chapterDiagnostics = [];
         _itemFragmentMap.clear();
         _shownFragmentIndex = null;
+        _selectedItemIndex = 0;
+        _chapterRunId++;
+        _chapterLoading = false;
       });
 
   void _toggleFragment(int index) => setState(
@@ -123,17 +135,8 @@ class _PluginTestPageState extends State<PluginTestPage> {
         _itemFragmentMap.addAll(searchTrace.matchedFragments.asMap());
       });
       if (_hasSearchData && _needChapterParse) {
-        final firstItem = searchRes!.data.first;
-        if (firstItem.src.isNotEmpty) {
-          final chapterTrace = await plugin.traceChapters(firstItem.src,
-              cancelToken: cancelToken);
-          if (!mounted || runId != _runId) return;
-          setState(() {
-            chapterRaw = chapterTrace.rawResponse;
-            chapters = chapterTrace.roads;
-            chapterDiagnostics = chapterTrace.diagnostics;
-          });
-        }
+        // 默认取第一条；之后点选结果卡片会重新拉取对应的播放线路。
+        await _selectItem(0, cancelToken: cancelToken, throwOnError: true);
       }
     } catch (error, stack) {
       if (!mounted || runId != _runId) return;
@@ -143,6 +146,57 @@ class _PluginTestPageState extends State<PluginTestPage> {
     } finally {
       if (mounted && runId == _runId) setState(() => isTesting = false);
     }
+  }
+
+  /// 选中第 [index] 条搜索结果，并拉取它自己的播放线路。
+  ///
+  /// [throwOnError] 为 true 时把异常抛给调用方（首次测试走这条，错误统一显示在
+  /// 顶部错误卡片里）；点选卡片时传 false，出错只清掉旧数据，不打断页面。
+  Future<void> _selectItem(
+    int index, {
+    CancelToken? cancelToken,
+    bool throwOnError = false,
+  }) async {
+    final data = searchRes?.data;
+    if (data == null || index < 0 || index >= data.length) return;
+    final item = data[index];
+    final chapterRunId = ++_chapterRunId;
+    setState(() {
+      _selectedItemIndex = index;
+      chapterRaw = "";
+      chapters = null;
+      chapterDiagnostics = [];
+      _chapterLoading = item.src.isNotEmpty;
+    });
+    if (item.src.isEmpty) return;
+    try {
+      final chapterTrace =
+          await plugin.traceChapters(item.src, cancelToken: cancelToken);
+      if (!mounted || chapterRunId != _chapterRunId) return;
+      setState(() {
+        chapterRaw = chapterTrace.rawResponse;
+        chapters = chapterTrace.roads;
+        chapterDiagnostics = chapterTrace.diagnostics;
+        _chapterLoading = false;
+      });
+    } catch (error, stack) {
+      if (!mounted || chapterRunId != _chapterRunId) return;
+      setState(() => _chapterLoading = false);
+      if (throwOnError) rethrow;
+      KazumiLogger().e('PluginTest: chapter fetch failed',
+          error: error, stackTrace: stack);
+      if (mounted) {
+        KazumiDialog.showToast(context: context, message: '获取播放线路失败');
+      }
+    }
+  }
+
+  /// 点击结果卡片：切到这条结果并重新拉取播放线路。
+  Future<void> _onItemTap(int index) async {
+    if (isTesting) return;
+    // 已经是当前这条且数据还在，就不重复请求。
+    if (index == _selectedItemIndex && chapters != null) return;
+    await _selectItem(index);
   }
 
   @override
@@ -176,7 +230,7 @@ class _PluginTestPageState extends State<PluginTestPage> {
                   const SizedBox(height: 20),
                   RuleSection(
                     title: '试着搜索一部番剧',
-                    description: '选集测试会使用第一条搜索结果。',
+                    description: '点击「结果解析」里的任意一条，即可查看它的播放线路。',
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -230,7 +284,8 @@ class _PluginTestPageState extends State<PluginTestPage> {
                       title: '播放线路',
                       subtitle: _getChapterSubtitle(),
                       completed: _hasChapters,
-                      expanded: _hasChapters,
+                      // 切到别的结果时章节先清空，这里保持展开，避免面板自己收起来。
+                      expanded: _hasChapters || _chapterLoading,
                       child: _buildChapterContent(theme)),
                 ],
               ),
@@ -257,7 +312,7 @@ class _PluginTestPageState extends State<PluginTestPage> {
         switch (number) {
           1 => true,
           2 => _hasSearchRaw,
-          _ => _hasSearchData && _needChapterParse,
+          _ => _hasSearchData && _needChapterParse && !_chapterLoading,
         };
     final foreground = completed
         ? colors.onTertiaryContainer
@@ -499,42 +554,64 @@ class _PluginTestPageState extends State<PluginTestPage> {
   Widget _buildSearchItemCard(SearchItem item, int i, ThemeData theme) {
     final isShowingFragment = _shownFragmentIndex == i;
     final fragment = _itemFragmentMap[i] ?? '无匹配片段';
+    // 当前正在查看播放线路的那一条，用底色 + 描边标出来。
+    final selected = _selectedItemIndex == i;
 
     return Column(children: [
       Card(
         margin: const EdgeInsets.only(bottom: 8.0),
         elevation: 0,
-        color: theme.colorScheme.surfaceContainerHighest,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Expanded(
-                child: Text(
-                  '${i + 1}：${item.name}',
-                  style: theme.textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w500),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              IconButton(
-                onPressed: isTesting ? null : () => _toggleFragment(i),
-                icon: Icon(
-                  isShowingFragment ? Icons.keyboard_arrow_up : Icons.code,
-                  size: 18,
-                  color: theme.colorScheme.primary,
-                ),
-                tooltip: isShowingFragment ? '隐藏匹配片段' : '查看匹配片段',
-              ),
-            ]),
-            _h8,
-            Text('链接：${item.src}',
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-          ]),
+        color: selected
+            ? theme.colorScheme.primaryContainer
+            : theme.colorScheme.surfaceContainerHighest,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: selected
+              ? BorderSide(color: theme.colorScheme.primary, width: 1.5)
+              : BorderSide.none,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: isTesting ? null : () => _onItemTap(i),
+          child: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${i + 1}：${item.name}',
+                            style: theme.textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w500),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        IconButton(
+                          onPressed:
+                              isTesting ? null : () => _toggleFragment(i),
+                          icon: Icon(
+                            isShowingFragment
+                                ? Icons.keyboard_arrow_up
+                                : Icons.code,
+                            size: 18,
+                            color: theme.colorScheme.primary,
+                          ),
+                          tooltip:
+                              isShowingFragment ? '隐藏匹配片段' : '查看匹配片段',
+                        ),
+                      ]),
+                  _h8,
+                  Text('链接：${item.src}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                          color: selected
+                              ? theme.colorScheme.onPrimaryContainer
+                              : theme.colorScheme.onSurfaceVariant)),
+                ]),
+          ),
         ),
       ),
       if (isShowingFragment)
@@ -551,15 +628,16 @@ class _PluginTestPageState extends State<PluginTestPage> {
     if (isTesting) return _hasSearchData ? '正在获取播放线路…' : '等待搜索结果';
     if (!_hasSearchData) return '等待有效搜索结果';
     if (!_needChapterParse) return '无需解析章节';
-    if (chapters == null) return '未获取章节数据';
+    if (_chapterLoading) return '正在获取第 ${_selectedItemIndex + 1} 条的播放线路…';
+    if (chapters == null) return '第 ${_selectedItemIndex + 1} 条 · 未获取章节数据';
     final skipped =
         chapterDiagnostics.isEmpty ? '' : '，跳过 ${chapterDiagnostics.length} 条';
-    return '获取到 ${chapters?.length ?? 0} 个播放线路$skipped';
+    return '第 ${_selectedItemIndex + 1} 条 · 获取到 ${chapters?.length ?? 0} 个播放线路$skipped';
   }
 
   Widget _buildChapterContent(ThemeData theme) {
     if (!_needChapterParse) return _buildEmpty('未填写章节规则', theme);
-    if (isTesting) return _buildLoading(theme);
+    if (isTesting || _chapterLoading) return _buildLoading(theme);
     if (!_hasSearchData) return _buildEmpty('请先解析到有效结果', theme);
     if (chapters == null) return _buildEmpty('未获取章节数据', theme, isError: true);
     if (!_hasChapters) return _buildEmpty('无可用章节', theme, isError: true);
