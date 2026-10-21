@@ -530,7 +530,6 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
 
   @override
   Widget build(BuildContext context) => Observer(builder: (context) {
-        final colors = Theme.of(context).colorScheme;
         final catalog = _controller.pluginHTTPList.toList();
         final installed = catalog
             .where((p) =>
@@ -593,8 +592,9 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
                               height: 16,
                               radius: 6,
                               fontSize: 10,
-                              background: colors.secondaryContainer,
-                              foreground: colors.onSecondaryContainer),
+                              // 源类型固定蓝色，同样不跟主题走。
+                              background: const Color(0xFFCFE3FA),
+                              foreground: const Color(0xFF14406B)),
                       installed: status == PluginCatalogItemStatus.installed,
                       subtitle:
                           item.author.isEmpty ? null : '作者 · ${item.author}',
