@@ -926,23 +926,47 @@ class _PluginTestPageState extends State<PluginTestPage>
       child: InkWell(
         onTap: url.isEmpty ? null : () => _showEpisodeActions(road, index),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.only(left: 14, right: 8, top: 8, bottom: 8),
+          child: Row(
             children: [
-              Text(
-                name,
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(fontWeight: FontWeight.w500),
-              ),
-              if (url.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  url,
-                  style:
-                      theme.textTheme.bodySmall?.copyWith(color: _linkGreen),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(fontWeight: FontWeight.w500),
+                    ),
+                    if (url.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        url,
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: _linkGreen),
+                      ),
+                    ],
+                  ],
                 ),
-              ],
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                tooltip: '测试播放',
+                onPressed:
+                    url.isEmpty ? null : () => _startTestPlayback(road, index),
+                icon: const Icon(Icons.play_circle_outline),
+                iconSize: 20,
+                padding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints.tightFor(
+                  width: 34,
+                  height: 34,
+                ),
+                style: IconButton.styleFrom(
+                  foregroundColor: colors.onPrimaryContainer,
+                  backgroundColor: colors.primaryContainer,
+                ),
+              ),
             ],
           ),
         ),
@@ -950,7 +974,8 @@ class _PluginTestPageState extends State<PluginTestPage>
     );
   }
 
-  /// 章节链接点开后的三选一：应用内看、交给系统浏览器、或者直接进播放器试一下。
+  /// 章节链接点开后的二选一：应用内看，或者交给系统浏览器。
+  /// 「测试播放」已经挪到卡片右侧的图标按钮上（长按显示说明）。
   Future<void> _showEpisodeActions(Road road, int index) async {
     final url = road.data[index];
     final choice = await KazumiDialog.show<String>(
@@ -968,19 +993,11 @@ class _PluginTestPageState extends State<PluginTestPage>
               onPressed: () => Navigator.of(dialogContext).pop('external'),
               child: const Text('外部打开'),
             ),
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop('play'),
-              child: const Text('测试播放'),
-            ),
           ],
         );
       },
     );
     if (!mounted || choice == null) return;
-    if (choice == 'play') {
-      _startTestPlayback(road, index);
-      return;
-    }
     if (choice == 'internal') {
       Navigator.of(context, rootNavigator: true).push(
         MaterialPageRoute(
