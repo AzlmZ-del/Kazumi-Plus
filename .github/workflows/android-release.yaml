@@ -80,25 +80,25 @@
               flutter-version-file: pubspec.yaml
               cache: true
 
-          # Gradle 发行包 + 依赖缓存。首次仍然要下，之后命中就跳过那 119 秒空档。
-          # key 里带上 wrapper 与 gradle 文件的 hash，改了依赖会自动换一套。
-          - name: Cache Gradle
-            uses: actions/cache@v4
-            with:
-              path: |
-                ~/.gradle/caches
-                ~/.gradle/wrapper
-              key: gradle-${{ runner.os }}-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'android/**/*.gradle', 'android/gradle.properties', 'pubspec.lock') }}
-              restore-keys: |
-                gradle-${{ runner.os }}-
+          # Gradle 缓存交给 setup-gradle，不再手写 actions/cache。
+          #
+          # 原来那个 actions/cache 把整个 ~/.gradle/caches 打成 tar.gz，
+          # 实测 2859 MB、命中后仍要 51 秒下载解压 —— 缓存反而成了第二大开销。
+          # setup-gradle 只收真正用到的模块，并在 job 结束时裁掉陈旧条目，
+          # 归档通常降到几百 MB，恢复降到十几秒。
+          #
+          # 它能生效的原因：它往 ~/.gradle/init.d/ 写 init 脚本，而 init 脚本对
+          # 任何 Gradle 调用都会自动应用 —— 包括 flutter build 内部调用的 gradlew。
+          #
+          # 用 v6：默认的 enhanced 缓存对公开仓库免费，会做去重 + 细粒度条目，
+          # 恢复比整包 tar 快得多。本仓库是 public，所以直接吃这个默认值。
+          - name: Set up Gradle
+            uses: gradle/actions/setup-gradle@v6
 
-          - name: Cache pub
-            uses: actions/cache@v4
-            with:
-              path: ~/.pub-cache
-              key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
-              restore-keys: |
-                pub-${{ runner.os }}-
+          # 注意：这里不要再单独缓存 ~/.pub-cache。
+          # 上面 subosito/flutter-action 的 cache: true 已经缓存了同一份
+          # （缓存列表里那条 flutter-pub-linux-* 就是它），再存一遍纯属浪费
+          # 249 MB 存储 + 13 秒恢复时间。
 
           # NDK 28.2 不在 runner 预装列表里（预装 27.3 / 29.0 / 30.0），
           # 每次都要现下 20 多秒。单独缓存这个目录就能跳过。
