@@ -260,6 +260,7 @@ class RuleTag extends StatelessWidget {
     this.width,
     this.height,
     this.radius = 8,
+    this.fontSize,
   });
 
   final String label;
@@ -274,13 +275,17 @@ class RuleTag extends StatelessWidget {
   /// 圆角。标签压到 16 高时用 6，否则 8 的圆角会让它变成胶囊形。
   final double radius;
 
+  /// 字号。窄标签（44 宽）要配 10 才不贴边，不传就用 labelSmall 默认的 11。
+  final double? fontSize;
+
   @override
   Widget build(BuildContext context) {
+    final base = Theme.of(context).textTheme.labelSmall;
     final text = Text(label,
-        style: Theme.of(context)
-            .textTheme
-            .labelSmall
-            ?.copyWith(color: foreground, fontWeight: FontWeight.w600));
+        style: base?.copyWith(
+            color: foreground,
+            fontWeight: FontWeight.w600,
+            fontSize: fontSize));
     final decoration = BoxDecoration(
       color: background,
       borderRadius: BorderRadius.circular(radius),
