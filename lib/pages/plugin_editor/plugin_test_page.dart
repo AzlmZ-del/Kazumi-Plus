@@ -15,6 +15,7 @@ import 'package:kazumi/pages/video/video_playback_args.dart';
 import 'package:kazumi/pages/webview/internal_browser_page.dart';
 import 'package:kazumi/plugins/api_rule_config.dart';
 import 'package:kazumi/plugins/plugins.dart';
+import 'package:kazumi/request/apis/bangumi_api.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -36,7 +37,8 @@ class PluginTestPage extends StatefulWidget {
   State<PluginTestPage> createState() => _PluginTestPageState();
 }
 
-class _PluginTestPageState extends State<PluginTestPage> {
+class _PluginTestPageState extends State<PluginTestPage>
+    with KazumiDialogOwner {
   late final Plugin plugin;
   final testKeywordController = TextEditingController();
   final searchRawScrollController = ScrollController();
@@ -1004,7 +1006,10 @@ class _PluginTestPageState extends State<PluginTestPage> {
   }
 
   /// 测试播放：用当前已解析的线路直接进播放器，并定位到点的那一集。
-  void _startTestPlayback(Road road, int index) {
+  ///
+  /// 弹幕和讨论都要靠 Bangumi 条目 id 去查，所以先拿番剧名去 Bangumi 搜一次，
+  /// 取第一条真实条目带进去；搜不到才退回合成条目（此时弹幕与讨论不可用）。
+  Future<void> _startTestPlayback(Road road, int index) async {
     final data = searchRes?.data;
     if (data == null || data.isEmpty) {
       KazumiDialog.showToast(context: context, message: '请先解析出搜索结果');
@@ -1022,30 +1027,62 @@ class _PluginTestPageState extends State<PluginTestPage> {
     }
     final roadIndex = roads.indexOf(road);
     final item = data[itemIndex];
-    final name = item.name.trim().isEmpty ? plugin.name : item.name.trim();
-    final bangumiItem = BangumiItem(
-      id: 0,
-      type: 2,
-      name: name,
-      nameCn: name,
-      summary: '',
-      airDate: '',
-      airWeekday: 0,
-      rank: 0,
-      images: const {},
-      tags: const [],
-      alias: const [],
-      ratingScore: 0,
-      votes: 0,
-      votesCount: const [],
-      info: '',
-    );
-    context.pushNamed(
+    final rawName = item.name.trim().isEmpty ? plugin.name : item.name.trim();
+
+    BangumiItem? matched;
+    await dialogs.run((task) async {
+      matched = await task.loading<BangumiItem?>(
+        message: '正在关联 Bangumi 条目…',
+        action: () async {
+          try {
+            final page = await BangumiApi.bangumiSearch(rawName, limit: 10);
+            final items = page?.items ?? const <BangumiItem>[];
+            return items.isEmpty ? null : items.first;
+          } catch (error) {
+            KazumiLogger()
+                .w('PluginTestPage: bangumi search failed', error: error);
+            return null;
+          }
+        },
+      );
+    });
+    if (!mounted) return;
+
+    final matchedItem = matched;
+    final bangumiItem = matchedItem ??
+        BangumiItem(
+          id: 0,
+          type: 2,
+          name: rawName,
+          nameCn: rawName,
+          summary: '',
+          airDate: '',
+          airWeekday: 0,
+          rank: 0,
+          images: const {},
+          tags: const [],
+          alias: const [],
+          ratingScore: 0,
+          votes: 0,
+          votesCount: const [],
+          info: '',
+        );
+    if (matchedItem == null) {
+      KazumiDialog.showToast(
+        context: context,
+        message: '没匹配到 Bangumi 条目，弹幕与讨论不可用',
+      );
+    }
+    final title = matchedItem == null
+        ? rawName
+        : (matchedItem.nameCn.isNotEmpty
+            ? matchedItem.nameCn
+            : matchedItem.name);    context.pushNamed(
       '/video/',
       arguments: OnlineVideoPlaybackArgs(
         bangumiItem: bangumiItem,
         plugin: plugin,
-        title: name,
+        title: title,
         src: item.src,
         roads: roads,
         initialEpisode: index + 1,
