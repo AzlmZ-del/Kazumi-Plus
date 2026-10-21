@@ -304,31 +304,16 @@ class _PluginTestPageState extends State<PluginTestPage> {
                             completed: true,
                             expanded: false,
                             failedOverride: false,
-                            subtitleWidget: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (roadName.isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 2),
-                                    child: Text(
-                                      roadName,
-                                      style: theme.textTheme.bodySmall
-                                          ?.copyWith(
-                                              color: theme
-                                                  .colorScheme.onSurfaceVariant),
-                                    ),
-                                  ),
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 2),
-                                  child: Text(
-                                    '章节数量：${road.data.length}',
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                        color: theme
-                                            .colorScheme.onSurfaceVariant),
-                                  ),
-                                ),
-                              ],
+                            subtitleWidget: Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(
+                                roadName.isEmpty
+                                    ? '章节数量：${road.data.length}'
+                                    : '$roadName · 章节数量：${road.data.length}',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                    color:
+                                        theme.colorScheme.onSurfaceVariant),
+                              ),
                             ),
                             child: _buildRoadChapterList(road, theme)),
                         _h12,
