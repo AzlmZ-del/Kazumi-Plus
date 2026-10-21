@@ -159,8 +159,66 @@ void main() {
     );
   });
 
-  test('chapter parsing never triggers the search captcha flow', () async {
+  test('reverse:: prefix restores ascending episode order', () async {
+    const reversedResponse = '''
+<html>
+  <div class="road">
+    <a href="/play/ep3">3</a>
+    <a href="/play/ep2">2</a>
+    <a href="/play/ep1">1</a>
+  </div>
+</html>
+''';
     final engine = RuleEngine(
+      requestExecutor: _FakeExecutor([reversedResponse]),
+      logFailures: false,
+    );
+
+    final chapters = await engine.queryChapters(
+      _config(
+        searchMode: RuleMode.xpath,
+        chapterMode: RuleMode.xpath,
+        chapterResult: 'reverse::.//a',
+      ),
+      '/video/1',
+    );
+
+    expect(chapters.roads, hasLength(1));
+    final road = chapters.roads.single;
+    expect(road.identifier, ['1', '2', '3']);
+    expect(road.data, [
+      'https://example.com/play/ep1',
+      'https://example.com/play/ep2',
+      'https://example.com/play/ep3',
+    ]);
+    expect(chapters.diagnostics, isEmpty);
+  });
+
+  test('reverse:: prefix on the road list is ignored with a diagnostic',
+      () async {
+    final engine = RuleEngine(
+      requestExecutor: _FakeExecutor([xpathResponse]),
+      logFailures: false,
+    );
+
+    final chapters = await engine.queryChapters(
+      _config(
+        searchMode: RuleMode.xpath,
+        chapterMode: RuleMode.xpath,
+        chapterRoads: 'reverse:://div[@class="road"]',
+        chapterResult: './/a',
+      ),
+      '/video/1',
+    );
+
+    expect(chapters.roads, hasLength(1));
+    expect(
+      chapters.diagnostics,
+      contains('$xpathReversePrefix 前缀只对剧集列表生效，播放线路列表已忽略'),
+    );
+  });
+
+  test('chapter parsing never triggers the search captcha flow', () async {    final engine = RuleEngine(
       requestExecutor: _FakeExecutor(['<html>captcha</html>']),
       logFailures: false,
     );
@@ -370,7 +428,9 @@ RuleExecutionConfig _config({
   required String chapterMode,
   AntiCrawlerConfig? antiCrawler,
   String searchName = '//h2/a',
+  String chapterRoads = '//div[@class="road"]',
   String chapterResult = '//a',
+  String chapterRoadName = '',
 }) {
   return RuleExecutionConfig(
     pluginName: 'runtime-test',
@@ -382,8 +442,9 @@ RuleExecutionConfig _config({
     searchList: '//article[@class="result"]',
     searchName: searchName,
     searchResult: '//h2/a',
-    chapterRoads: '//div[@class="road"]',
+    chapterRoads: chapterRoads,
     chapterResult: chapterResult,
+    chapterRoadName: chapterRoadName,
     searchApiConfig: ApiSearchConfig(
       request: ApiRequestConfig(
         url: 'https://example.com/api/search',

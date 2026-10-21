@@ -25,6 +25,17 @@ enum XPathRuleField {
   captchaButton,
 }
 
+/// Optional prefix on an XPath expression that flips the resulting node list.
+///
+/// Some sites list the newest episode first (`3, 2, 1`). Writing the episode
+/// XPath as `reverse::<selector>` makes Kazumi restore the natural order
+/// (`1, 2, 3`) without touching the rule's selectors.
+///
+/// Only the episode list honours this prefix. Reversing the road list would
+/// desynchronise it from the index-aligned road-name list, so the prefix is
+/// stripped and ignored there (a diagnostic is emitted instead).
+const String xpathReversePrefix = 'reverse::';
+
 class XPathRuleFormatException implements Exception {
   const XPathRuleFormatException(
     this.message, {
@@ -151,6 +162,22 @@ class XPathRuleStrategy {
     );
   }
 
+  /// Splits the optional [xpathReversePrefix] off an XPath expression.
+  ///
+  /// Returns the cleaned selector and whether the caller should reverse the
+  /// resulting node list. The prefix is matched case-sensitively right at the
+  /// start so an ordinary selector that merely contains the word is untouched.
+  ({String expression, bool reverse}) _splitReversePrefix(String raw) {
+    final trimmed = raw.trimLeft();
+    if (!trimmed.startsWith(xpathReversePrefix)) {
+      return (expression: raw, reverse: false);
+    }
+    return (
+      expression: trimmed.substring(xpathReversePrefix.length).trim(),
+      reverse: true,
+    );
+  }
+
   RuleChapterParseResult parseChapters(
     String raw,
     RuleExecutionConfig config,
@@ -158,15 +185,28 @@ class XPathRuleStrategy {
     final root = _documentElement(raw);
     final roads = <Road>[];
     final diagnostics = <String>[];
+    // Only the episode selector honours the reverse prefix. The road list is
+    // paired with the road-name list by index, so reversing one without the
+    // other would silently mislabel every road; the prefix is stripped and
+    // reported there instead.
+    final episodeSelector = _splitReversePrefix(config.chapterResult);
+    final roadsSelector = _splitReversePrefix(config.chapterRoads);
+    if (roadsSelector.reverse) {
+      diagnostics.add('$xpathReversePrefix 前缀只对剧集列表生效，播放线路列表已忽略');
+    }
     final roadNodes = _runSelector(
       XPathRuleField.chapterRoads,
-      config.chapterRoads,
-      () => root.queryXPath(config.chapterRoads).nodes,
+      roadsSelector.expression,
+      () => root.queryXPath(roadsSelector.expression).nodes,
     );
     // Optional: road names live outside the road nodes on many sites (tab
     // headers vs. tab panes), so they are queried separately and matched to
     // the roads by index.
-    final roadNameExpression = config.chapterRoadName.trim();
+    final roadNameSelector = _splitReversePrefix(config.chapterRoadName);
+    final roadNameExpression = roadNameSelector.expression.trim();
+    if (roadNameSelector.reverse) {
+      diagnostics.add('$xpathReversePrefix 前缀只对剧集列表生效，线路名称列表已忽略');
+    }
     // Starts as an empty list of the same element type, so the optional field
     // can be skipped without a second type parameter.
     var roadNameNodes = roadNodes.sublist(0, 0);
@@ -191,14 +231,19 @@ class XPathRuleStrategy {
         final names = <String>[];
         final episodeNodes = _runSelector(
           XPathRuleField.chapterResult,
-          config.chapterResult,
-          () => roadNode.queryXPath(config.chapterResult).nodes,
+          episodeSelector.expression,
+          () => roadNode.queryXPath(episodeSelector.expression).nodes,
         );
+        // Sites that list the newest episode first are parsed back into
+        // broadcast order so "第1集"（or the site's own `1`）lines up with the
+        // first episode the user expects.
+        final orderedEpisodes =
+            episodeSelector.reverse ? episodeNodes.reversed.toList() : episodeNodes;
         for (var episodeIndex = 0;
-            episodeIndex < episodeNodes.length;
+            episodeIndex < orderedEpisodes.length;
             episodeIndex++) {
           try {
-            final episode = episodeNodes[episodeIndex].node;
+            final episode = orderedEpisodes[episodeIndex].node;
             final source = episode.attributes['href']?.trim() ?? '';
             if (source.isEmpty) {
               diagnostics.add(

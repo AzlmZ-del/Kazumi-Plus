@@ -103,6 +103,8 @@ abstract final class _RuleEditorText {
   static const itemLinkXPath = '条目链接（XPath）';
   static const roadListXPath = '播放线路列表（XPath）';
   static const episodeListXPath = '剧集列表（XPath）';
+  static const episodeListXPathHelper =
+      '按文档顺序取剧集；站点若把最新集排在最前，在表达式最前面加 reverse:: 反序。';
   static const roadNameXPath = '线路名称列表（XPath，可选）';
   static const roadNameXPathHelper =
       '按出现顺序对应上面的播放线路；留空则显示“播放线路1、2、3…”';
@@ -1171,6 +1173,7 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
         EditorTextField(
           controller: chapterResultController,
           label: _RuleEditorText.episodeListXPath,
+          helper: _RuleEditorText.episodeListXPathHelper,
         ),
         EditorTextField(
           controller: chapterRoadNameController,
