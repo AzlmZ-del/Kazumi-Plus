@@ -572,10 +572,27 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
                       builder: (context, snapshot) => RuleCard(
                       key: ValueKey(item.name),
                       title: item.name,
-                      titleTag: RuleTag(
-                          label: item.version,
-                          background: colors.primaryContainer,
-                          foreground: colors.onPrimaryContainer),
+                      titleTag: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          RuleTag(
+                              label: item.version,
+                              background: colors.primaryContainer,
+                              foreground: colors.onPrimaryContainer),
+                          // 源类型跟着版本号走：两者都是规则的身份信息，
+                          // 放进 tags 行会随安装状态变来变去。
+                          if (item.type.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            RuleTag(
+                                label: item.type,
+                                width: 56,
+                                height: 20,
+                                background: colors.secondaryContainer,
+                                foreground: colors.onSecondaryContainer),
+                          ],
+                        ],
+                      ),
                       installed: status == PluginCatalogItemStatus.installed,
                       subtitle:
                           item.author.isEmpty ? null : '作者 · ${item.author}',
