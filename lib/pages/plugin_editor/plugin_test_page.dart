@@ -536,8 +536,11 @@ class _PluginTestPageState extends State<PluginTestPage>
     if (choice == 'internal') {
       Navigator.of(context, rootNavigator: true).push(
         MaterialPageRoute(
-          builder: (_) =>
-              InternalBrowserPage(url: item.src, title: item.name),
+          builder: (_) => InternalBrowserPage(
+            url: item.src,
+            title: item.name,
+            userAgent: plugin.userAgent,
+          ),
         ),
       );
       return;
@@ -1011,6 +1014,7 @@ class _PluginTestPageState extends State<PluginTestPage>
         builder: (_) => InternalBrowserPage(
           url: road.data[index],
           title: road.identifier[index],
+          userAgent: plugin.userAgent,
         ),
       ),
     );

@@ -77,6 +77,10 @@ const List<String> userAgentsList = [
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0',
 ];
 
+/// 内置浏览器的兜底 UA：规则里没配 userAgent 时用手机版，站点才会给移动页面。
+const String mobileUserAgent =
+    'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36';
+
 /// 随机HTTP请求头accept-language字段列表
 const List<String> acceptLanguageList = [
   'zh-CN,zh;q=0.9',
