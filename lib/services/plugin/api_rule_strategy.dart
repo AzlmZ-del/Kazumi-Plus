@@ -4,6 +4,7 @@ import 'package:json_path/json_path.dart';
 import 'package:kazumi/modules/roads/road_module.dart';
 import 'package:kazumi/modules/search/plugin_search_module.dart';
 import 'package:kazumi/plugins/api_rule_config.dart';
+import 'package:kazumi/services/plugin/reverse_prefix.dart';
 import 'package:kazumi/services/plugin/rule_engine_models.dart';
 import 'package:kazumi/utils/episode_url.dart';
 
@@ -236,22 +237,38 @@ class ApiRuleStrategy {
     String baseUrl,
     List<String> diagnostics,
   ) {
-    final hasRoads = config.roadsPath.trim().isNotEmpty;
+    // Only the episode list honours the reverse prefix; the road list and the
+    // road-name list are paired by index, so the marker is stripped and
+    // reported there instead.
+    final episodesSelector = splitReversePrefix(config.episodesPath);
+    final roadsSelector = splitReversePrefix(config.roadsPath);
+    if (roadsSelector.reverse) {
+      diagnostics.add('$reversePrefixLabel 只对剧集列表生效，播放线路列表已忽略');
+    }
+    final roadNameSelector = splitReversePrefix(config.roadNamePath);
+    if (roadNameSelector.reverse) {
+      diagnostics.add('$reversePrefixLabel 只对剧集列表生效，线路名称列表已忽略');
+    }
+    final hasRoads = roadsSelector.expression.trim().isNotEmpty;
     final roadNodes = hasRoads
-        ? RestrictedJsonPath.read(document, config.roadsPath)
+        ? RestrictedJsonPath.read(document, roadsSelector.expression)
         : <Object?>[document];
     final roads = <Road>[];
     for (var roadIndex = 0; roadIndex < roadNodes.length; roadIndex++) {
       final roadNode = roadNodes[roadIndex];
       try {
-        final roadName = hasRoads && config.roadNamePath.trim().isNotEmpty
+        final roadName =
+            hasRoads && roadNameSelector.expression.trim().isNotEmpty
             ? _stringValue(
-                RestrictedJsonPath.readFirst(roadNode, config.roadNamePath),
+                RestrictedJsonPath.readFirst(
+                  roadNode,
+                  roadNameSelector.expression,
+                ),
               )
             : '';
         final episodeNodes = RestrictedJsonPath.read(
           roadNode,
-          config.episodesPath,
+          episodesSelector.expression,
         );
         final urls = <String>[];
         final names = <String>[];
@@ -309,8 +326,10 @@ class ApiRuleStrategy {
             name: roadName.isEmpty
                 ? '播放线路${roads.length + 1}'
                 : roadName,
-            data: urls,
-            identifier: names,
+            data: episodesSelector.reverse ? urls.reversed.toList() : urls,
+            identifier: episodesSelector.reverse
+                ? names.reversed.toList()
+                : names,
           ),
         );
       } on ApiRuleFormatException {
@@ -329,11 +348,16 @@ class ApiRuleStrategy {
     String baseUrl,
     List<String> diagnostics,
   ) {
+    final episodesSelector = splitReversePrefix(config.roadEpisodesPath);
+    final roadNamesSelector = splitReversePrefix(config.roadNamesPath);
+    if (roadNamesSelector.reverse) {
+      diagnostics.add('$reversePrefixLabel 只对剧集列表生效，线路名称列表已忽略');
+    }
     final namesValue = _stringValue(
-      RestrictedJsonPath.readFirst(document, config.roadNamesPath),
+      RestrictedJsonPath.readFirst(document, roadNamesSelector.expression),
     );
     final episodesValue = _stringValue(
-      RestrictedJsonPath.readFirst(document, config.roadEpisodesPath),
+      RestrictedJsonPath.readFirst(document, episodesSelector.expression),
     );
     if (episodesValue.isEmpty) return <Road>[];
     final roadNames = namesValue.split(config.roadSeparator);
@@ -375,7 +399,7 @@ class ApiRuleStrategy {
             continue;
           }
           urls.add(pageUrl);
-          names.add(name.isEmpty ? '第${episodeIndex + 1}集' : name);
+          names.add(name);
         } on ApiRuleFormatException {
           rethrow;
         } catch (error) {
@@ -390,13 +414,20 @@ class ApiRuleStrategy {
       }
       final configuredName =
           roadIndex < roadNames.length ? roadNames[roadIndex].trim() : '';
+      final orderedUrls =
+          episodesSelector.reverse ? urls.reversed.toList() : urls;
+      final orderedNames =
+          episodesSelector.reverse ? names.reversed.toList() : names;
       roads.add(
         Road(
           name: configuredName.isEmpty
               ? '播放线路${roads.length + 1}'
               : configuredName,
-          data: urls,
-          identifier: names,
+          data: orderedUrls,
+          identifier: [
+            for (var i = 0; i < orderedNames.length; i++)
+              orderedNames[i].isEmpty ? '第${i + 1}集' : orderedNames[i],
+          ],
         ),
       );
     }
@@ -506,8 +537,12 @@ class ApiRuleStrategy {
       }
     }
     if (config.format == ApiChapterFormat.delimited) {
-      RestrictedJsonPath.validate(config.roadNamesPath);
-      RestrictedJsonPath.validate(config.roadEpisodesPath);
+      RestrictedJsonPath.validate(
+        splitReversePrefix(config.roadNamesPath).expression,
+      );
+      RestrictedJsonPath.validate(
+        splitReversePrefix(config.roadEpisodesPath).expression,
+      );
       if (config.roadSeparator.isEmpty ||
           config.episodeSeparator.isEmpty ||
           config.fieldSeparator.isEmpty) {
@@ -516,13 +551,17 @@ class ApiRuleStrategy {
       return;
     }
 
-    if (config.roadsPath.trim().isNotEmpty) {
-      RestrictedJsonPath.validate(config.roadsPath);
+    final roadsPath = splitReversePrefix(config.roadsPath).expression.trim();
+    if (roadsPath.isNotEmpty) {
+      RestrictedJsonPath.validate(roadsPath);
     }
-    if (config.roadNamePath.trim().isNotEmpty) {
-      RestrictedJsonPath.validate(config.roadNamePath);
+    final roadNamePath = splitReversePrefix(config.roadNamePath).expression;
+    if (roadNamePath.trim().isNotEmpty) {
+      RestrictedJsonPath.validate(roadNamePath);
     }
-    RestrictedJsonPath.validate(config.episodesPath);
+    RestrictedJsonPath.validate(
+      splitReversePrefix(config.episodesPath).expression,
+    );
     RestrictedJsonPath.validate(config.episodeNamePath);
     if (config.episodeUrlPath.trim().isNotEmpty) {
       RestrictedJsonPath.validate(config.episodeUrlPath);

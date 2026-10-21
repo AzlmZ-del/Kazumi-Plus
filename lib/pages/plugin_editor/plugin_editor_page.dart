@@ -133,11 +133,15 @@ abstract final class _RuleEditorText {
   static const roadListPath = '播放线路列表路径（JSONPath，留空表示单线路）';
   static const roadNamePath = '线路名称路径（JSONPath，相对线路）';
   static const episodeListPath = '剧集列表路径（JSONPath，相对线路）';
+  static const episodeListPathHelper =
+      '按数组顺序取剧集；站点若把最新集排在最前，在路径最前面加 - 反序。';
   static const episodeNamePath = '剧集名称路径（JSONPath，相对剧集）';
   static const playbackEntryPath = '播放入口地址路径（JSONPath，使用播放页地址模板时可留空）';
   static const playbackEntryPathHelper = '从剧集对象读取交给 WebView 的地址，可以是播放页面或媒体直链。';
   static const roadNamesPath = '线路名称串路径（JSONPath）';
   static const roadEpisodesPath = '线路剧集串路径（JSONPath）';
+  static const roadEpisodesPathHelper =
+      '每条线路内按顺序取剧集；站点若把最新集排在最前，在路径最前面加 - 反序。';
   static const roadSeparator = '线路分隔符';
   static const episodeSeparator = '剧集分隔符';
   static const fieldSeparator = '名称与地址分隔符';
@@ -1303,6 +1307,7 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
                     EditorTextField(
                       controller: chapterApiEpisodesPathController,
                       label: _RuleEditorText.episodeListPath,
+                      helper: _RuleEditorText.episodeListPathHelper,
                     ),
                     EditorTextField(
                       controller: chapterApiEpisodeNamePathController,
@@ -1322,6 +1327,7 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
                     EditorTextField(
                       controller: chapterApiRoadEpisodesPathController,
                       label: _RuleEditorText.roadEpisodesPath,
+                      helper: _RuleEditorText.roadEpisodesPathHelper,
                     ),
                     EditorTextField(
                       controller: chapterApiRoadSeparatorController,
