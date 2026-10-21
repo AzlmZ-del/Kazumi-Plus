@@ -898,7 +898,8 @@ class _PluginTestPageState extends State<PluginTestPage>
     );
   }
 
-  /// 单条线路的章节明细：一集一张小卡片，链接可点，弹窗里可选内部浏览/外部打开/测试播放。
+  /// 单条线路的章节明细：一集一张小卡片，集标题那一行右侧排三枚图标按钮
+  /// （内部浏览 / 外部打开 / 测试播放），长按显示说明。
   Widget _buildRoadChapterList(Road road, ThemeData theme) {
     if (road.identifier.isEmpty) {
       return _buildEmpty('这条线路没有章节', theme);
@@ -923,92 +924,101 @@ class _PluginTestPageState extends State<PluginTestPage>
       color: colors.surfaceContainerHighest,
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: url.isEmpty ? null : () => _showEpisodeActions(road, index),
-        child: Padding(
-          padding: const EdgeInsets.only(left: 14, right: 8, top: 8, bottom: 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: theme.textTheme.bodyMedium
-                          ?.copyWith(fontWeight: FontWeight.w500),
-                    ),
-                    if (url.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        url,
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: _linkGreen),
-                      ),
-                    ],
-                  ],
+      child: Padding(
+        padding: const EdgeInsets.only(left: 14, right: 8, top: 6, bottom: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    name,
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.w500),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                tooltip: '测试播放',
-                onPressed:
-                    url.isEmpty ? null : () => _startTestPlayback(road, index),
-                icon: const Icon(Icons.play_circle_outline),
-                iconSize: 20,
-                padding: EdgeInsets.zero,
-                visualDensity: VisualDensity.compact,
-                constraints: const BoxConstraints.tightFor(
-                  width: 34,
-                  height: 34,
+                const SizedBox(width: 4),
+                _episodeActionButton(
+                  tooltip: '内部浏览',
+                  icon: Icons.open_in_browser,
+                  onPressed:
+                      url.isEmpty ? null : () => _openEpisodeInternal(road, index),
+                  background: colors.secondaryContainer,
+                  foreground: colors.onSecondaryContainer,
                 ),
-                style: IconButton.styleFrom(
-                  foregroundColor: colors.onPrimaryContainer,
-                  backgroundColor: colors.primaryContainer,
+                const SizedBox(width: 4),
+                _episodeActionButton(
+                  tooltip: '外部打开',
+                  icon: Icons.open_in_new,
+                  onPressed:
+                      url.isEmpty ? null : () => _openEpisodeExternal(road, index),
+                  background: colors.secondaryContainer,
+                  foreground: colors.onSecondaryContainer,
                 ),
+                const SizedBox(width: 4),
+                _episodeActionButton(
+                  tooltip: '测试播放',
+                  icon: Icons.play_circle_outline,
+                  onPressed:
+                      url.isEmpty ? null : () => _startTestPlayback(road, index),
+                  background: colors.primaryContainer,
+                  foreground: colors.onPrimaryContainer,
+                ),
+              ],
+            ),
+            if (url.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                url,
+                style: theme.textTheme.bodySmall?.copyWith(color: _linkGreen),
               ),
             ],
-          ),
+          ],
         ),
       ),
     );
   }
 
-  /// 章节链接点开后的二选一：应用内看，或者交给系统浏览器。
-  /// 「测试播放」已经挪到卡片右侧的图标按钮上（长按显示说明）。
-  Future<void> _showEpisodeActions(Road road, int index) async {
-    final url = road.data[index];
-    final choice = await KazumiDialog.show<String>(
-      builder: (dialogContext) {
-        final theme = Theme.of(dialogContext);
-        return AlertDialog(
-          title: const Text('打开链接'),
-          content: Text(url, style: theme.textTheme.bodySmall),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop('internal'),
-              child: const Text('内部浏览'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop('external'),
-              child: const Text('外部打开'),
-            ),
-          ],
-        );
-      },
+  /// 章节卡右上角那排图标按钮，三枚尺寸与圆角保持一致。
+  Widget _episodeActionButton({
+    required String tooltip,
+    required IconData icon,
+    required VoidCallback? onPressed,
+    required Color background,
+    required Color foreground,
+  }) {
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      icon: Icon(icon),
+      iconSize: 18,
+      padding: EdgeInsets.zero,
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+      style: IconButton.styleFrom(
+        foregroundColor: foreground,
+        backgroundColor: background,
+        disabledBackgroundColor: background.withValues(alpha: 0.4),
+      ),
     );
-    if (!mounted || choice == null) return;
-    if (choice == 'internal') {
-      Navigator.of(context, rootNavigator: true).push(
-        MaterialPageRoute(
-          builder: (_) => InternalBrowserPage(
-            url: url,
-            title: road.identifier[index],
-          ),
+  }
+
+  /// 章节链接在应用内打开。
+  void _openEpisodeInternal(Road road, int index) {
+    Navigator.of(context, rootNavigator: true).push(
+      MaterialPageRoute(
+        builder: (_) => InternalBrowserPage(
+          url: road.data[index],
+          title: road.identifier[index],
         ),
-      );
-      return;
-    }
+      ),
+    );
+  }
+
+  /// 章节链接交给系统浏览器打开。
+  Future<void> _openEpisodeExternal(Road road, int index) async {
+    final url = road.data[index];
     try {
       if (await launchUrl(Uri.parse(url),
           mode: LaunchMode.externalApplication)) {
