@@ -235,23 +235,43 @@ class RuleTag extends StatelessWidget {
     required this.label,
     required this.background,
     required this.foreground,
+    this.width,
+    this.height,
   });
 
   final String label;
   final Color background;
   final Color foreground;
 
+  /// 固定尺寸。传了就按这个宽高画，不再随文字长短伸缩；
+  /// 一组标签（例如 API / XPath / 混合）必须传同一组数值才对得齐。
+  final double? width;
+  final double? height;
+
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) {
+    final text = Text(label,
+        style: Theme.of(context)
+            .textTheme
+            .labelSmall
+            ?.copyWith(color: foreground, fontWeight: FontWeight.w600));
+    final decoration = BoxDecoration(
+      color: background,
+      borderRadius: BorderRadius.circular(8),
+    );
+    if (width == null && height == null) {
+      return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: background,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(label,
-            style: Theme.of(context)
-                .textTheme
-                .labelSmall
-                ?.copyWith(color: foreground, fontWeight: FontWeight.w600)),
+        decoration: decoration,
+        child: text,
       );
+    }
+    return Container(
+      width: width,
+      height: height,
+      alignment: Alignment.center,
+      decoration: decoration,
+      child: text,
+    );
+  }
 }

@@ -6,6 +6,11 @@ class PluginHTTPItem {
   int lastUpdate;
   bool antiCrawlerEnabled;
 
+  /// 规则类型（API / XPath / 混合），由规则文件的 `api` 键在生成索引时翻好。
+  ///
+  /// 老仓库的 index.json 没有这个字段，[fromJson] 会留空串，界面据此不画标签。
+  String type;
+
   /// Normalized URL of the repository this item was listed by.
   ///
   /// Filled in only while the catalog is aggregated from multiple
@@ -24,6 +29,7 @@ class PluginHTTPItem {
     required this.useNativePlayer,
     required this.author,
     required this.lastUpdate,
+    this.type = '',
     this.antiCrawlerEnabled = false,
     this.repositoryUrl = '',
     this.repositoryLabel = '',
@@ -40,6 +46,7 @@ class PluginHTTPItem {
       useNativePlayer: json['useNativePlayer'],
       author: json['author'],
       lastUpdate: json['lastUpdate'] ?? 0,
+      type: json['type']?.toString() ?? '',
       antiCrawlerEnabled: antiCrawlerEnabled,
     );
   }
@@ -58,6 +65,7 @@ class PluginHTTPItem {
       useNativePlayer: useNativePlayer,
       author: author,
       lastUpdate: lastUpdate,
+      type: type,
       antiCrawlerEnabled: antiCrawlerEnabled,
       repositoryUrl: url,
       repositoryLabel: label,
