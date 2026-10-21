@@ -284,7 +284,16 @@ class _PluginTestPageState extends State<PluginTestPage> {
                   _buildExpansionTile(
                       theme: theme,
                       number: 3,
-                      title: '播放线路',
+                      title: '响应内容',
+                      subtitle: _getChapterRawSubtitle(),
+                      completed: _needChapterParse && chapterRaw.isNotEmpty,
+                      expanded: false,
+                      child: _buildChapterRawContent(theme)),
+                  _h12,
+                  _buildExpansionTile(
+                      theme: theme,
+                      number: 4,
+                      title: '播放路线',
                       subtitle: _getChapterSubtitle(),
                       completed: _hasChapters,
                       // 切到别的结果时章节先清空，这里保持展开，避免面板自己收起来。
@@ -315,6 +324,7 @@ class _PluginTestPageState extends State<PluginTestPage> {
         switch (number) {
           1 => true,
           2 => _hasSearchRaw,
+          3 => _hasSearchData && _needChapterParse && !_chapterLoading,
           _ => _hasSearchData && _needChapterParse && !_chapterLoading,
         };
     final foreground = completed
@@ -717,6 +727,41 @@ class _PluginTestPageState extends State<PluginTestPage> {
     return '第 ${_selectedItemIndex + 1} 条 · 获取到 ${chapters?.length ?? 0} 个播放线路$skipped';
   }
 
+  String _getChapterRawSubtitle() {
+    if (!_hasRun) return '等待开始';
+    if (isTesting) return _hasSearchData ? '正在获取响应…' : '等待搜索结果';
+    if (!_hasSearchData) return '等待有效搜索结果';
+    if (!_needChapterParse) return '无需解析章节';
+    if (_chapterLoading) return '正在获取第 ${_selectedItemIndex + 1} 条的响应…';
+    if (chapterRaw.isEmpty) return '第 ${_selectedItemIndex + 1} 条 · 未获取到响应';
+    final kind = plugin.chapterMode == RuleMode.api ? 'JSON' : 'HTML';
+    return '第 ${_selectedItemIndex + 1} 条 · $kind长度：${chapterRaw.length} 字符';
+  }
+
+  Widget _buildChapterRawContent(ThemeData theme) {
+    if (!_needChapterParse) return _buildEmpty('未填写章节规则', theme);
+    if (isTesting || _chapterLoading) return _buildLoading(theme);
+    if (!_hasSearchData) return _buildEmpty('请先解析到有效结果', theme);
+    if (chapterRaw.isEmpty) {
+      return _buildEmpty('未获取到响应内容', theme, isError: true);
+    }
+
+    return Column(
+      children: [
+        _buildDiagnosticsWidget(chapterDiagnostics, theme),
+        _buildResponseCard(
+          raw: _formattedRaw(chapterRaw,
+              isJson: plugin.chapterMode == RuleMode.api),
+          theme: theme,
+          expanded: _chapterRawExpanded,
+          controller: chapterRawScrollController,
+          onToggle: () =>
+              setState(() => _chapterRawExpanded = !_chapterRawExpanded),
+        ),
+      ],
+    );
+  }
+
   Widget _buildChapterContent(ThemeData theme) {
     if (!_needChapterParse) return _buildEmpty('未填写章节规则', theme);
     if (isTesting || _chapterLoading) return _buildLoading(theme);
@@ -724,29 +769,14 @@ class _PluginTestPageState extends State<PluginTestPage> {
     if (chapters == null) return _buildEmpty('未获取章节数据', theme, isError: true);
     if (!_hasChapters) return _buildEmpty('无可用章节', theme, isError: true);
 
-    return Column(
-      children: [
-        _buildDiagnosticsWidget(chapterDiagnostics, theme),
-        if (chapterRaw.isNotEmpty)
-          _buildResponseCard(
-            raw: _formattedRaw(chapterRaw,
-                isJson: plugin.chapterMode == RuleMode.api),
-            theme: theme,
-            expanded: _chapterRawExpanded,
-            controller: chapterRawScrollController,
-            onToggle: () =>
-                setState(() => _chapterRawExpanded = !_chapterRawExpanded),
-          ),
-        Container(
-          padding: const EdgeInsets.all(8.0),
-          height: 280,
-          child: ListView.builder(
-            controller: chapterScrollController,
-            itemCount: chapters?.length ?? 0,
-            itemBuilder: (_, i) => _buildChapterCard(chapters![i], i, theme),
-          ),
-        ),
-      ],
+    return Container(
+      padding: const EdgeInsets.all(8.0),
+      height: 280,
+      child: ListView.builder(
+        controller: chapterScrollController,
+        itemCount: chapters?.length ?? 0,
+        itemBuilder: (_, i) => _buildChapterCard(chapters![i], i, theme),
+      ),
     );
   }
 
