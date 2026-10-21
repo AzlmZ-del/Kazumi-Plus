@@ -293,15 +293,42 @@ class _PluginTestPageState extends State<PluginTestPage> {
                     ...chapters!.asMap().entries.expand((e) {
                       final i = e.key;
                       final road = e.value;
+                      final roadName = road.name.trim();
                       return [
                         _buildExpansionTile(
                             theme: theme,
                             number: 4 + i,
-                            title: '播放线路 ${i + 1}：${road.name}',
-                            subtitle: '章节数量：${road.data.length}',
+                            title: '播放线路 ${i + 1}',
+                            subtitle: '',
                             completed: true,
                             expanded: false,
                             failedOverride: false,
+                            subtitleWidget: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (roadName.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2),
+                                    child: Text(
+                                      roadName,
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                              color: theme
+                                                  .colorScheme.onSurfaceVariant),
+                                    ),
+                                  ),
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2),
+                                  child: Text(
+                                    '章节数量：${road.data.length}',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                        color: theme
+                                            .colorScheme.onSurfaceVariant),
+                                  ),
+                                ),
+                              ],
+                            ),
                             child: _buildRoadChapterList(road, theme)),
                         _h12,
                       ];
@@ -336,6 +363,7 @@ class _PluginTestPageState extends State<PluginTestPage> {
     required bool expanded,
     required Widget child,
     bool? failedOverride,
+    Widget? subtitleWidget,
   }) {
     final colors = theme.colorScheme;
     final failed = failedOverride ??
@@ -383,9 +411,10 @@ class _PluginTestPageState extends State<PluginTestPage> {
         title: Text(title,
             style: theme.textTheme.titleMedium
                 ?.copyWith(fontWeight: FontWeight.w600)),
-        subtitle: Text(subtitle,
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: colors.onSurfaceVariant)),
+        subtitle: subtitleWidget ??
+            Text(subtitle,
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: colors.onSurfaceVariant)),
         initiallyExpanded: expanded,
         shape: const Border(),
         collapsedShape: const Border(),
