@@ -384,8 +384,23 @@ class _PluginViewPageState extends State<PluginViewPage> {
                         title: plugin.name,
                         titleTag: RuleTag(
                             label: plugin.version,
-                            background: colors.primaryContainer,
-                            foreground: colors.onPrimaryContainer),
+                            width: 44,
+                            height: 16,
+                            radius: 6,
+                            fontSize: 10,
+                            background: const Color(0xFFCDEFD4),
+                            foreground: const Color(0xFF1B5E33)),
+                        // 源类型跟作者/站点同一行，与规则仓库页保持一致。
+                        subtitleTag: plugin.sourceTypeLabel.isEmpty
+                            ? null
+                            : RuleTag(
+                                label: plugin.sourceTypeLabel,
+                                width: 44,
+                                height: 16,
+                                radius: 6,
+                                fontSize: 10,
+                                background: const Color(0xFFCFE3FA),
+                                foreground: const Color(0xFF14406B)),
                         subtitle: Uri.tryParse(plugin.baseUrl)?.host ??
                             plugin.baseUrl,
                         selected: _selected.contains(plugin.name),
