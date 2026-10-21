@@ -163,6 +163,14 @@ class _VideoPageState extends State<VideoPage>
   void _initOnlineMode() {
     videoPageController.historyOffset = 0;
 
+    // 「测试播放」是入口硬指定的集数，不能被观看记录改回去。
+    if (videoPageController.episodePinned) {
+      _revealCurrentEpisode();
+      _attachLogListener();
+      _startPinnedEpisode();
+      return;
+    }
+
     var progress = historyController.lastWatching(
         videoPageController.bangumiItem,
         videoPageController.currentPlugin.name);
@@ -182,6 +190,30 @@ class _VideoPageState extends State<VideoPage>
     }
     _revealCurrentEpisode();
 
+    _attachLogListener();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      changeEpisode(videoPageController.selectedEpisode.episode,
+          currentRoad: videoPageController.selectedEpisode.road,
+          offset: videoPageController.historyOffset);
+    });
+  }
+
+  void _startPinnedEpisode() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      changeEpisode(videoPageController.selectedEpisode.episode,
+          currentRoad: videoPageController.selectedEpisode.road,
+          offset: 0);
+    });
+  }
+
+  void _attachLogListener() {
     _logSubscription = videoPageController.logStream.listen((log) {
       if (mounted) {
         setState(() {
@@ -191,15 +223,6 @@ class _VideoPageState extends State<VideoPage>
           }
         });
       }
-    });
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-      changeEpisode(videoPageController.selectedEpisode.episode,
-          currentRoad: videoPageController.selectedEpisode.road,
-          offset: videoPageController.historyOffset);
     });
   }
 

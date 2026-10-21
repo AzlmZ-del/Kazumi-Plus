@@ -21,6 +21,7 @@ class OnlineVideoPlaybackArgs extends VideoPlaybackArgs {
     required this.roads,
     this.initialEpisode = 1,
     this.initialRoad = 0,
+    this.pinInitialEpisode = false,
   });
 
   final Plugin plugin;
@@ -33,6 +34,10 @@ class OnlineVideoPlaybackArgs extends VideoPlaybackArgs {
 
   /// 0 起的线路序号。
   final int initialRoad;
+
+  /// 为 true 时 [initialEpisode]/[initialRoad] 是硬指定，不再被观看记录覆盖。
+  /// 普通入口走默认值，仍然按历史记录续播。
+  final bool pinInitialEpisode;
 }
 
 class OfflineVideoPlaybackArgs extends VideoPlaybackArgs {
