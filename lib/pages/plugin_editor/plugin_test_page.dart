@@ -733,7 +733,7 @@ class _PluginTestPageState extends State<PluginTestPage> {
                         ),
                       ]),
                   _h8,
-                  Text('链接：${item.src}',
+                  Text('${plugin.searchMode == RuleMode.api ? 'ID' : '链接'}：${item.src}',
                       style: theme.textTheme.bodySmall?.copyWith(
                           color: selected
                               ? theme.colorScheme.onPrimaryContainer
