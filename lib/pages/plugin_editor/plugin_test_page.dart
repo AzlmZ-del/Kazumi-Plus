@@ -1049,6 +1049,7 @@ class _PluginTestPageState extends State<PluginTestPage>
     BangumiItem? matched;
     await dialogs.run((task) async {
       matched = await task.loading<BangumiItem?>(
+        title: '测试播放',
         message: '正在关联 Bangumi 条目…',
         action: () async {
           try {
