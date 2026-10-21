@@ -9,9 +9,11 @@ import 'package:kazumi/bean/widget/loading_indicator.dart';
 import 'package:kazumi/modules/roads/road_module.dart';
 import 'package:kazumi/modules/search/plugin_search_module.dart';
 import 'package:kazumi/pages/plugin_editor/rule_management_widgets.dart';
+import 'package:kazumi/pages/webview/internal_browser_page.dart';
 import 'package:kazumi/plugins/api_rule_config.dart';
 import 'package:kazumi/plugins/plugins.dart';
 import 'package:kazumi/services/logging/logger.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 const _h8 = SizedBox(height: 8.0);
 const _h12 = SizedBox(height: 12.0);
@@ -477,6 +479,75 @@ class _PluginTestPageState extends State<PluginTestPage> {
     return '${plugin.searchMode == RuleMode.api ? 'JSON' : 'HTML'}长度：${searchRaw.length} 字符';
   }
 
+  /// 结果卡片底部那行：API 模式显示条目 ID，XPath 模式显示可点击的链接。
+  Widget _buildSrcLine(SearchItem item, bool selected, ThemeData theme) {
+    final style = theme.textTheme.bodySmall?.copyWith(
+        color: selected
+            ? theme.colorScheme.onPrimaryContainer
+            : theme.colorScheme.onSurfaceVariant);
+    if (plugin.searchMode == RuleMode.api) {
+      return Text('ID：${item.src}', style: style);
+    }
+    return InkWell(
+      onTap: isTesting ? null : () => _showOpenUrlDialog(item),
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Text(
+          '链接：${item.src}',
+          style: style?.copyWith(
+            decoration: TextDecoration.underline,
+            decorationColor: style.color,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 链接点开先问一句：应用内浏览，还是交给系统浏览器。
+  Future<void> _showOpenUrlDialog(SearchItem item) async {
+    final choice = await KazumiDialog.show<String>(
+      builder: (dialogContext) {
+        final theme = Theme.of(dialogContext);
+        return AlertDialog(
+          title: const Text('打开链接'),
+          content: Text(item.src, style: theme.textTheme.bodySmall),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop('internal'),
+              child: const Text('内部浏览'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop('external'),
+              child: const Text('外部打开'),
+            ),
+          ],
+        );
+      },
+    );
+    if (!mounted || choice == null) return;
+    if (choice == 'internal') {
+      Navigator.of(context, rootNavigator: true).push(
+        MaterialPageRoute(
+          builder: (_) =>
+              InternalBrowserPage(url: item.src, title: item.name),
+        ),
+      );
+      return;
+    }
+    try {
+      if (await launchUrl(Uri.parse(item.src),
+          mode: LaunchMode.externalApplication)) {
+        return;
+      }
+    } catch (error) {
+      KazumiLogger().w('PluginTestPage: failed to open url', error: error);
+    }
+    if (mounted) {
+      KazumiDialog.showToast(context: context, message: '无法打开浏览器');
+    }
+  }
+
   Widget _codePanel(String raw, ThemeData theme,
       {ScrollController? controller}) {
     return Container(
@@ -733,11 +804,7 @@ class _PluginTestPageState extends State<PluginTestPage> {
                         ),
                       ]),
                   _h8,
-                  Text('${plugin.searchMode == RuleMode.api ? 'ID' : '链接'}：${item.src}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                          color: selected
-                              ? theme.colorScheme.onPrimaryContainer
-                              : theme.colorScheme.onSurfaceVariant)),
+                  _buildSrcLine(item, selected, theme),
                 ]),
           ),
         ),
