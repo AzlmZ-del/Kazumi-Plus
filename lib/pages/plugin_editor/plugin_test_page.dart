@@ -283,7 +283,8 @@ class _PluginTestPageState extends State<PluginTestPage> {
                       theme: theme,
                       number: 3,
                       title: '响应内容',
-                      subtitle: _getChapterRawSubtitle(),
+                      subtitle: '',
+                      subtitleWidget: _buildChapterRawSubtitle(theme),
                       completed: _needChapterParse && chapterRaw.isNotEmpty,
                       expanded: false,
                       child: _buildChapterRawContent(theme)),
@@ -777,15 +778,45 @@ class _PluginTestPageState extends State<PluginTestPage> {
     return '第 ${_selectedItemIndex + 1} 条 · 获取到 ${chapters?.length ?? 0} 个播放线路$skipped';
   }
 
-  String _getChapterRawSubtitle() {
-    if (!_hasRun) return '等待开始';
-    if (isTesting) return _hasSearchData ? '正在获取响应…' : '等待搜索结果';
-    if (!_hasSearchData) return '等待有效搜索结果';
-    if (!_needChapterParse) return '无需解析章节';
-    if (_chapterLoading) return '正在获取第 ${_selectedItemIndex + 1} 条的响应…';
-    if (chapterRaw.isEmpty) return '第 ${_selectedItemIndex + 1} 条 · 未获取到响应';
+  /// 「响应内容」卡的副标题：第一行第几条，第二行数据类型与长度。
+  Widget _buildChapterRawSubtitle(ThemeData theme) {
+    final style = theme.textTheme.bodySmall
+        ?.copyWith(color: theme.colorScheme.onSurfaceVariant);
     final kind = plugin.chapterMode == RuleMode.api ? 'JSON' : 'HTML';
-    return '第 ${_selectedItemIndex + 1} 条 · $kind长度：${chapterRaw.length} 字符';
+    String? line1;
+    String line2;
+    if (!_hasRun) {
+      line2 = '等待开始';
+    } else if (isTesting) {
+      line2 = _hasSearchData ? '正在获取响应…' : '等待搜索结果';
+    } else if (!_hasSearchData) {
+      line2 = '等待有效搜索结果';
+    } else if (!_needChapterParse) {
+      line2 = '无需解析章节';
+    } else if (_chapterLoading) {
+      line2 = '正在获取第 ${_selectedItemIndex + 1} 条的响应…';
+    } else if (chapterRaw.isEmpty) {
+      line1 = '第 ${_selectedItemIndex + 1} 条';
+      line2 = '未获取到响应';
+    } else {
+      line1 = '第 ${_selectedItemIndex + 1} 条';
+      line2 = '$kind长度：${chapterRaw.length} 字符';
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (line1 != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(line1, style: style),
+          ),
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Text(line2, style: style),
+        ),
+      ],
+    );
   }
 
   Widget _buildChapterRawContent(ThemeData theme) {
