@@ -128,7 +128,7 @@ class _InfoActionsMenuState extends State<InfoActionsMenu> {
         ),
         KazumiMenuItem(
           onPressed: _openInternally,
-          label: '内部打开',
+          label: '内部浏览',
         ),
         KazumiMenuItem(
           onPressed: _openExternally,
