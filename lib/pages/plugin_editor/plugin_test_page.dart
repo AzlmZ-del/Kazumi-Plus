@@ -18,6 +18,9 @@ import 'package:url_launcher/url_launcher.dart';
 const _h8 = SizedBox(height: 8.0);
 const _h12 = SizedBox(height: 12.0);
 
+/// 结果卡片里链接文字固定用绿色，不跟主题色走（用户 2026-10-22 指定）。
+const _linkGreen = Color(0xFF2E7D32);
+
 class PluginTestPage extends StatefulWidget {
   const PluginTestPage({
     super.key,
@@ -481,12 +484,14 @@ class _PluginTestPageState extends State<PluginTestPage> {
 
   /// 结果卡片底部那行：API 模式显示条目 ID，XPath 模式显示可点击的链接。
   Widget _buildSrcLine(SearchItem item, bool selected, ThemeData theme) {
-    final style = theme.textTheme.bodySmall?.copyWith(
-        color: selected
-            ? theme.colorScheme.onPrimaryContainer
-            : theme.colorScheme.onSurfaceVariant);
     if (plugin.searchMode == RuleMode.api) {
-      return Text('ID：${item.src}', style: style);
+      return Text(
+        'ID：${item.src}',
+        style: theme.textTheme.bodySmall?.copyWith(
+            color: selected
+                ? theme.colorScheme.onPrimaryContainer
+                : theme.colorScheme.onSurfaceVariant),
+      );
     }
     return InkWell(
       onTap: isTesting ? null : () => _showOpenUrlDialog(item),
@@ -495,10 +500,7 @@ class _PluginTestPageState extends State<PluginTestPage> {
         padding: const EdgeInsets.symmetric(vertical: 2),
         child: Text(
           '链接：${item.src}',
-          style: style?.copyWith(
-            decoration: TextDecoration.underline,
-            decorationColor: style.color,
-          ),
+          style: theme.textTheme.bodySmall?.copyWith(color: _linkGreen),
         ),
       ),
     );
