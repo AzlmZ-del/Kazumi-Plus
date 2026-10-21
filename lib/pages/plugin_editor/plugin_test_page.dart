@@ -32,7 +32,6 @@ class _PluginTestPageState extends State<PluginTestPage> {
   late final Plugin plugin;
   final testKeywordController = TextEditingController();
   final searchRawScrollController = ScrollController();
-  final chapterScrollController = ScrollController();
   final chapterRawScrollController = ScrollController();
   final fragmentScrollController = ScrollController();
 
@@ -83,7 +82,6 @@ class _PluginTestPageState extends State<PluginTestPage> {
     _testCancelToken?.cancel();
     testKeywordController.dispose();
     searchRawScrollController.dispose();
-    chapterScrollController.dispose();
     chapterRawScrollController.dispose();
     fragmentScrollController.dispose();
     super.dispose();
@@ -769,14 +767,12 @@ class _PluginTestPageState extends State<PluginTestPage> {
     if (chapters == null) return _buildEmpty('未获取章节数据', theme, isError: true);
     if (!_hasChapters) return _buildEmpty('无可用章节', theme, isError: true);
 
-    return Container(
-      padding: const EdgeInsets.all(8.0),
-      height: 280,
-      child: ListView.builder(
-        controller: chapterScrollController,
-        itemCount: chapters?.length ?? 0,
-        itemBuilder: (_, i) => _buildChapterCard(chapters![i], i, theme),
-      ),
+    // 有几条线路就铺几张卡片，不再套 280 高的内层滚动，整段跟着页面滚。
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: chapters?.length ?? 0,
+      itemBuilder: (_, i) => _buildChapterCard(chapters![i], i, theme),
     );
   }
 
@@ -810,25 +806,20 @@ class _PluginTestPageState extends State<PluginTestPage> {
                     style: theme.textTheme.bodySmall
                         ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
                 _h8,
-                SizedBox(
-                  width: double.infinity,
-                  height: 120,
-                  child: SingleChildScrollView(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          ...road.identifier.asMap().entries.map(
-                                (e) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 6),
-                                  child: SelectableText(
-                                    '${e.key + 1}. ${e.value}\n'
-                                    '${e.key < road.data.length ? road.data[e.key] : ''}',
-                                    style: theme.textTheme.bodySmall,
-                                  ),
-                                ),
-                              ),
-                        ]),
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ...road.identifier.asMap().entries.map(
+                          (e) => Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: SelectableText(
+                              '${e.key + 1}. ${e.value}\n'
+                              '${e.key < road.data.length ? road.data[e.key] : ''}',
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          ),
+                        ),
+                  ],
                 ),
               ]),
         ),
