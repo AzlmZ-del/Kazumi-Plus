@@ -306,9 +306,7 @@ class ApiRuleStrategy {
               continue;
             }
             urls.add(pageUrl);
-            names.add(
-              episodeName.isEmpty ? '第${episodeIndex + 1}集' : episodeName,
-            );
+            names.add(episodeName);
           } on ApiRuleFormatException {
             rethrow;
           } catch (error) {
@@ -321,15 +319,20 @@ class ApiRuleStrategy {
           diagnostics.add('线路节点 $roadIndex 没有有效剧集，已跳过');
           continue;
         }
+        final orderedUrls =
+            episodesSelector.reverse ? urls.reversed.toList() : urls;
+        final orderedNames =
+            episodesSelector.reverse ? names.reversed.toList() : names;
         roads.add(
           Road(
             name: roadName.isEmpty
                 ? '播放线路${roads.length + 1}'
                 : roadName,
-            data: episodesSelector.reverse ? urls.reversed.toList() : urls,
-            identifier: episodesSelector.reverse
-                ? names.reversed.toList()
-                : names,
+            data: orderedUrls,
+            identifier: [
+              for (var i = 0; i < orderedNames.length; i++)
+                orderedNames[i].isEmpty ? '第${i + 1}集' : orderedNames[i],
+            ],
           ),
         );
       } on ApiRuleFormatException {
