@@ -28,13 +28,27 @@ enum XPathRuleField {
 /// Optional prefix on an XPath expression that flips the resulting node list.
 ///
 /// Some sites list the newest episode first (`3, 2, 1`). Writing the episode
-/// XPath as `reverse::<selector>` makes Kazumi restore the natural order
+/// XPath as `-<selector>` makes Kazumi restore the natural order
 /// (`1, 2, 3`) without touching the rule's selectors.
+///
+/// `-` is safe as a marker because XPath 1.0 treats a leading `-` as unary
+/// minus applied to a node-set, which always evaluates to NaN and therefore
+/// never matches anything — no working rule can legitimately start with it.
+///
+/// [xpathReversePrefixLegacy] (`reverse::`) is still recognised so rules
+/// published before the shorter marker existed keep working.
 ///
 /// Only the episode list honours this prefix. Reversing the road list would
 /// desynchronise it from the index-aligned road-name list, so the prefix is
 /// stripped and ignored there (a diagnostic is emitted instead).
-const String xpathReversePrefix = 'reverse::';
+const String xpathReversePrefix = '-';
+
+/// Accepted for backwards compatibility with already published rules.
+const String xpathReversePrefixLegacy = 'reverse::';
+
+/// Shown in diagnostics; deliberately covers both spellings so a rule written
+/// with either marker gets an understandable message.
+const String xpathReversePrefixLabel = '反序前缀（- 或 reverse::）';
 
 class XPathRuleFormatException implements Exception {
   const XPathRuleFormatException(
@@ -162,20 +176,32 @@ class XPathRuleStrategy {
     );
   }
 
-  /// Splits the optional [xpathReversePrefix] off an XPath expression.
+  /// Splits the optional reverse marker off an XPath expression.
   ///
   /// Returns the cleaned selector and whether the caller should reverse the
-  /// resulting node list. The prefix is matched case-sensitively right at the
-  /// start so an ordinary selector that merely contains the word is untouched.
+  /// resulting node list. Both [xpathReversePrefix] and
+  /// [xpathReversePrefixLegacy] are matched right at the start so an ordinary
+  /// selector that merely contains the marker further in is untouched.
+  ///
+  /// A leading `-` followed by a number is left alone: `-1` and `-.5` are
+  /// legal (if pointless) XPath numeric expressions, not a request to reverse.
+  /// A dot only counts when a digit follows, so `-.//a` stays a reverse marker.
   ({String expression, bool reverse}) _splitReversePrefix(String raw) {
     final trimmed = raw.trimLeft();
-    if (!trimmed.startsWith(xpathReversePrefix)) {
-      return (expression: raw, reverse: false);
+    for (final prefix in const [
+      xpathReversePrefix,
+      xpathReversePrefixLegacy,
+    ]) {
+      if (!trimmed.startsWith(prefix)) continue;
+      final rest = trimmed.substring(prefix.length).trim();
+      if (rest.isEmpty) continue;
+      if (prefix == xpathReversePrefix &&
+          RegExp(r'^(?:[0-9]|\.[0-9])').hasMatch(rest)) {
+        continue;
+      }
+      return (expression: rest, reverse: true);
     }
-    return (
-      expression: trimmed.substring(xpathReversePrefix.length).trim(),
-      reverse: true,
-    );
+    return (expression: raw, reverse: false);
   }
 
   RuleChapterParseResult parseChapters(
@@ -192,7 +218,7 @@ class XPathRuleStrategy {
     final episodeSelector = _splitReversePrefix(config.chapterResult);
     final roadsSelector = _splitReversePrefix(config.chapterRoads);
     if (roadsSelector.reverse) {
-      diagnostics.add('$xpathReversePrefix 前缀只对剧集列表生效，播放线路列表已忽略');
+      diagnostics.add('$xpathReversePrefixLabel 只对剧集列表生效，播放线路列表已忽略');
     }
     final roadNodes = _runSelector(
       XPathRuleField.chapterRoads,
@@ -205,7 +231,7 @@ class XPathRuleStrategy {
     final roadNameSelector = _splitReversePrefix(config.chapterRoadName);
     final roadNameExpression = roadNameSelector.expression.trim();
     if (roadNameSelector.reverse) {
-      diagnostics.add('$xpathReversePrefix 前缀只对剧集列表生效，线路名称列表已忽略');
+      diagnostics.add('$xpathReversePrefixLabel 只对剧集列表生效，线路名称列表已忽略');
     }
     // Starts as an empty list of the same element type, so the optional field
     // can be skipped without a second type parameter.

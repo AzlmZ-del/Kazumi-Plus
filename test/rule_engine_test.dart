@@ -159,7 +159,43 @@ void main() {
     );
   });
 
-  test('reverse:: prefix restores ascending episode order', () async {
+  test('- prefix restores ascending episode order', () async {
+    const reversedResponse = '''
+<html>
+  <div class="road">
+    <a href="/play/ep3">3</a>
+    <a href="/play/ep2">2</a>
+    <a href="/play/ep1">1</a>
+  </div>
+</html>
+''';
+    final engine = RuleEngine(
+      requestExecutor: _FakeExecutor([reversedResponse]),
+      logFailures: false,
+    );
+
+    final chapters = await engine.queryChapters(
+      _config(
+        searchMode: RuleMode.xpath,
+        chapterMode: RuleMode.xpath,
+        chapterResult: '-.//a',
+      ),
+      '/video/1',
+    );
+
+    expect(chapters.roads, hasLength(1));
+    final road = chapters.roads.single;
+    expect(road.identifier, ['1', '2', '3']);
+    expect(road.data, [
+      'https://example.com/play/ep1',
+      'https://example.com/play/ep2',
+      'https://example.com/play/ep3',
+    ]);
+    expect(chapters.diagnostics, isEmpty);
+  });
+
+  test('legacy reverse:: prefix still restores ascending episode order',
+      () async {
     const reversedResponse = '''
 <html>
   <div class="road">
@@ -186,16 +222,10 @@ void main() {
     expect(chapters.roads, hasLength(1));
     final road = chapters.roads.single;
     expect(road.identifier, ['1', '2', '3']);
-    expect(road.data, [
-      'https://example.com/play/ep1',
-      'https://example.com/play/ep2',
-      'https://example.com/play/ep3',
-    ]);
     expect(chapters.diagnostics, isEmpty);
   });
 
-  test('reverse:: prefix on the road list is ignored with a diagnostic',
-      () async {
+  test('- prefix on the road list is ignored with a diagnostic', () async {
     final engine = RuleEngine(
       requestExecutor: _FakeExecutor([xpathResponse]),
       logFailures: false,
@@ -205,7 +235,7 @@ void main() {
       _config(
         searchMode: RuleMode.xpath,
         chapterMode: RuleMode.xpath,
-        chapterRoads: 'reverse:://div[@class="road"]',
+        chapterRoads: '-//div[@class="road"]',
         chapterResult: './/a',
       ),
       '/video/1',
@@ -214,7 +244,7 @@ void main() {
     expect(chapters.roads, hasLength(1));
     expect(
       chapters.diagnostics,
-      contains('$xpathReversePrefix 前缀只对剧集列表生效，播放线路列表已忽略'),
+      contains('$xpathReversePrefixLabel 只对剧集列表生效，播放线路列表已忽略'),
     );
   });
 
