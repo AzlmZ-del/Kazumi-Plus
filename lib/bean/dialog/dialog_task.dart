@@ -142,6 +142,7 @@ class KazumiDialogTask {
 
   Future<T> loading<T>({
     required Future<T> Function() action,
+    String? title,
     String? message,
     bool barrierDismissible = false,
     FutureOr<void> Function()? onCancel,
@@ -155,7 +156,8 @@ class KazumiDialogTask {
       context: _owner._context?.call(),
       handle: dialog,
       clickMaskDismiss: barrierDismissible,
-      builder: builder ?? (_) => _LoadingDialog(message: message),
+      builder: builder ??
+          (_) => _LoadingDialog(title: title, message: message),
     );
     unawaited(closed.then((_) {
       if (identical(_dialog, dialog)) cancel();
@@ -209,8 +211,9 @@ class _DialogTaskCancelled implements Exception {
 }
 
 class _LoadingDialog extends StatelessWidget {
-  const _LoadingDialog({this.message});
+  const _LoadingDialog({this.title, this.message});
 
+  final String? title;
   final String? message;
 
   @override
@@ -226,8 +229,22 @@ class _LoadingDialog extends StatelessWidget {
               children: [
                 const LoadingIndicator(),
                 const SizedBox(height: 16),
-                Text(message ?? 'Loading...',
-                    style: const TextStyle(fontSize: 16)),
+                if (title != null) ...[
+                  Text(
+                    title!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                ],
+                Text(
+                  message ?? 'Loading...',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 16),
+                ),
               ],
             ),
           ),
