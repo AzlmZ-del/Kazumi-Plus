@@ -282,7 +282,7 @@ class _PluginTestPageState extends State<PluginTestPage> {
                   _buildExpansionTile(
                       theme: theme,
                       number: 3,
-                      title: '响应内容',
+                      title: _getResponseTitle(),
                       subtitle: '',
                       subtitleWidget: _buildChapterRawSubtitle(theme),
                       completed: _needChapterParse && chapterRaw.isNotEmpty,
@@ -776,6 +776,16 @@ class _PluginTestPageState extends State<PluginTestPage> {
     final skipped =
         chapterDiagnostics.isEmpty ? '' : '，跳过 ${chapterDiagnostics.length} 条';
     return '第 ${_selectedItemIndex + 1} 条 · 获取到 ${chapters?.length ?? 0} 个播放线路$skipped';
+  }
+
+  /// 卡片标题直接显示「结果解析」里选中的那条的名称，没选中时退回默认文案。
+  String _getResponseTitle() {
+    final data = searchRes?.data;
+    if (data == null || data.isEmpty) return '响应内容';
+    final index = _selectedItemIndex;
+    if (index < 0 || index >= data.length) return '响应内容';
+    final name = data[index].name.trim();
+    return name.isEmpty ? '响应内容' : name;
   }
 
   /// 「响应内容」卡的副标题：第一行第几条，第二行数据类型与长度。
