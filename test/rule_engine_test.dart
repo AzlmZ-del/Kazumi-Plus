@@ -194,35 +194,33 @@ void main() {
     expect(chapters.diagnostics, isEmpty);
   });
 
-  test('legacy reverse:: prefix still restores ascending episode order',
-      () async {
-    const reversedResponse = '''
-<html>
-  <div class="road">
-    <a href="/play/ep3">3</a>
-    <a href="/play/ep2">2</a>
-    <a href="/play/ep1">1</a>
-  </div>
-</html>
-''';
+  test('reverse:: prefix is no longer supported', () async {
     final engine = RuleEngine(
-      requestExecutor: _FakeExecutor([reversedResponse]),
+      requestExecutor: _FakeExecutor([xpathResponse]),
       logFailures: false,
     );
 
-    final chapters = await engine.queryChapters(
-      _config(
-        searchMode: RuleMode.xpath,
-        chapterMode: RuleMode.xpath,
-        chapterResult: 'reverse::.//a',
+    await expectLater(
+      engine.queryChapters(
+        _config(
+          searchMode: RuleMode.xpath,
+          chapterMode: RuleMode.xpath,
+          chapterResult: 'reverse::.//a',
+        ),
+        '/video/1',
       ),
-      '/video/1',
+      throwsA(
+        isA<ChapterErrorException>().having(
+          (error) => error.cause,
+          'cause',
+          isA<XPathRuleFormatException>().having(
+            (error) => error.field,
+            'field',
+            XPathRuleField.chapterResult,
+          ),
+        ),
+      ),
     );
-
-    expect(chapters.roads, hasLength(1));
-    final road = chapters.roads.single;
-    expect(road.identifier, ['1', '2', '3']);
-    expect(chapters.diagnostics, isEmpty);
   });
 
   test('- prefix on the road list is ignored with a diagnostic', () async {
