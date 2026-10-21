@@ -487,7 +487,7 @@ class _PluginTestPageState extends State<PluginTestPage>
     return '${plugin.searchMode == RuleMode.api ? 'JSON' : 'HTML'}长度：${searchRaw.length} 字符';
   }
 
-  /// 结果卡片底部那行：API 模式显示条目 ID，XPath 模式显示可点击的链接。
+  /// 结果卡片底部那行：API 模式显示条目 ID，XPath 模式显示可点击复制的链接。
   Widget _buildSrcLine(SearchItem item, bool selected, ThemeData theme) {
     if (plugin.searchMode == RuleMode.api) {
       return Text(
@@ -499,54 +499,63 @@ class _PluginTestPageState extends State<PluginTestPage>
       );
     }
     return InkWell(
-      onTap: isTesting ? null : () => _showOpenUrlDialog(item),
+      onTap: isTesting ? null : () => _copyUrl(item.src),
       borderRadius: BorderRadius.circular(8),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),
         child: Text(
-          '链接：${item.src}',
+          item.src,
           style: theme.textTheme.bodySmall?.copyWith(color: _linkGreen),
         ),
       ),
     );
   }
 
-  /// 链接点开先问一句：应用内浏览，还是交给系统浏览器。
-  Future<void> _showOpenUrlDialog(SearchItem item) async {
-    final choice = await KazumiDialog.show<String>(
-      builder: (dialogContext) {
-        final theme = Theme.of(dialogContext);
-        return AlertDialog(
-          title: const Text('打开链接'),
-          content: Text(item.src, style: theme.textTheme.bodySmall),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop('internal'),
-              child: const Text('内部浏览'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop('external'),
-              child: const Text('外部打开'),
-            ),
-          ],
-        );
-      },
-    );
-    if (!mounted || choice == null) return;
-    if (choice == 'internal') {
-      Navigator.of(context, rootNavigator: true).push(
-        MaterialPageRoute(
-          builder: (_) => InternalBrowserPage(
-            url: item.src,
-            title: item.name,
-            userAgent: plugin.userAgent,
-          ),
-        ),
-      );
-      return;
+  /// 结果卡片标题行右侧的内部浏览 / 外部打开两枚图标按钮（仅 XPath 模式有链接）。
+  Widget _buildSrcActions(SearchItem item, ThemeData theme) {
+    if (plugin.searchMode == RuleMode.api) {
+      return const SizedBox.shrink();
     }
+    final colors = theme.colorScheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _episodeActionButton(
+          tooltip: '内部浏览',
+          icon: Icons.open_in_browser,
+          onPressed: isTesting ? null : () => _openUrlInternal(item.src, item.name),
+          background: colors.secondaryContainer,
+          foreground: colors.onSecondaryContainer,
+        ),
+        const SizedBox(width: 4),
+        _episodeActionButton(
+          tooltip: '外部打开',
+          icon: Icons.open_in_new,
+          onPressed: isTesting ? null : () => _openUrlExternal(item.src),
+          background: colors.secondaryContainer,
+          foreground: colors.onSecondaryContainer,
+        ),
+      ],
+    );
+  }
+
+  /// 在应用内打开一个网页。
+  void _openUrlInternal(String url, String title) {
+    Navigator.of(context, rootNavigator: true).push(
+      MaterialPageRoute(
+        builder: (_) => InternalBrowserPage(
+          url: url,
+          title: title,
+          userAgent: plugin.userAgent,
+        ),
+      ),
+    );
+  }
+
+  /// 把链接交给系统浏览器。
+  Future<void> _openUrlExternal(String url) async {
     try {
-      if (await launchUrl(Uri.parse(item.src),
+      if (await launchUrl(Uri.parse(url),
           mode: LaunchMode.externalApplication)) {
         return;
       }
@@ -799,6 +808,7 @@ class _PluginTestPageState extends State<PluginTestPage>
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        _buildSrcActions(item, theme),
                         IconButton(
                           onPressed:
                               isTesting ? null : () => _toggleFragment(i),
@@ -808,6 +818,13 @@ class _PluginTestPageState extends State<PluginTestPage>
                                 : Icons.code,
                             size: 18,
                             color: theme.colorScheme.primary,
+                          ),
+                          iconSize: 18,
+                          padding: EdgeInsets.zero,
+                          visualDensity: VisualDensity.compact,
+                          constraints: const BoxConstraints.tightFor(
+                            width: 32,
+                            height: 32,
                           ),
                           tooltip:
                               isShowingFragment ? '隐藏匹配片段' : '查看匹配片段',
@@ -973,7 +990,7 @@ class _PluginTestPageState extends State<PluginTestPage>
             if (url.isNotEmpty) ...[
               const SizedBox(height: 4),
               InkWell(
-                onTap: () => _copyEpisodeUrl(url),
+                onTap: () => _copyUrl(url),
                 borderRadius: BorderRadius.circular(6),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 2),
@@ -1015,8 +1032,8 @@ class _PluginTestPageState extends State<PluginTestPage>
     );
   }
 
-  /// 章节链接复制到剪贴板。
-  Future<void> _copyEpisodeUrl(String url) async {
+  /// 把一段文本（章节链接、结果链接）复制到剪贴板。
+  Future<void> _copyUrl(String url) async {
     try {
       await Clipboard.setData(ClipboardData(text: url));
       if (mounted) {
@@ -1032,31 +1049,12 @@ class _PluginTestPageState extends State<PluginTestPage>
 
   /// 章节链接在应用内打开。
   void _openEpisodeInternal(Road road, int index) {
-    Navigator.of(context, rootNavigator: true).push(
-      MaterialPageRoute(
-        builder: (_) => InternalBrowserPage(
-          url: road.data[index],
-          title: road.identifier[index],
-          userAgent: plugin.userAgent,
-        ),
-      ),
-    );
+    _openUrlInternal(road.data[index], road.identifier[index]);
   }
 
   /// 章节链接交给系统浏览器打开。
   Future<void> _openEpisodeExternal(Road road, int index) async {
-    final url = road.data[index];
-    try {
-      if (await launchUrl(Uri.parse(url),
-          mode: LaunchMode.externalApplication)) {
-        return;
-      }
-    } catch (error) {
-      KazumiLogger().w('PluginTestPage: failed to open url', error: error);
-    }
-    if (mounted) {
-      KazumiDialog.showToast(context: context, message: '无法打开浏览器');
-    }
+    await _openUrlExternal(road.data[index]);
   }
 
   /// 测试播放：用当前已解析的线路直接进播放器，并定位到点的那一集。
