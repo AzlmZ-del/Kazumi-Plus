@@ -259,6 +259,7 @@ class RuleTag extends StatelessWidget {
     required this.foreground,
     this.width,
     this.height,
+    this.radius = 8,
   });
 
   final String label;
@@ -270,6 +271,9 @@ class RuleTag extends StatelessWidget {
   final double? width;
   final double? height;
 
+  /// 圆角。标签压到 16 高时用 6，否则 8 的圆角会让它变成胶囊形。
+  final double radius;
+
   @override
   Widget build(BuildContext context) {
     final text = Text(label,
@@ -279,7 +283,7 @@ class RuleTag extends StatelessWidget {
             ?.copyWith(color: foreground, fontWeight: FontWeight.w600));
     final decoration = BoxDecoration(
       color: background,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(radius),
     );
     if (width == null && height == null) {
       return Container(
