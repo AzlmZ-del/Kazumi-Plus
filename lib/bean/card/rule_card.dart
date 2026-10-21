@@ -5,6 +5,7 @@ class RuleCard extends StatelessWidget {
     super.key,
     required this.title,
     this.titleTag,
+    this.subtitleTag,
     this.tags = const [],
     this.caption,
     this.subtitle,
@@ -27,6 +28,13 @@ class RuleCard extends StatelessWidget {
   /// the name than in the chip row under the URLs, so they get their own slot
   /// and stay put while the [tags] row changes.
   final Widget? titleTag;
+
+  /// Chip docked at the right edge of the [subtitle] line.
+  ///
+  /// The rule type (API / XPath / mixed) belongs to the author line: it is a
+  /// property of the rule's implementation, not of its identity, so it sits
+  /// beside the author instead of crowding the name.
+  final Widget? subtitleTag;
 
   final List<Widget> tags;
   final String? caption;
@@ -150,11 +158,25 @@ class RuleCard extends StatelessWidget {
                             ),
                             if (subtitle != null && subtitle!.isNotEmpty) ...[
                               const SizedBox(height: 3),
-                              Text(subtitle!,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: text.bodySmall?.copyWith(
-                                      color: colors.onSurfaceVariant)),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(subtitle!,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: text.bodySmall?.copyWith(
+                                            color: colors.onSurfaceVariant)),
+                                  ),
+                                  if (subtitleTag != null) ...[
+                                    const SizedBox(width: 8),
+                                    // 与标题行的版本号右边缘对齐。
+                                    Padding(
+                                      padding: const EdgeInsets.only(right: 16),
+                                      child: subtitleTag!,
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ],
                             if (source != null && source!.isNotEmpty) ...[
                               const SizedBox(height: 3),
