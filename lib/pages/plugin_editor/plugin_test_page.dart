@@ -276,7 +276,7 @@ class _PluginTestPageState extends State<PluginTestPage> {
                       title: '结果解析',
                       subtitle: _getParseSubtitle(),
                       completed: _hasSearchData,
-                      expanded: _hasSearchData,
+                      expanded: false,
                       child: _buildParseContent(theme)),
                   _h12,
                   _buildExpansionTile(
