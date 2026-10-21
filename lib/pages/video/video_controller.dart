@@ -308,6 +308,12 @@ abstract class _VideoPageController with Store implements Disposable {
   }
 
   void _setOnlineHistoryIdentity(EpisodeRef episode) {
+    // 规则测试页的「测试播放」只是临时看一集，不该污染观看记录：
+    // 身份留空，播放页那个每秒保存进度的定时器就找不到记录点，直接跳过。
+    if (episodePinned) {
+      _playbackHistoryIdentity = null;
+      return;
+    }
     _playbackHistoryIdentity = PlaybackHistoryIdentity.online(
       bangumiItem: bangumiItem,
       pluginName: currentPlugin.name,
