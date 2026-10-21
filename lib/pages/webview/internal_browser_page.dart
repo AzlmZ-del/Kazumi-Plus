@@ -15,10 +15,14 @@ class InternalBrowserArgs {
   const InternalBrowserArgs({
     required this.url,
     required this.title,
+    this.userAgent = '',
   });
 
   final String url;
   final String title;
+
+  /// 站点（规则）配置的 User-Agent；为空时退回手机 UA。
+  final String userAgent;
 }
 
 /// 内置浏览器页面：在应用内直接浏览网页（如 bangumi.tv 条目页）。
