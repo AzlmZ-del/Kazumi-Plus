@@ -35,10 +35,6 @@ enum XPathRuleField {
 /// minus applied to a node-set, which always evaluates to NaN and therefore
 /// never matches anything — no working rule can legitimately start with it.
 ///
-/// `-` is the only accepted spelling. The older `reverse::` marker was removed
-/// once published rules had been migrated; it is no longer stripped and is
-/// passed through to the XPath engine, where it fails to compile.
-///
 /// Only the episode list honours this prefix. Reversing the road list would
 /// desynchronise it from the index-aligned road-name list, so the prefix is
 /// stripped and ignored there (a diagnostic is emitted instead).

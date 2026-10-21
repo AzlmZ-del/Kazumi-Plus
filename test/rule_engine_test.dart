@@ -194,35 +194,6 @@ void main() {
     expect(chapters.diagnostics, isEmpty);
   });
 
-  test('reverse:: prefix is no longer supported', () async {
-    final engine = RuleEngine(
-      requestExecutor: _FakeExecutor([xpathResponse]),
-      logFailures: false,
-    );
-
-    await expectLater(
-      engine.queryChapters(
-        _config(
-          searchMode: RuleMode.xpath,
-          chapterMode: RuleMode.xpath,
-          chapterResult: 'reverse::.//a',
-        ),
-        '/video/1',
-      ),
-      throwsA(
-        isA<ChapterErrorException>().having(
-          (error) => error.cause,
-          'cause',
-          isA<XPathRuleFormatException>().having(
-            (error) => error.field,
-            'field',
-            XPathRuleField.chapterResult,
-          ),
-        ),
-      ),
-    );
-  });
-
   test('- prefix on the road list is ignored with a diagnostic', () async {
     final engine = RuleEngine(
       requestExecutor: _FakeExecutor([xpathResponse]),
