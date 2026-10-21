@@ -574,9 +574,10 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
                       title: item.name,
                       titleTag: RuleTag(
                           label: item.version,
-                          width: 56,
+                          width: 44,
                           height: 16,
                           radius: 6,
+                          fontSize: 10,
                           background: colors.primaryContainer,
                           foreground: colors.onPrimaryContainer),
                       // 源类型跟作者同一行：它描述规则的实现方式，
@@ -585,10 +586,11 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
                           ? null
                           : RuleTag(
                               label: item.type,
-                              width: 56,
+                              width: 44,
                               // 16 = bodySmall 的行高，再高就会把作者行撑开。
                               height: 16,
                               radius: 6,
+                              fontSize: 10,
                               background: colors.secondaryContainer,
                               foreground: colors.onSecondaryContainer),
                       installed: status == PluginCatalogItemStatus.installed,
