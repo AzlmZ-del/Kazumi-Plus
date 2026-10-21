@@ -7,6 +7,7 @@ import 'package:kazumi/plugins/api_rule_config.dart';
 import 'package:kazumi/request/core/network_exception.dart';
 import 'package:kazumi/services/plugin/rule_engine.dart';
 import 'package:kazumi/services/plugin/rule_engine_models.dart';
+import 'package:kazumi/services/plugin/reverse_prefix.dart';
 import 'package:kazumi/services/plugin/xpath_rule_strategy.dart';
 
 void main() {
@@ -213,7 +214,136 @@ void main() {
     expect(chapters.roads, hasLength(1));
     expect(
       chapters.diagnostics,
-      contains('$xpathReversePrefixLabel 只对剧集列表生效，播放线路列表已忽略'),
+      contains('$reversePrefixLabel 只对剧集列表生效，播放线路列表已忽略'),
+    );
+  });
+
+  test('- prefix reverses API nested episode arrays', () async {
+    final fixture = jsonEncode({
+      'data': {
+        'roads': [
+          {
+            'name': '线路A',
+            'episodes': [
+              {'name': '第3集', 'url': '/p/3'},
+              {'name': '第2集', 'url': '/p/2'},
+              {'name': '第1集', 'url': '/p/1'},
+            ],
+          },
+        ],
+      },
+    });
+    final engine = RuleEngine(
+      requestExecutor: _FakeExecutor([fixture]),
+      logFailures: false,
+    );
+
+    final chapters = await engine.queryChapters(
+      _config(
+        searchMode: RuleMode.api,
+        chapterMode: RuleMode.api,
+        chapterApiConfig: ApiChapterConfig(
+          request: ApiRequestConfig(
+            url: 'https://example.com/api/videos/@source',
+          ),
+          roadsPath: r'$.data.roads[*]',
+          roadNamePath: r'$.name',
+          episodesPath: r'-$.episodes[*]',
+          episodeNamePath: r'$.name',
+          episodeUrlPath: r'$.url',
+        ),
+      ),
+      '/video/1',
+    );
+
+    final road = chapters.roads.single;
+    expect(road.identifier, ['第1集', '第2集', '第3集']);
+    expect(road.data, [
+      'https://example.com/p/1',
+      'https://example.com/p/2',
+      'https://example.com/p/3',
+    ]);
+    expect(chapters.diagnostics, isEmpty);
+  });
+
+  test('- prefix reverses API delimited episode strings per road', () async {
+    final fixture = jsonEncode({
+      'data': {
+        'names': '线路A',
+        'episodes': r'第3集$/p/3#第2集$/p/2#第1集$/p/1',
+      },
+    });
+    final engine = RuleEngine(
+      requestExecutor: _FakeExecutor([fixture]),
+      logFailures: false,
+    );
+
+    final chapters = await engine.queryChapters(
+      _config(
+        searchMode: RuleMode.api,
+        chapterMode: RuleMode.api,
+        chapterApiConfig: ApiChapterConfig(
+          request: ApiRequestConfig(
+            url: 'https://example.com/api/videos/@source',
+          ),
+          format: ApiChapterFormat.delimited,
+          roadNamesPath: r'$.data.names',
+          roadEpisodesPath: r'-$.data.episodes',
+        ),
+      ),
+      '/video/1',
+    );
+
+    final road = chapters.roads.single;
+    expect(road.name, '线路A');
+    expect(road.identifier, ['第1集', '第2集', '第3集']);
+    expect(road.data, [
+      'https://example.com/p/1',
+      'https://example.com/p/2',
+      'https://example.com/p/3',
+    ]);
+  });
+
+  test('- prefix on the API road list is ignored with a diagnostic', () async {
+    final fixture = jsonEncode({
+      'data': {
+        'roads': [
+          {
+            'name': '线路A',
+            'episodes': [
+              {'name': '第1集', 'url': '/p/1'},
+            ],
+          },
+        ],
+      },
+    });
+    final engine = RuleEngine(
+      requestExecutor: _FakeExecutor([fixture]),
+      logFailures: false,
+    );
+
+    final chapters = await engine.queryChapters(
+      _config(
+        searchMode: RuleMode.api,
+        chapterMode: RuleMode.api,
+        chapterApiConfig: ApiChapterConfig(
+          request: ApiRequestConfig(
+            url: 'https://example.com/api/videos/@source',
+          ),
+          roadsPath: r'-$.data.roads[*]',
+          roadNamePath: r'$.name',
+          episodesPath: r'$.episodes[*]',
+          episodeNamePath: r'$.name',
+          episodeUrlPath: r'$.url',
+        ),
+      ),
+      '/video/1',
+    );
+
+    expect(chapters.roads, hasLength(1));
+    expect(
+      chapters.diagnostics,
+      contains('$reversePrefixLabel 只对剧集列表生效，播放线路列表已忽略'),
     );
   });
 
@@ -430,6 +560,7 @@ RuleExecutionConfig _config({
   String chapterRoads = '//div[@class="road"]',
   String chapterResult = '//a',
   String chapterRoadName = '',
+  ApiChapterConfig? chapterApiConfig,
 }) {
   return RuleExecutionConfig(
     pluginName: 'runtime-test',
@@ -453,16 +584,17 @@ RuleExecutionConfig _config({
       namePath: r'$.name',
       sourcePath: r'$.id',
     ),
-    chapterApiConfig: ApiChapterConfig(
-      request: ApiRequestConfig(
-        url: 'https://example.com/api/videos/@source',
-      ),
-      roadsPath: r'$.data.roads[*]',
-      roadNamePath: r'$.name',
-      episodesPath: r'$.episodes[*]',
-      episodeNamePath: r'$.name',
-      episodeUrlPath: r'$.url',
-    ),
+    chapterApiConfig: chapterApiConfig ??
+        ApiChapterConfig(
+          request: ApiRequestConfig(
+            url: 'https://example.com/api/videos/@source',
+          ),
+          roadsPath: r'$.data.roads[*]',
+          roadNamePath: r'$.name',
+          episodesPath: r'$.episodes[*]',
+          episodeNamePath: r'$.name',
+          episodeUrlPath: r'$.url',
+        ),
     antiCrawlerConfig: antiCrawler ?? AntiCrawlerConfig.empty(),
   );
 }

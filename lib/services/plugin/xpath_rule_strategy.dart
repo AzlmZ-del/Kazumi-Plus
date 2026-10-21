@@ -3,6 +3,7 @@ import 'package:html/parser.dart';
 import 'package:kazumi/modules/roads/road_module.dart';
 import 'package:kazumi/modules/search/plugin_search_module.dart';
 import 'package:kazumi/plugins/anti_crawler_config.dart';
+import 'package:kazumi/services/plugin/reverse_prefix.dart';
 import 'package:kazumi/services/plugin/rule_engine_models.dart';
 import 'package:kazumi/utils/episode_url.dart';
 import 'package:xpath_selector_html_parser/xpath_selector_html_parser.dart';
@@ -24,24 +25,6 @@ enum XPathRuleField {
   captchaImage,
   captchaButton,
 }
-
-/// Optional prefix on an XPath expression that flips the resulting node list.
-///
-/// Some sites list the newest episode first (`3, 2, 1`). Writing the episode
-/// XPath as `-<selector>` makes Kazumi restore the natural order
-/// (`1, 2, 3`) without touching the rule's selectors.
-///
-/// `-` is safe as a marker because XPath 1.0 treats a leading `-` as unary
-/// minus applied to a node-set, which always evaluates to NaN and therefore
-/// never matches anything — no working rule can legitimately start with it.
-///
-/// Only the episode list honours this prefix. Reversing the road list would
-/// desynchronise it from the index-aligned road-name list, so the prefix is
-/// stripped and ignored there (a diagnostic is emitted instead).
-const String xpathReversePrefix = '-';
-
-/// Shown in diagnostics so a misused prefix gets an understandable message.
-const String xpathReversePrefixLabel = '反序前缀（-）';
 
 class XPathRuleFormatException implements Exception {
   const XPathRuleFormatException(
@@ -169,28 +152,6 @@ class XPathRuleStrategy {
     );
   }
 
-  /// Splits the optional reverse marker off an XPath expression.
-  ///
-  /// Returns the cleaned selector and whether the caller should reverse the
-  /// resulting node list. Only [xpathReversePrefix] is matched, right at the
-  /// start, so an ordinary selector that merely contains a `-` further in is
-  /// untouched.
-  ///
-  /// A leading `-` followed by a number is left alone: `-1` and `-.5` are
-  /// legal (if pointless) XPath numeric expressions, not a request to reverse.
-  /// A dot only counts when a digit follows, so `-.//a` stays a reverse marker.
-  ({String expression, bool reverse}) _splitReversePrefix(String raw) {
-    final trimmed = raw.trimLeft();
-    if (trimmed.startsWith(xpathReversePrefix)) {
-      final rest = trimmed.substring(xpathReversePrefix.length).trim();
-      if (rest.isNotEmpty &&
-          !RegExp(r'^(?:[0-9]|\.[0-9])').hasMatch(rest)) {
-        return (expression: rest, reverse: true);
-      }
-    }
-    return (expression: raw, reverse: false);
-  }
-
   RuleChapterParseResult parseChapters(
     String raw,
     RuleExecutionConfig config,
@@ -202,10 +163,16 @@ class XPathRuleStrategy {
     // paired with the road-name list by index, so reversing one without the
     // other would silently mislabel every road; the prefix is stripped and
     // reported there instead.
-    final episodeSelector = _splitReversePrefix(config.chapterResult);
-    final roadsSelector = _splitReversePrefix(config.chapterRoads);
+    final episodeSelector = splitReversePrefix(
+      config.chapterResult,
+      xpathNumericLiteral: true,
+    );
+    final roadsSelector = splitReversePrefix(
+      config.chapterRoads,
+      xpathNumericLiteral: true,
+    );
     if (roadsSelector.reverse) {
-      diagnostics.add('$xpathReversePrefixLabel 只对剧集列表生效，播放线路列表已忽略');
+      diagnostics.add('$reversePrefixLabel 只对剧集列表生效，播放线路列表已忽略');
     }
     final roadNodes = _runSelector(
       XPathRuleField.chapterRoads,
@@ -215,10 +182,13 @@ class XPathRuleStrategy {
     // Optional: road names live outside the road nodes on many sites (tab
     // headers vs. tab panes), so they are queried separately and matched to
     // the roads by index.
-    final roadNameSelector = _splitReversePrefix(config.chapterRoadName);
+    final roadNameSelector = splitReversePrefix(
+      config.chapterRoadName,
+      xpathNumericLiteral: true,
+    );
     final roadNameExpression = roadNameSelector.expression.trim();
     if (roadNameSelector.reverse) {
-      diagnostics.add('$xpathReversePrefixLabel 只对剧集列表生效，线路名称列表已忽略');
+      diagnostics.add('$reversePrefixLabel 只对剧集列表生效，线路名称列表已忽略');
     }
     // Starts as an empty list of the same element type, so the optional field
     // can be skipped without a second type parameter.
