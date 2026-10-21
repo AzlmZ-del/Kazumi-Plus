@@ -7,7 +7,7 @@ import 'package:kazumi/bean/appbar/sys_app_bar.dart';
 import 'package:kazumi/bean/dialog/dialog.dart';
 import 'package:kazumi/bean/widget/error_widget.dart';
 import 'package:kazumi/services/logging/logger.dart';
-import 'package:kazumi/utils/http_headers.dart';
+import 'package:kazumi/utils/constants.dart';
 import 'package:webview_windows/webview_windows.dart' as windows;
 
 /// 打开 [InternalBrowserPage] 时通过路由传入的参数。
@@ -31,10 +31,14 @@ class InternalBrowserPage extends StatefulWidget {
     super.key,
     required this.url,
     required this.title,
+    this.userAgent = '',
   });
 
   final String url;
   final String title;
+
+  /// 站点（规则）配置的 User-Agent；为空时退回手机 UA。
+  final String userAgent;
 
   @override
   State<InternalBrowserPage> createState() => _InternalBrowserPageState();
@@ -84,7 +88,11 @@ class _InternalBrowserPageState extends State<InternalBrowserPage> {
     if (Platform.isWindows) {
       return _WindowsBrowserPage(url: widget.url, title: widget.title);
     }
-    return _InAppBrowserPage(url: widget.url, title: widget.title);
+    return _InAppBrowserPage(
+      url: widget.url,
+      title: widget.title,
+      userAgent: widget.userAgent,
+    );
   }
 }
 
@@ -197,10 +205,15 @@ class _WindowsBrowserPageState extends State<_WindowsBrowserPage> {
 }
 
 class _InAppBrowserPage extends StatefulWidget {
-  const _InAppBrowserPage({required this.url, required this.title});
+  const _InAppBrowserPage({
+    required this.url,
+    required this.title,
+    this.userAgent = '',
+  });
 
   final String url;
   final String title;
+  final String userAgent;
 
   @override
   State<_InAppBrowserPage> createState() => _InAppBrowserPageState();
@@ -218,7 +231,9 @@ class _InAppBrowserPageState extends State<_InAppBrowserPage> {
         PlatformInAppWebViewWidgetCreationParams(
           initialUrlRequest: URLRequest(url: WebUri(widget.url)),
           initialSettings: InAppWebViewSettings(
-            userAgent: getRandomUA(),
+            userAgent: widget.userAgent.trim().isEmpty
+                ? mobileUserAgent
+                : widget.userAgent.trim(),
             mediaPlaybackRequiresUserGesture: true,
             cacheEnabled: true,
             transparentBackground: false,
