@@ -19,12 +19,20 @@ class OnlineVideoPlaybackArgs extends VideoPlaybackArgs {
     required this.title,
     required this.src,
     required this.roads,
+    this.initialEpisode = 1,
+    this.initialRoad = 0,
   });
 
   final Plugin plugin;
   final String title;
   final String src;
   final List<Road> roads;
+
+  /// 1 起的集数，供规则测试页「测试播放」直接跳到指定集。
+  final int initialEpisode;
+
+  /// 0 起的线路序号。
+  final int initialRoad;
 }
 
 class OfflineVideoPlaybackArgs extends VideoPlaybackArgs {

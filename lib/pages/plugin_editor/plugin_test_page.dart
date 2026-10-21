@@ -3,12 +3,15 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_modular/flutter_modular.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/bean/settings/settings_detail_scaffold.dart';
 import 'package:kazumi/bean/widget/loading_indicator.dart';
+import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/modules/roads/road_module.dart';
 import 'package:kazumi/modules/search/plugin_search_module.dart';
 import 'package:kazumi/pages/plugin_editor/rule_management_widgets.dart';
+import 'package:kazumi/pages/video/video_playback_args.dart';
 import 'package:kazumi/pages/webview/internal_browser_page.dart';
 import 'package:kazumi/plugins/api_rule_config.dart';
 import 'package:kazumi/plugins/plugins.dart';
@@ -893,25 +896,161 @@ class _PluginTestPageState extends State<PluginTestPage> {
     );
   }
 
-  /// 单条线路的章节明细，塞进它自己那张折叠卡里。
+  /// 单条线路的章节明细：一集一张小卡片，链接可点，弹窗里可选内部浏览/外部打开/测试播放。
   Widget _buildRoadChapterList(Road road, ThemeData theme) {
     if (road.identifier.isEmpty) {
       return _buildEmpty('这条线路没有章节', theme);
     }
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ...road.identifier.asMap().entries.map(
-              (e) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: SelectableText(
-                  '${e.key + 1}. ${e.value}\n'
-                  '${e.key < road.data.length ? road.data[e.key] : ''}',
-                  style: theme.textTheme.bodySmall,
-                ),
-              ),
-            ),
+        for (var i = 0; i < road.identifier.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _buildEpisodeCard(road, i, theme),
+          ),
       ],
+    );
+  }
+
+  Widget _buildEpisodeCard(Road road, int index, ThemeData theme) {
+    final colors = theme.colorScheme;
+    final name = road.identifier[index];
+    final url = index < road.data.length ? road.data[index] : '';
+    return Material(
+      color: colors.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: url.isEmpty ? null : () => _showEpisodeActions(road, index),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                name,
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(fontWeight: FontWeight.w500),
+              ),
+              if (url.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  url,
+                  style:
+                      theme.textTheme.bodySmall?.copyWith(color: _linkGreen),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 章节链接点开后的三选一：应用内看、交给系统浏览器、或者直接进播放器试一下。
+  Future<void> _showEpisodeActions(Road road, int index) async {
+    final url = road.data[index];
+    final choice = await KazumiDialog.show<String>(
+      builder: (dialogContext) {
+        final theme = Theme.of(dialogContext);
+        return AlertDialog(
+          title: const Text('打开链接'),
+          content: Text(url, style: theme.textTheme.bodySmall),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop('internal'),
+              child: const Text('内部浏览'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop('external'),
+              child: const Text('外部打开'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop('play'),
+              child: const Text('测试播放'),
+            ),
+          ],
+        );
+      },
+    );
+    if (!mounted || choice == null) return;
+    if (choice == 'play') {
+      _startTestPlayback(road, index);
+      return;
+    }
+    if (choice == 'internal') {
+      Navigator.of(context, rootNavigator: true).push(
+        MaterialPageRoute(
+          builder: (_) => InternalBrowserPage(
+            url: url,
+            title: road.identifier[index],
+          ),
+        ),
+      );
+      return;
+    }
+    try {
+      if (await launchUrl(Uri.parse(url),
+          mode: LaunchMode.externalApplication)) {
+        return;
+      }
+    } catch (error) {
+      KazumiLogger().w('PluginTestPage: failed to open url', error: error);
+    }
+    if (mounted) {
+      KazumiDialog.showToast(context: context, message: '无法打开浏览器');
+    }
+  }
+
+  /// 测试播放：用当前已解析的线路直接进播放器，并定位到点的那一集。
+  void _startTestPlayback(Road road, int index) {
+    final data = searchRes?.data;
+    if (data == null || data.isEmpty) {
+      KazumiDialog.showToast(context: context, message: '请先解析出搜索结果');
+      return;
+    }
+    final itemIndex = _selectedItemIndex;
+    if (itemIndex < 0 || itemIndex >= data.length) {
+      KazumiDialog.showToast(context: context, message: '请先选择一条搜索结果');
+      return;
+    }
+    final roads = chapters;
+    if (roads == null || roads.isEmpty) {
+      KazumiDialog.showToast(context: context, message: '请先解析播放线路');
+      return;
+    }
+    final roadIndex = roads.indexOf(road);
+    final item = data[itemIndex];
+    final name = item.name.trim().isEmpty ? plugin.name : item.name.trim();
+    final bangumiItem = BangumiItem(
+      id: 0,
+      type: 2,
+      name: name,
+      nameCn: name,
+      summary: '',
+      airDate: '',
+      airWeekday: 0,
+      rank: 0,
+      images: const {},
+      tags: const [],
+      alias: const [],
+      ratingScore: 0,
+      votes: 0,
+      votesCount: const [],
+      info: '',
+    );
+    context.pushNamed(
+      '/video/',
+      arguments: OnlineVideoPlaybackArgs(
+        bangumiItem: bangumiItem,
+        plugin: plugin,
+        title: name,
+        src: item.src,
+        roads: roads,
+        initialEpisode: index + 1,
+        initialRoad: roadIndex < 0 ? 0 : roadIndex,
+      ),
     );
   }
 

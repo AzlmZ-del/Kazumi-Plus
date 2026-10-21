@@ -165,6 +165,13 @@ abstract class _VideoPageController with Store implements Disposable {
         src = args.src;
         roadList.clear();
         roadList.addAll(args.roads);
+        // 规则测试页的「测试播放」会带上具体集数，没有历史记录可恢复时直接从这里起播。
+        if (args.initialEpisode > 1 || args.initialRoad > 0) {
+          resetEpisodeState(
+            episode: args.initialEpisode,
+            road: args.initialRoad,
+          );
+        }
       case OfflineVideoPlaybackArgs():
         _initForOfflinePlayback(
           bangumiItem: args.bangumiItem,
