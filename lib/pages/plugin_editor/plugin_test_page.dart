@@ -972,9 +972,17 @@ class _PluginTestPageState extends State<PluginTestPage>
             ),
             if (url.isNotEmpty) ...[
               const SizedBox(height: 4),
-              Text(
-                url,
-                style: theme.textTheme.bodySmall?.copyWith(color: _linkGreen),
+              InkWell(
+                onTap: () => _copyEpisodeUrl(url),
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Text(
+                    url,
+                    style:
+                        theme.textTheme.bodySmall?.copyWith(color: _linkGreen),
+                  ),
+                ),
               ),
             ],
           ],
@@ -1005,6 +1013,21 @@ class _PluginTestPageState extends State<PluginTestPage>
         disabledBackgroundColor: background.withValues(alpha: 0.4),
       ),
     );
+  }
+
+  /// 章节链接复制到剪贴板。
+  Future<void> _copyEpisodeUrl(String url) async {
+    try {
+      await Clipboard.setData(ClipboardData(text: url));
+      if (mounted) {
+        KazumiDialog.showToast(context: context, message: '链接已复制');
+      }
+    } catch (error) {
+      KazumiLogger().w('PluginTestPage: failed to copy url', error: error);
+      if (mounted) {
+        KazumiDialog.showToast(context: context, message: '复制失败，请重试');
+      }
+    }
   }
 
   /// 章节链接在应用内打开。
