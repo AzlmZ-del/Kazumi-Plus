@@ -124,6 +124,9 @@ abstract class _VideoPageController with Store implements Disposable {
   @observable
   bool isOfflineMode = false;
 
+  /// 入口显式指定了集数与线路（规则测试页的「测试播放」），播放页不要再拿观看记录覆盖。
+  bool episodePinned = false;
+
   PlaybackHistoryIdentity? _playbackHistoryIdentity;
   final Map<int, DownloadEpisode> _offlineEpisodesByNumber = {};
   final Map<int, int> _offlineDisplayRoadToOriginalRoad = {};
@@ -157,6 +160,7 @@ abstract class _VideoPageController with Store implements Disposable {
   /// Applies the route arguments exactly once, from [VideoPage.initState].
   @action
   void applyPlaybackArgs(VideoPlaybackArgs args) {
+    episodePinned = false;
     switch (args) {
       case OnlineVideoPlaybackArgs():
         bangumiItem = args.bangumiItem;
@@ -165,8 +169,14 @@ abstract class _VideoPageController with Store implements Disposable {
         src = args.src;
         roadList.clear();
         roadList.addAll(args.roads);
-        // 规则测试页的「测试播放」会带上具体集数，没有历史记录可恢复时直接从这里起播。
-        if (args.initialEpisode > 1 || args.initialRoad > 0) {
+        // 规则测试页的「测试播放」会硬指定集数与线路，此时不能让观看记录把它覆盖掉。
+        if (args.pinInitialEpisode) {
+          episodePinned = true;
+          resetEpisodeState(
+            episode: args.initialEpisode,
+            road: args.initialRoad,
+          );
+        } else if (args.initialEpisode > 1 || args.initialRoad > 0) {
           resetEpisodeState(
             episode: args.initialEpisode,
             road: args.initialRoad,

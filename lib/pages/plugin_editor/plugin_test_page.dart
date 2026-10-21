@@ -1104,6 +1104,7 @@ class _PluginTestPageState extends State<PluginTestPage>
         roads: roads,
         initialEpisode: index + 1,
         initialRoad: roadIndex < 0 ? 0 : roadIndex,
+        pinInitialEpisode: true,
       ),
     );
   }
