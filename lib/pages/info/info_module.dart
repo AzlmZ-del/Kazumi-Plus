@@ -48,7 +48,11 @@ final infoModule = createModule(
           if (args is! InternalBrowserArgs) {
             return const RouteErrorPage(message: '浏览器参数无效，请返回后重试。');
           }
-          return InternalBrowserPage(url: args.url, title: args.title);
+          return InternalBrowserPage(
+            url: args.url,
+            title: args.title,
+            userAgent: args.userAgent,
+          );
         },
       );
   },

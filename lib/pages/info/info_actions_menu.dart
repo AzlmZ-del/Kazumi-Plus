@@ -15,9 +15,16 @@ import 'package:saver_gallery/saver_gallery.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class InfoActionsMenu extends StatefulWidget {
-  const InfoActionsMenu({super.key, required this.bangumiItem});
+  const InfoActionsMenu({
+    super.key,
+    required this.bangumiItem,
+    this.userAgent = '',
+  });
 
   final BangumiItem bangumiItem;
+
+  /// 当前番剧所属规则配置的 User-Agent；为空时内置浏览器用手机 UA。
+  final String userAgent;
 
   @override
   State<InfoActionsMenu> createState() => _InfoActionsMenuState();
@@ -50,6 +57,7 @@ class _InfoActionsMenuState extends State<InfoActionsMenu> {
       arguments: InternalBrowserArgs(
         url: 'https://bangumi.tv/subject/${widget.bangumiItem.id}',
         title: _title,
+        userAgent: widget.userAgent,
       ),
     );
   }
