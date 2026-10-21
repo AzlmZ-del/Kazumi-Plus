@@ -106,7 +106,7 @@ abstract final class _RuleEditorText {
       '按文档顺序取线路；反序前缀 - 只对下面的剧集列表生效，写在这里会被忽略。';
   static const episodeListXPath = '剧集列表（XPath）';
   static const episodeListXPathHelper =
-      '按文档顺序取剧集；站点若把最新集排在最前，在表达式最前面加 - 反序（旧写法 reverse:: 仍可用）。';
+      '按文档顺序取剧集；站点若把最新集排在最前，在表达式最前面加 - 反序。';
   static const roadNameXPath = '线路名称列表（XPath，可选）';
   static const roadNameXPathHelper =
       '按出现顺序对应上面的播放线路；留空则显示“播放线路1、2、3…”';
