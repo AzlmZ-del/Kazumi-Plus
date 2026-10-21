@@ -288,15 +288,36 @@ class _PluginTestPageState extends State<PluginTestPage> {
                       expanded: false,
                       child: _buildChapterRawContent(theme)),
                   _h12,
-                  _buildExpansionTile(
-                      theme: theme,
-                      number: 4,
-                      title: '播放路线',
-                      subtitle: _getChapterSubtitle(),
-                      completed: _hasChapters,
-                      // 切到别的结果时章节先清空，这里保持展开，避免面板自己收起来。
-                      expanded: _hasChapters || _chapterLoading,
-                      child: _buildChapterContent(theme)),
+                  if (_hasChapters)
+                    // 一条线路一张卡，跟「搜索请求」同级铺开。
+                    ...chapters!.asMap().entries.expand((e) {
+                      final i = e.key;
+                      final road = e.value;
+                      return [
+                        _buildExpansionTile(
+                            theme: theme,
+                            number: 4 + i,
+                            title: '播放线路 ${i + 1}：${road.name}',
+                            subtitle: '章节数量：${road.data.length}',
+                            completed: true,
+                            expanded: false,
+                            failedOverride: false,
+                            child: _buildRoadChapterList(road, theme)),
+                        _h12,
+                      ];
+                    })
+                  else if (_needChapterParse &&
+                      _hasSearchData &&
+                      !isTesting &&
+                      !_chapterLoading)
+                    _buildExpansionTile(
+                        theme: theme,
+                        number: 4,
+                        title: '播放线路',
+                        subtitle: _getChapterSubtitle(),
+                        completed: false,
+                        expanded: false,
+                        child: _buildEmpty('无可用章节', theme, isError: true)),
                 ],
               ),
             ),
@@ -314,17 +335,19 @@ class _PluginTestPageState extends State<PluginTestPage> {
     required bool completed,
     required bool expanded,
     required Widget child,
+    bool? failedOverride,
   }) {
     final colors = theme.colorScheme;
-    final failed = _hasRun &&
-        !isTesting &&
-        !completed &&
-        switch (number) {
-          1 => true,
-          2 => _hasSearchRaw,
-          3 => _hasSearchData && _needChapterParse && !_chapterLoading,
-          _ => _hasSearchData && _needChapterParse && !_chapterLoading,
-        };
+    final failed = failedOverride ??
+        (_hasRun &&
+            !isTesting &&
+            !completed &&
+            switch (number) {
+              1 => true,
+              2 => _hasSearchRaw,
+              3 => _hasSearchData && _needChapterParse && !_chapterLoading,
+              _ => _hasSearchData && _needChapterParse && !_chapterLoading,
+            });
     final foreground = completed
         ? colors.onTertiaryContainer
         : failed
@@ -760,19 +783,25 @@ class _PluginTestPageState extends State<PluginTestPage> {
     );
   }
 
-  Widget _buildChapterContent(ThemeData theme) {
-    if (!_needChapterParse) return _buildEmpty('未填写章节规则', theme);
-    if (isTesting || _chapterLoading) return _buildLoading(theme);
-    if (!_hasSearchData) return _buildEmpty('请先解析到有效结果', theme);
-    if (chapters == null) return _buildEmpty('未获取章节数据', theme, isError: true);
-    if (!_hasChapters) return _buildEmpty('无可用章节', theme, isError: true);
-
-    // 有几条线路就铺几张卡片，不再套 280 高的内层滚动，整段跟着页面滚。
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: chapters?.length ?? 0,
-      itemBuilder: (_, i) => _buildChapterCard(chapters![i], i, theme),
+  /// 单条线路的章节明细，塞进它自己那张折叠卡里。
+  Widget _buildRoadChapterList(Road road, ThemeData theme) {
+    if (road.identifier.isEmpty) {
+      return _buildEmpty('这条线路没有章节', theme);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ...road.identifier.asMap().entries.map(
+              (e) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: SelectableText(
+                  '${e.key + 1}. ${e.value}\n'
+                  '${e.key < road.data.length ? road.data[e.key] : ''}',
+                  style: theme.textTheme.bodySmall,
+                ),
+              ),
+            ),
+      ],
     );
   }
 
@@ -784,44 +813,4 @@ class _PluginTestPageState extends State<PluginTestPage> {
       return raw;
     }
   }
-
-  Widget _buildChapterCard(Road road, int i, ThemeData theme) => Card(
-        margin: const EdgeInsets.only(bottom: 8.0),
-        elevation: 0,
-        color: theme.colorScheme.surfaceContainerHighest,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '播放线路 ${i + 1}：${road.name}',
-                  style: theme.textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w500),
-                ),
-                _h8,
-                Text('章节数量：${road.data.length}',
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                _h8,
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ...road.identifier.asMap().entries.map(
-                          (e) => Padding(
-                            padding: const EdgeInsets.only(bottom: 6),
-                            child: SelectableText(
-                              '${e.key + 1}. ${e.value}\n'
-                              '${e.key < road.data.length ? road.data[e.key] : ''}',
-                              style: theme.textTheme.bodySmall,
-                            ),
-                          ),
-                        ),
-                  ],
-                ),
-              ]),
-        ),
-      );
 }
