@@ -578,8 +578,10 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
                           height: 16,
                           radius: 6,
                           fontSize: 10,
-                          background: colors.primaryContainer,
-                          foreground: colors.onPrimaryContainer),
+                          // 版本号固定绿色，不跟主题走：它是「版本」这个身份的
+                          // 固定记号，换了主题也该一眼认出来。
+                          background: const Color(0xFFCDEFD4),
+                          foreground: const Color(0xFF1B5E33)),
                       // 源类型跟作者同一行：它描述规则的实现方式，
                       // 不是身份信息，不该挤在名称旁边。
                       subtitleTag: item.type.isEmpty
