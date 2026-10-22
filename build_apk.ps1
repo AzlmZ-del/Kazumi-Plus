@@ -128,21 +128,32 @@ if ($NoInstall) {
     exit 0
 }
 
-# 设备检查
+# 设备检查：USB 优先，其次无线调试；都没有立刻报错
 $sw = [Diagnostics.Stopwatch]::StartNew()
-$devices = & $Adb devices |
+$deviceSerials = & $Adb devices |
     Select-Object -Skip 1 |
     ForEach-Object { $_.Trim() } |
-    Where-Object { $_ -match '\sdevice$' }
+    Where-Object { $_ -match '\sdevice$' } |
+    ForEach-Object { ($_ -split '\s+')[0] }
 Add-Timing 'adb devices' $sw
-if (-not $devices) {
+if (-not $deviceSerials) {
     Write-Output 'NO DEVICE: 没有检测到已授权的设备，产物保留在 build 目录'
     exit 2
 }
 
-Write-Output "INSTALL -> $($devices -join ', ')"
+# USB 序列号不含冒号；无线调试形如 192.168.3.53:5555
+$usbDevice = $deviceSerials | Where-Object { $_ -notmatch ':' } | Select-Object -First 1
+$wifiDevice = $deviceSerials | Where-Object { $_ -match ':' } | Select-Object -First 1
+$targetDevice = if ($usbDevice) { $usbDevice } else { $wifiDevice }
+if (-not $targetDevice) {
+    Write-Output 'NO DEVICE: 没有可用设备，产物保留在 build 目录'
+    exit 2
+}
+
+$transport = if ($usbDevice) { 'USB' } else { '无线调试' }
+Write-Output "INSTALL -> $targetDevice ($transport)"
 $sw = [Diagnostics.Stopwatch]::StartNew()
-& $Adb install -r -d $apk 2>&1 | ForEach-Object { Write-Output "  $_" }
+& $Adb -s $targetDevice install -r -d $apk 2>&1 | ForEach-Object { Write-Output "  $_" }
 $installCode = $LASTEXITCODE
 Add-Timing 'adb install' $sw
 if ($installCode -ne 0) {
