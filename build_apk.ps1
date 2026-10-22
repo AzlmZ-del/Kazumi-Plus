@@ -1,4 +1,4 @@
-# 常驻 APK 构建：单架构 arm64 + 凭据从 build_local.env 注入，
+﻿# 常驻 APK 构建：单架构 arm64 + 凭据从 build_local.env 注入，
 # 编译完直接 adb 装机（不落桌面）。
 #
 # 凭据来自 build_local.env（已 gitignore，切勿提交），格式：
@@ -99,11 +99,23 @@ if ($buildCode -ne 0) {
     exit 1
 }
 
-$apk = 'D:\Kazumi\build\app\outputs\flutter-apk\app-arm64-v8a-release.apk'
+$apkDir = 'D:\Kazumi\build\app\outputs\flutter-apk'
+$apk = Join-Path $apkDir 'app-arm64-v8a-release.apk'
 if (-not (Test-Path -LiteralPath $apk)) {
     Write-Error "构建产物不存在: $apk"
     exit 1
 }
+
+# ---- 产物名归一（用户 2026-10-22 要求：只构建 arm64，包名统一为 app-arm64-v8a-release.apk）----
+# 有人（含子代理）若直接跑 `flutter build apk --release --target-platform android-arm64`
+# 而不带 --split-per-abi，会产出无 ABI 后缀的 app-release.apk，与正式产物混淆。
+# 这里在构建成功后统一清掉，保证目录里只有 app-arm64-v8a-release.apk 这一个包。
+Get-ChildItem -LiteralPath $apkDir -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -like 'app-release.apk*' } |
+    ForEach-Object {
+        Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue
+        Write-Output "CLEAN -> 已删除非 ABI 命名产物 $($_.Name)"
+    }
 $sizeMb = [math]::Round((Get-Item -LiteralPath $apk).Length / 1MB, 1)
 Remove-Item -LiteralPath 'D:\Kazumi\build_apk_log.txt' -Force -ErrorAction SilentlyContinue
 Write-Output "BUILD OK -> $apk ($sizeMb MB)"
