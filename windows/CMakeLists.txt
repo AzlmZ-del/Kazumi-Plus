@@ -1,10 +1,13 @@
 # Project-level configuration.
 cmake_minimum_required(VERSION 3.14)
-project(kazumi LANGUAGES CXX)
+project(KazumiPlus LANGUAGES CXX)
 
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
-set(BINARY_NAME "kazumi")
+# 注意：这里不能带空格 —— 该变量同时是 CMake target 名（add_executable 的参数），
+# 带空格会被拆成多个参数导致配置失败。带空格的 "Kazumi Plus.exe" 由 build_local.ps1
+# 在打 zip 时改名产生。
+set(BINARY_NAME "KazumiPlus")
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.
