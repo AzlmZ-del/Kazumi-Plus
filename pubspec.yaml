@@ -146,9 +146,12 @@ flutter_native_splash:
   image_dark_ios: assets/images/logo/logo_ios.png
 
 msix_config:
-  display_name: Kazumi
+  display_name: Kazumi Plus
+  publisher_display_name: Kazumi Plus
+  identity_name: AzlmZ-del.KazumiPlus
   publisher: CN=SignPath Foundation, O=SignPath Foundation, L=Lewes, S=Delaware, C=US
   logo_path: assets/images/logo/logo_rounded.png
+  capabilities: internetClient
   sign_msix: false
   install_certificate: false
   build_windows: false
