@@ -14,10 +14,22 @@
 #   .\build_local.ps1 -Windows -Zip  -NoLaunch   出 zip 便携版
 #   .\build_local.ps1 -Windows -Msix -Zip        两个都出
 #
-# 不带 -Windows / -Android 时直接报错退出 —— 构建哪个版本由用户决定。
+# 并行（两路同时跑，省一半墙钟）：
+#   .\build_local.ps1 -Parallel -Zip              Android APK + Windows 编译/打包 同时跑
+#   .\build_local.ps1 -Parallel -Msix -Zip        Android APK + Windows(msix+zip) 同时跑
+#   .\build_local.ps1 -Parallel -WithAnalyze -NoInstall
+#
+#   -Parallel 自带 Android 与 Windows 两路，不能与 -Windows / -Android 叠加。
+#   -NoInstall / -WithAnalyze / -Msix / -Zip 照常生效；
+#   -WithAnalyze 在并行模式下由主进程只跑一次（analyze 与平台无关），失败则两路都不启动。
+#   Windows 那路强制 -NoLaunch（后台构建，不弹 GUI）。
+#   两路日志分别写 build\parallel\{android,windows}.log，不污染仓库根目录。
+#
+# 不带 -Windows / -Android / -Parallel 时直接报错退出 —— 构建哪个版本由用户决定。
 param(
     [switch]$Windows,
     [switch]$Android,
+    [switch]$Parallel,
     [switch]$NoLaunch,
     [switch]$NoInstall,
     [switch]$WithAnalyze,
@@ -35,10 +47,15 @@ if ($Windows -and $Android) {
     Write-Host '-Windows 与 -Android 只能选一个' -ForegroundColor Red
     exit 1
 }
-if (-not $Windows -and -not $Android) {
+if ($Parallel -and ($Windows -or $Android)) {
+    Write-Host '-Parallel 已包含 Android 与 Windows 两路，不要再叠加 -Windows / -Android' -ForegroundColor Red
+    exit 1
+}
+if (-not $Windows -and -not $Android -and -not $Parallel) {
     Write-Host '未指定构建目标。构建哪个版本由你决定，脚本不替你选：' -ForegroundColor Yellow
     Write-Host '  .\build_local.ps1 -Windows   # Windows 桌面版'
     Write-Host '  .\build_local.ps1 -Android   # Android APK'
+    Write-Host '  .\build_local.ps1 -Parallel -Zip   # 两路并行（APK + Windows）'
     exit 1
 }
 
@@ -92,6 +109,186 @@ if ($Android) {
     if ($WithAnalyze) { $apkArgs += '-WithAnalyze' }
     & pwsh @apkArgs
     exit $LASTEXITCODE
+}
+
+# ---- 并行：Android 与 Windows 两路同时跑 ----
+# 实测（2026-10-22）：单路串行约 547 s（apk 402 + windows 145），两路并行墙钟 403.6 s。
+# 收益来自「apk 与 windows 用不同工具链、不同 build 子目录」;
+# msix 与 zip 共享同一次 Windows 编译产物，所以只能在 Windows 这一路内部串行，不能各开一路。
+if ($Parallel) {
+    $apkScript = Join-Path $root 'build_apk.ps1'
+    foreach ($s in @($apkScript, (Join-Path $root 'build_local.ps1'))) {
+        if (-not (Test-Path -LiteralPath $s)) {
+            Write-Host "缺少 $s" -ForegroundColor Red
+            exit 1
+        }
+    }
+
+    $parDir = Join-Path $root 'build\parallel'
+    New-Item -ItemType Directory -Path $parDir -Force | Out-Null
+    $logApk = Join-Path $parDir 'android.log'
+    $logWin = Join-Path $parDir 'windows.log'
+    $errApk = Join-Path $parDir 'android.err.log'
+    $errWin = Join-Path $parDir 'windows.err.log'
+    foreach ($f in @($logApk, $logWin, $errApk, $errWin)) {
+        if (Test-Path -LiteralPath $f) { Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue }
+    }
+
+    # analyze 与平台无关，并行时由主进程只跑一次；有 error 则两路都不启动。
+    # （否则两路各跑一遍 analyze，既重复又在抢 CPU，实测并行下 analyze 会从 16 s 涨到 76 s）
+    $analyzeSeconds = $null
+    if ($WithAnalyze) {
+        Write-Host ''
+        Write-Host '======== flutter analyze（两路共用，只跑一次） ========' -ForegroundColor Cyan
+        # 走 cmd /c 重定向到文件：与 build_apk.ps1 一致，也让本脚本的
+        # $ErrorActionPreference='Stop' 不会把 flutter 写 stderr 的进度行当成异常抛出。
+        $analyzeLog = Join-Path $parDir 'analyze.log'
+        if (Test-Path -LiteralPath $analyzeLog) { Remove-Item -LiteralPath $analyzeLog -Force -ErrorAction SilentlyContinue }
+        $swA = [Diagnostics.Stopwatch]::StartNew()
+        Push-Location $root
+        try {
+            cmd /c "flutter analyze > `"$analyzeLog`" 2>&1"
+            $analyzeCode = $LASTEXITCODE
+        } finally {
+            Pop-Location
+        }
+        $analyzeSeconds = [math]::Round($swA.Elapsed.TotalSeconds, 1)
+        $analyzeText = if (Test-Path -LiteralPath $analyzeLog) {
+            Get-Content -LiteralPath $analyzeLog -Raw -Encoding utf8
+        } else { '' }
+        if ($analyzeText) { Write-Host $analyzeText.TrimEnd() }
+        $hasError = $analyzeText -match '(?m)^\s*error\s+-'
+        $issueCount = ([regex]::Matches($analyzeText, '(?m)^\s*(info|warning|error)\s+-')).Count
+        if ($analyzeCode -ne 0 -and $hasError) {
+            Write-Host "flutter analyze 有 error 级问题（${analyzeSeconds}s），两路都不启动" -ForegroundColor Red
+            exit 1
+        }
+        if ($issueCount -gt 0) {
+            Write-Host "ANALYZE -> 无 error，另有 $issueCount 条 info/warning（不阻断），${analyzeSeconds}s" -ForegroundColor Yellow
+        } else {
+            Write-Host "ANALYZE -> No issues（${analyzeSeconds}s）" -ForegroundColor Green
+        }
+    }
+
+    $pwshExe = (Get-Process -Id $PID).Path
+    $apkArgs = @('-NoProfile', '-File', $apkScript)
+    if ($NoInstall) { $apkArgs += '-NoInstall' }
+    $winArgs = @('-NoProfile', '-File', (Join-Path $root 'build_local.ps1'), '-Windows', '-NoLaunch')
+    if ($Msix) { $winArgs += '-Msix' }
+    if ($Zip) { $winArgs += '-Zip' }
+
+    Write-Host ''
+    Write-Host '======== 两路并行启动 ========' -ForegroundColor Cyan
+    Write-Host "  路 1  Android APK$(if ($NoInstall) { '（只编译不装机）' } else { '（编译 + 装机）' })"
+    Write-Host "  路 2  Windows 编译$(if ($Msix -or $Zip) { ' + 打包' } else { '' })$(if ($Msix) { ' msix' })$(if ($Zip) { ' zip' })"
+    Write-Host "  日志  $parDir" -ForegroundColor DarkGray
+
+    $env:FLUTTER_SUPPRESS_ANALYTICS = 'true'
+    $parStartTime = Get-Date
+    $swWall = [Diagnostics.Stopwatch]::StartNew()
+    $swApk = [Diagnostics.Stopwatch]::StartNew()
+    $procApk = Start-Process -FilePath $pwshExe -ArgumentList $apkArgs -WorkingDirectory $root `
+        -NoNewWindow -PassThru -RedirectStandardOutput $logApk -RedirectStandardError $errApk
+    $swWin = [Diagnostics.Stopwatch]::StartNew()
+    $procWin = Start-Process -FilePath $pwshExe -ArgumentList $winArgs -WorkingDirectory $root `
+        -NoNewWindow -PassThru -RedirectStandardOutput $logWin -RedirectStandardError $errWin
+
+    # 两路各自一个秒表：谁先结束都能拿到自己的真实耗时。
+    # ExitCode 只在 WaitForExit() 之后有效，且中途不要 Refresh()。
+    $procApk.WaitForExit()
+    $apkCode = $procApk.ExitCode
+    $swApk.Stop()
+    $apkSeconds = [math]::Round($swApk.Elapsed.TotalSeconds, 1)
+    Write-Host ("  [路 1 完成] Android  {0} s  exit={1}" -f $apkSeconds, $apkCode) -ForegroundColor $(
+        if ($apkCode -eq 0) { 'Green' } else { 'Red' })
+
+    $procWin.WaitForExit()
+    $winCode = $procWin.ExitCode
+    $swWin.Stop()
+    $swWall.Stop()
+    $winSeconds = [math]::Round($swWin.Elapsed.TotalSeconds, 1)
+    $wallSeconds = [math]::Round($swWall.Elapsed.TotalSeconds, 1)
+    Write-Host ("  [路 2 完成] Windows  {0} s  exit={1}" -f $winSeconds, $winCode) -ForegroundColor $(
+        if ($winCode -eq 0) { 'Green' } else { 'Red' })
+
+    # ---- 计时汇总（两路的明细由各自脚本写进 timing.log，这里只记墙钟与并行收益） ----
+    Write-Host ''
+    Write-Host '======== 并行耗时 ========' -ForegroundColor Cyan
+    $apkDisp = if ($null -ne $apkSeconds) { $apkSeconds } else { 0 }
+    $parRows = @(
+        [pscustomobject]@{ 步骤 = 'flutter analyze（共用一次）'; 秒 = $(if ($null -ne $analyzeSeconds) { $analyzeSeconds } else { 0 }) }
+        [pscustomobject]@{ 步骤 = '路 1 Android'; 秒 = $apkDisp }
+        [pscustomobject]@{ 步骤 = '路 2 Windows'; 秒 = $winSeconds }
+        [pscustomobject]@{ 步骤 = '并行墙钟'; 秒 = $wallSeconds }
+    )
+    # 串行估算 = analyze + 两路各自耗时（不用墙钟，用各自实际耗时）
+    $serialEstimate = [math]::Round($apkDisp + $winSeconds, 1)
+    $parRows | Format-Table -AutoSize | Out-String | Write-Host
+    Write-Host ("两路并行墙钟 {0} s（取两路较长者）；串行约 {1} s，省 {2} s" -f `
+        $wallSeconds, $serialEstimate, [math]::Round($serialEstimate - $wallSeconds, 1)) -ForegroundColor Cyan
+
+    try {
+        if (-not (Test-Path -LiteralPath $TimingLog)) {
+            '时间,项目,步骤,秒' | Out-File -LiteralPath $TimingLog -Encoding utf8 -Append
+        }
+        $stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+        foreach ($r in $parRows) {
+            "$stamp,并行构建,$($r.步骤),$($r.秒)" | Out-File -LiteralPath $TimingLog -Encoding utf8 -Append
+        }
+    } catch {
+        Write-Host "写 timing.log 失败：$($_.Exception.Message)" -ForegroundColor Yellow
+    }
+
+    # ---- 两路产物 ----
+    Write-Host ''
+    Write-Host '======== 产物 ========' -ForegroundColor Cyan
+    $parPackages = @()
+    $apkPath = Join-Path $root 'build\app\outputs\flutter-apk\app-arm64-v8a-release.apk'
+    if (Test-Path -LiteralPath $apkPath) {
+        $parPackages += [pscustomobject]@{
+            类型 = 'APK'; 路径 = $apkPath
+            MB = [math]::Round((Get-Item -LiteralPath $apkPath).Length / 1MB, 2)
+        }
+    }
+    $distDir = Join-Path $root 'build\windows\dist'
+    # 只列本次真正打出来的包：按开关过滤，否则上一轮的 msix 会被当成这次的产物报出来。
+    $wantExt = @()
+    if ($Msix) { $wantExt += '.msix' }
+    if ($Zip) { $wantExt += '.zip' }
+    if ($wantExt.Count -gt 0) {
+        Get-ChildItem -LiteralPath $distDir -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Extension -in $wantExt -and $_.LastWriteTime -ge $parStartTime } |
+            Sort-Object LastWriteTime -Descending |
+            ForEach-Object {
+                $parPackages += [pscustomobject]@{
+                    类型 = $_.Extension.TrimStart('.').ToUpper(); 路径 = $_.FullName
+                    MB = [math]::Round($_.Length / 1MB, 2)
+                }
+            }
+    }
+    if ($parPackages.Count -gt 0) {
+        $parPackages | Format-Table -AutoSize | Out-String | Write-Host
+    } else {
+        Write-Host '  未找到产物，检查 build\parallel\ 下的日志' -ForegroundColor Yellow
+    }
+
+    # build_apk.ps1 的退出码约定：0=构建并装机成功，2=构建成功但没装成（没设备），1=失败。
+    # 手机常拔线，exit=2 不该让整条并行命令判红 —— 包已经出来了，只提示没装机。
+    $apkBuiltNoInstall = ($apkCode -eq 2)
+    $apkRealFail = ($apkCode -ne 0 -and $apkCode -ne 2)
+    if ($apkBuiltNoInstall) {
+        Write-Host '  [路 1 提示] APK 构建成功，但没有可用设备装机（产物已保留）' -ForegroundColor Yellow
+    }
+
+    if ($apkRealFail -or $winCode -ne 0) {
+        Write-Host ''
+        Write-Host "PARALLEL FAILED（Android exit=$apkCode, Windows exit=$winCode）" -ForegroundColor Red
+        Write-Host "  日志：$logApk  /  $logWin" -ForegroundColor Yellow
+        exit 1
+    }
+    Write-Host ''
+    Write-Host "PARALLEL OK  ${wallSeconds}s" -ForegroundColor Green
+    exit 0
 }
 
 # ---- Windows：本脚本自己构建 ----
