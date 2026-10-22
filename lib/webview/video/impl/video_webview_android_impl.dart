@@ -18,12 +18,12 @@ class VideoWebviewAndroidImpl
   bool useLegacyParser = false;
 
   @override
-  Future<void> init() async {
+  Future<void> init({String userAgent = ''}) async {
     await _setupProxy();
     headlessWebView ??= PlatformHeadlessInAppWebView(
       PlatformHeadlessInAppWebViewCreationParams(
         initialSettings: InAppWebViewSettings(
-          userAgent: getRandomUA(),
+          userAgent: resolveWebviewUserAgent(userAgent),
           mediaPlaybackRequiresUserGesture: true,
           cacheEnabled: false,
           blockNetworkImage: true,

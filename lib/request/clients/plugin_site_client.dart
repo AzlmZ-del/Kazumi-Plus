@@ -36,7 +36,9 @@ class PluginSiteClient {
 
   Map<String, dynamic> _headers(Map<String, dynamic> headers) {
     return {
-      'user-agent': getRandomUA(),
+      // 原生 HTTP 请求用非浏览器 UA：浏览器 UA 配 BoringSSL 指纹会被
+      // Cloudflare 判为伪装并直接 403。规则显式配了 UA 时由 headers 覆盖。
+      'user-agent': getRandomHttpUA(),
       'Accept-Language': getRandomAcceptedLanguage(),
       'Connection': 'keep-alive',
       ...headers,

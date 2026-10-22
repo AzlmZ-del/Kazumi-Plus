@@ -28,7 +28,11 @@ abstract class VideoWebviewController<T> {
   bool isVideoSourceLoaded = false;
 
   /// WebView initialization method.
-  Future<void> init();
+  ///
+  /// [userAgent] 规则自带的 UA。非空时 WebView 必须用它，让页面内拿到的
+  /// 资源与后续媒体请求保持同一个 UA，避免站点按 UA 做防盗链时对不上。
+  /// 为空时各平台自行回落到浏览器 UA 池。
+  Future<void> init({String userAgent = ''});
 
   final StreamController<bool> initEventController =
       StreamController<bool>.broadcast();

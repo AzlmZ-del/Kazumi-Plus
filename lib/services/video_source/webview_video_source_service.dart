@@ -27,6 +27,7 @@ class WebViewVideoSourceService implements IVideoSourceService {
     required bool useLegacyParser,
     int offset = 0,
     Duration timeout = const Duration(seconds: 15),
+    String userAgent = '',
   }) async {
     final resolveTail = _resolveTail;
     if (resolveTail == null) {
@@ -44,6 +45,7 @@ class WebViewVideoSourceService implements IVideoSourceService {
         useLegacyParser: useLegacyParser,
         offset: offset,
         timeout: timeout,
+        userAgent: userAgent,
       ),
     );
 
@@ -57,12 +59,13 @@ class WebViewVideoSourceService implements IVideoSourceService {
     required bool useLegacyParser,
     required int offset,
     required Duration timeout,
+    required String userAgent,
   }) async {
     request.throwIfNotCurrent(_activeRequest);
 
     if (_webview == null) {
       _webview = VideoWebviewControllerFactory.getController();
-      await _webview!.init();
+      await _webview!.init(userAgent: userAgent);
 
       _logSubscription = _webview!.onLog.listen((log) {
         if (!_logController.isClosed) {

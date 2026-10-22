@@ -19,13 +19,13 @@ class VideoWebviewImpl
   Timer? videoParserTimer;
 
   @override
-  Future<void> init() async {
+  Future<void> init({String userAgent = ''}) async {
     await _setupProxy();
     headlessWebView ??= PlatformHeadlessInAppWebView(
       PlatformHeadlessInAppWebViewCreationParams(
         initialSize: const Size(360, 640),
         initialSettings: InAppWebViewSettings(
-          userAgent: getRandomUA(),
+          userAgent: resolveWebviewUserAgent(userAgent),
           mediaPlaybackRequiresUserGesture: true,
           upgradeKnownHostsToHTTPS: false,
           mixedContentMode: MixedContentMode.MIXED_CONTENT_COMPATIBILITY_MODE,

@@ -597,6 +597,7 @@ abstract class _DownloadController with Store {
             fullUrl,
             useLegacyParser: plugin.useLegacyParser,
             timeout: const Duration(seconds: 30),
+            userAgent: plugin.userAgent,
           );
           m3u8Url = source.url;
         } on VideoSourceTimeoutException {

@@ -15,7 +15,12 @@ class CaptchaWebviewLinuxImpl extends CaptchaWebviewController<Webview> {
   String? _customScript;
 
   @override
-  Future<void> init() async {
+  Future<void> init({String userAgent = ''}) async {
+    // desktop_webview_window 只暴露 setApplicationNameForUserAgent（在默认 UA
+    // 后追加一段），无法整体替换 UA，也没有注入请求头的入口。用 userScript
+    // 覆盖 navigator.userAgent 只能骗过页面 JS，HTTP 请求头仍是 WebKit 默认值，
+    // 对 Cloudflare 这类按请求头校验的 WAF 毫无作用，反而会制造「已对齐」的假象。
+    // 因此 Linux 保持随机浏览器 UA，UA 对齐能力只在能真正改请求头的平台生效。
     final proxyConfig = _getProxyConfiguration();
     webviewController ??= await WebviewWindow.create(
       configuration: CreateConfiguration(

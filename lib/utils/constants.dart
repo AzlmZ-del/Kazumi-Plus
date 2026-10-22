@@ -65,6 +65,9 @@ class LayoutBreakpoint {
 }
 
 /// 随机UA列表
+///
+/// 供 WebView 使用：必须是完整浏览器 UA，否则站点会下发移动页或非 JS 页面。
+/// HTTP 请求请改用 [httpClientUserAgentsList]。
 const List<String> userAgentsList = [
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36',
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
@@ -80,6 +83,23 @@ const List<String> userAgentsList = [
 /// 内置浏览器的兜底 UA：规则里没配 userAgent 时用手机版，站点才会给移动页面。
 const String mobileUserAgent =
     'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36';
+
+/// HTTP 请求专用的随机 UA 列表。
+///
+/// Dart 的 `HttpClient` 使用 BoringSSL，TLS 指纹与浏览器差异很大。Cloudflare
+/// 一类 WAF 会交叉校验「UA 声称的浏览器」与「TLS 指纹是否匹配」：只要 UA 是完整
+/// 浏览器 UA 而 TLS 不是，就直接回 403 硬拦截页（不是可解的验证码）。
+///
+/// 这里全部使用非浏览器 UA，让 UA 与 TLS 指纹自洽。实测 Chrome UA 在 Dart 下
+/// 必 403，而下列任意一条均 200。
+const List<String> httpClientUserAgentsList = [
+  'okhttp/4.9.0',
+  'okhttp/4.12.0',
+  'okhttp/3.14.9',
+  'Dart/3.13 (dart:io)',
+  'ktor-client/2.3.0',
+  'CFNetwork/1410.0.3 Darwin/22.6.0',
+];
 
 /// 随机HTTP请求头accept-language字段列表
 const List<String> acceptLanguageList = [

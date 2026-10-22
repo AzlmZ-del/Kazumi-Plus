@@ -38,14 +38,16 @@ class DioFactory {
 
   static Dio get rulesRepoDio => _rulesRepoDio ??= _create(
     NetworkConfig.fromSettings(),
-    defaultHeaders: {'user-agent': getRandomUA()},
+    defaultHeaders: {'user-agent': getRandomHttpUA()},
     interceptors: [_RulesMirrorInterceptor()],
   );
 
   static Dio get pluginDio => _pluginDio ??= _create(
     NetworkConfig.fromSettings(),
     defaultHeaders: {
-      'user-agent': getRandomUA(),
+      // 站点抓取一律用非浏览器 UA：浏览器 UA + BoringSSL 指纹会被 WAF 判为
+      // 伪装爬虫并直接 403。规则显式配了 userAgent 时以规则为准。
+      'user-agent': getRandomHttpUA(),
       'accept-language': getRandomAcceptedLanguage(),
     },
   );

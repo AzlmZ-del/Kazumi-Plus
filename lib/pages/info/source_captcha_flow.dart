@@ -22,6 +22,9 @@ class _SourceCaptchaFlow {
   void start(Plugin plugin, String keyword) {
     unawaited(_dialogs.run((task) async {
       final service = CaptchaVerificationService();
+      // 让验证 WebView 与后续 dio 请求共用规则 UA，clearance cookie 才不会
+      // 因 UA 不一致而作废（规则未配 UA 时内部回落到浏览器 UA 池）。
+      service.applyRuleUserAgent(plugin.userAgent);
       final verified = Completer<String>();
       final config = plugin.antiCrawlerConfig;
       final searchUrl = plugin.searchURL
