@@ -105,6 +105,15 @@ dependencies:
   macos_secure_bookmarks: ^0.2.1
   share_plus: ^12.0.2
 
+# Local vendored copy of ech_http 0.2.3 with only the CA-bundle generation
+# reverted to the 0.2.2 chunked implementation. Upstream 0.2.3 emits the whole
+# ~200 KB cacert.pem as one raw string literal via ca_bundle.h.in, which trips
+# MSVC C2026 ("string too big") and breaks every Windows build.
+# Remove this override once upstream ships the fix. See third_party/ech_http/PATCHES.md.
+dependency_overrides:
+  ech_http:
+    path: third_party/ech_http
+
 dev_dependencies:
   path_provider_platform_interface: ^2.1.2
   plugin_platform_interface: ^2.1.8
