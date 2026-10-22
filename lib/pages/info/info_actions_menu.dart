@@ -56,6 +56,12 @@ class _InfoActionsMenuState extends State<InfoActionsMenu> {
           leadingIcon: const Icon(Icons.open_in_new_rounded, size: 18),
           label: '外部打开',
         ),
+        KazumiMenuItem(
+          onPressed: () =>
+              InfoQuickActions.share(context, widget.bangumiItem),
+          leadingIcon: const Icon(Icons.share_rounded, size: 18),
+          label: '分享番剧',
+        ),
       ],
       builder: (context, toggle) => IconButton(
         tooltip: '更多操作',
