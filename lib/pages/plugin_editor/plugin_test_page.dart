@@ -700,8 +700,7 @@ class _PluginTestPageState extends State<PluginTestPage>
     if (isTesting && !_hasSearchRaw) return _buildLoading(theme);
     if (!_hasSearchRaw) return _buildEmpty('输入关键词后，点击「开始测试」。', theme);
     return _codePanel(
-        _formattedRaw(searchRaw, isJson: plugin.searchMode == RuleMode.api),
-        theme,
+        _formattedRaw(searchRaw), theme,
         controller: searchRawScrollController);
   }
 
@@ -839,8 +838,8 @@ class _PluginTestPageState extends State<PluginTestPage>
       if (isShowingFragment)
         Padding(
           padding: const EdgeInsets.only(bottom: 8),
-          child:
-              _codePanel(fragment, theme, controller: fragmentScrollController),
+          child: _codePanel(_formattedRaw(fragment), theme,
+              controller: fragmentScrollController),
         ),
     ]);
   }
@@ -906,8 +905,7 @@ class _PluginTestPageState extends State<PluginTestPage>
       children: [
         _buildDiagnosticsWidget(chapterDiagnostics, theme),
         _buildResponseCard(
-          raw: _formattedRaw(chapterRaw,
-              isJson: plugin.chapterMode == RuleMode.api),
+          raw: _formattedRaw(chapterRaw),
           theme: theme,
           expanded: _chapterRawExpanded,
           controller: chapterRawScrollController,
@@ -1145,8 +1143,15 @@ class _PluginTestPageState extends State<PluginTestPage>
     );
   }
 
-  String _formattedRaw(String raw, {required bool isJson}) {
-    if (!isJson) return raw;
+  /// 把响应文本里的 JSON 展开成带缩进的多行文本，HTML 原样返回。
+  ///
+  /// 不按「搜索模式 / 章节模式」判断，直接看内容：只有首字符是 `{` 或 `[`
+  /// 才尝试解析，所以 HTML 响应（以 `<` 开头）永远不会被误处理。
+  String _formattedRaw(String raw) {
+    final trimmed = raw.trimLeft();
+    if (trimmed.isEmpty) return raw;
+    final head = trimmed.codeUnitAt(0);
+    if (head != 0x7B && head != 0x5B) return raw; // '{' 或 '['
     try {
       return const JsonEncoder.withIndent('  ').convert(jsonDecode(raw));
     } catch (_) {
