@@ -1,6 +1,7 @@
 #include <flutter/dart_project.h>
 #include <flutter/flutter_view_controller.h>
 #include <windows.h>
+#include <app_links/app_links_plugin_c_api.h>
 
 #include "flutter_window.h"
 #include "utils.h"
@@ -28,6 +29,9 @@ bool ActivateExistingWindow()
   HWND hwnd = ::FindWindow(kWindowClassName, L"Kazumi Plus");
   if (hwnd != NULL)
   {
+    // 把本实例启动时携带的 kazumi:// 链接转发给已存在的窗口（若有）。
+    SendAppLink(hwnd);
+
     // Check if window is hidden (e.g., minimized to tray)
     if (!::IsWindowVisible(hwnd))
     {

@@ -10,10 +10,11 @@
              android:name="io.flutter.embedding.android.EnableImpeller"
              android:value="false" 
         />
+        <!-- singleTask：外部应用发来的链接不得在共享的 audio_service 引擎上再起一个 Activity。 -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleTop"
+            android:launchMode="singleTask"
             android:supportsPictureInPicture="true"
             android:resizeableActivity="true"
             android:theme="@style/LaunchTheme"
@@ -28,9 +29,21 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+            <!-- 深链交给 app_links 处理，关闭 Flutter 自带的深链转发。 -->
+            <meta-data
+              android:name="flutter_deeplinking_enabled"
+              android:value="false"
+              />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="kazumi" android:host="bangumi"/>
+                <data android:scheme="kazumi" android:host="search"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
