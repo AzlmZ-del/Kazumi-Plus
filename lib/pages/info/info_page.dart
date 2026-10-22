@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:window_manager/window_manager.dart';
@@ -10,6 +11,7 @@ import 'package:kazumi/bean/appbar/drag_to_move_bar.dart' as dtb;
 import 'package:kazumi/bean/card/bangumi_info_card.dart';
 import 'package:kazumi/bean/card/network_img_layer.dart';
 import 'package:kazumi/bean/dialog/adaptive_bottom_sheet.dart';
+import 'package:kazumi/bean/dialog/dialog.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/bean/widget/collect_button.dart';
 import 'package:kazumi/bean/widget/embedded_native_control_area.dart';
@@ -50,7 +52,7 @@ class _InfoPageState extends State<InfoPage>
     '吐槽',
     '角色',
     '关联',
-    '制作人员',
+    '制作',
   ];
   static const Duration _minimumBangumiInfoLoadingDuration =
       Duration(milliseconds: 600);
@@ -70,6 +72,26 @@ class _InfoPageState extends State<InfoPage>
 
   bool commentsIsLoading = false;
   bool charactersIsLoading = false;
+
+  /// 标题栏显示的番剧名（中文名优先）。
+  String get _displayTitle => infoController.bangumiItem.nameCn.trim().isEmpty
+      ? infoController.bangumiItem.name
+      : infoController.bangumiItem.nameCn;
+
+  /// 长按左上角番剧名复制标题。
+  Future<void> _copyTitleByLongPress() async {
+    try {
+      await Clipboard.setData(ClipboardData(text: _displayTitle));
+      if (mounted) {
+        KazumiDialog.showToast(context: context, message: '标题已复制');
+      }
+    } catch (error) {
+      KazumiLogger().w('InfoPage: failed to copy title', error: error);
+      if (mounted) {
+        KazumiDialog.showToast(context: context, message: '复制失败，请重试');
+      }
+    }
+  }
   bool commentsQueryTimeout = false;
   bool commentsHasLoaded = false;
   bool charactersQueryTimeout = false;
@@ -370,13 +392,13 @@ class _InfoPageState extends State<InfoPage>
               sliver: SliverAppBar.medium(
                 title: EmbeddedNativeControlArea(
                   child: dtb.DragToMoveArea(
-                    child: Container(
-                      width: double.infinity,
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        infoController.bangumiItem.nameCn == ''
-                            ? infoController.bangumiItem.name
-                            : infoController.bangumiItem.nameCn,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onLongPress: _copyTitleByLongPress,
+                      child: Container(
+                        width: double.infinity,
+                        alignment: Alignment.centerLeft,
+                        child: Text(_displayTitle),
                       ),
                     ),
                   ),
