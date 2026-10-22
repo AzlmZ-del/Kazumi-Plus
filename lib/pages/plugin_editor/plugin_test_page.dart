@@ -521,7 +521,7 @@ class _PluginTestPageState extends State<PluginTestPage>
       children: [
         _episodeActionButton(
           tooltip: '内部浏览',
-          icon: Icons.open_in_browser,
+          icon: Icons.travel_explore_rounded,
           onPressed: isTesting ? null : () => _openUrlInternal(item.src, item.name),
           background: colors.secondaryContainer,
           foreground: colors.onSecondaryContainer,
@@ -873,7 +873,7 @@ class _PluginTestPageState extends State<PluginTestPage>
                 const SizedBox(width: 4),
                 _episodeActionButton(
                   tooltip: '内部浏览',
-                  icon: Icons.open_in_browser,
+                  icon: Icons.travel_explore_rounded,
                   onPressed:
                       url.isEmpty ? null : () => _openEpisodeInternal(road, index),
                   background: colors.secondaryContainer,
