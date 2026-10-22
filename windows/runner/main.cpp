@@ -29,7 +29,7 @@ bool ActivateExistingWindow()
   HWND hwnd = ::FindWindow(kWindowClassName, L"Kazumi Plus");
   if (hwnd != NULL)
   {
-    // 把本实例启动时携带的 kazumi:// 链接转发给已存在的窗口（若有）。
+    // Forward the kazumi:// link this instance was launched with, if any.
     SendAppLink(hwnd);
 
     // Check if window is hidden (e.g., minimized to tray)
