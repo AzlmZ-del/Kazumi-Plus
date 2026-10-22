@@ -15,3 +15,6 @@ analyzer:
     - windows/**
     - macos/**
     - linux/**
+    # Vendored third-party packages (see third_party/*/PATCHES.md). Their own
+    # test suites depend on `package:test`, which this project does not provide.
+    - third_party/**

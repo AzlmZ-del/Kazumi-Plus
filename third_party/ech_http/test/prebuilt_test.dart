@@ -1,0 +1,229 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:archive/archive_io.dart';
+import 'package:code_assets/code_assets.dart';
+import 'package:crypto/crypto.dart';
+import 'package:ech_http/src/build_support/prebuilt.dart';
+import 'package:path/path.dart' as p;
+import 'package:test/test.dart';
+
+const _revision = 'cff1385e77b9b2095558fa625b3c35d589ffe09b';
+const _zlibDigest =
+    'bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16';
+
+List<int> _sdk({
+  String target = 'windows-x64',
+  String revision = _revision,
+  Map<String, String> extra = const {},
+  bool omitCrypto = false,
+  bool omitZlib = false,
+  String zlibVersion = '1.3.2',
+  String zlibDigest = _zlibDigest,
+}) {
+  final windows = target.startsWith('windows-');
+  String library(String name) => windows ? '$name.lib' : 'lib$name.a';
+  final files = <String, String>{
+    'cmake/EchHttpDeps.cmake': 'verified cmake',
+    'include/curl/curl.h': 'curl header',
+    'include/openssl/ssl.h': 'ssl header',
+    'lib/${library('curl')}': 'curl static library',
+    'lib/${library('ssl')}': 'ssl static library',
+    if (!omitCrypto) 'lib/${library('crypto')}': 'crypto static library',
+    if (!omitZlib) 'lib/${library('zlib')}': 'zlib static library',
+    'include/zlib.h': 'zlib header',
+    'include/zconf.h': 'zlib configuration',
+    'licenses/ZLIB_LICENSE': 'zlib license',
+    ...extra,
+  };
+  final archive = Archive();
+  for (final file in files.entries) {
+    final bytes = utf8.encode(file.value);
+    archive.addFile(ArchiveFile(file.key, bytes.length, bytes));
+  }
+  final metadata = utf8.encode(
+    jsonEncode({
+      'schema': 1,
+      'target': target,
+      'release': 'v0.1.0',
+      'curl': {'version': '8.22.0'},
+      'boringssl': {'revision': revision},
+      'zlib': {'version': zlibVersion, 'sha256': zlibDigest},
+      'files': {
+        for (final file in files.entries)
+          file.key: sha256.convert(utf8.encode(file.value)).toString(),
+      },
+    }),
+  );
+  archive.addFile(ArchiveFile('metadata.json', metadata.length, metadata));
+  return ZipEncoder().encode(archive);
+}
+
+PrebuiltDependency _pin(List<int> bytes, {String target = 'windows-x64'}) =>
+    PrebuiltDependency(
+      target: target,
+      release: 'v0.1.0',
+      url: Uri.https('example.test', '/dependency.zip'),
+      digest: sha256.convert(bytes).toString(),
+      curlVersion: '8.22.0',
+      boringRevision: _revision,
+      zlibVersion: '1.3.2',
+      zlibDigest: _zlibDigest,
+    );
+
+void main() {
+  late Directory cache;
+  setUp(() async => cache = await Directory.systemTemp.createTemp('ech-sdk-'));
+  tearDown(() async => cache.delete(recursive: true));
+
+  test('iOS device and simulator SDKs have distinct cache targets', () {
+    expect(dependencyTarget(OS.windows, Architecture.x64), 'windows-x64');
+    expect(
+      dependencyTarget(OS.iOS, Architecture.arm64, iosSdk: IOSSdk.iPhoneOS),
+      'ios-arm64-device',
+    );
+    expect(
+      dependencyTarget(
+        OS.iOS,
+        Architecture.arm64,
+        iosSdk: IOSSdk.iPhoneSimulator,
+      ),
+      'ios-arm64-simulator',
+    );
+  });
+
+  test(
+    'verified SDK works offline and repairs modified extracted libraries',
+    () async {
+      final bytes = _sdk();
+      final pin = _pin(bytes);
+      var downloads = 0;
+      Future<void> download(Uri _, File file) async {
+        downloads++;
+        await file.writeAsBytes(bytes);
+      }
+
+      final sdk = await preparePrebuilt(pin, cache.path, download: download);
+      final library = File(p.join(sdk, 'lib', 'curl.lib'));
+      await library.writeAsString('tampered');
+      expect(await preparePrebuilt(pin, cache.path, download: download), sdk);
+      expect(await library.readAsString(), 'curl static library');
+      expect(downloads, 1);
+      await preparePrebuilt(
+        pin,
+        cache.path,
+        download: (_, _) =>
+            throw StateError('Offline cache must not contact the network'),
+      );
+    },
+  );
+
+  for (final target in ['ohos-arm64', 'ohos-x64']) {
+    test('$target SDK is verified, cached offline and repaired', () async {
+      final bytes = _sdk(target: target);
+      final pin = _pin(bytes, target: target);
+      final sdk = await preparePrebuilt(
+        pin,
+        cache.path,
+        download: (_, file) => file.writeAsBytes(bytes),
+      );
+      final library = File(p.join(sdk, 'lib', 'libcurl.a'));
+      expect(await library.readAsString(), 'curl static library');
+      await library.writeAsString('tampered');
+      expect(
+        await preparePrebuilt(
+          pin,
+          cache.path,
+          download: (_, _) => throw StateError('Cached SDK must work offline'),
+        ),
+        sdk,
+      );
+      expect(await library.readAsString(), 'curl static library');
+    });
+  }
+
+  test('OHOS SDK cannot be used for the other architecture', () async {
+    final bytes = _sdk(target: 'ohos-x64');
+    await expectLater(
+      preparePrebuilt(
+        _pin(bytes, target: 'ohos-arm64'),
+        cache.path,
+        download: (_, file) => file.writeAsBytes(bytes),
+      ),
+      throwsStateError,
+    );
+  });
+
+  test(
+    'corrupt cached archive is replaced only by a matching download',
+    () async {
+      final bytes = _sdk();
+      final pin = _pin(bytes);
+      var downloads = 0;
+      Future<void> download(Uri _, File file) async {
+        downloads++;
+        await file.writeAsBytes(bytes);
+      }
+
+      await preparePrebuilt(pin, cache.path, download: download);
+      final zip = File(p.join(cache.path, '${pin.target}-${pin.digest}.zip'));
+      await zip.writeAsString('truncated');
+      await preparePrebuilt(pin, cache.path, download: download);
+      expect(downloads, 2);
+      expect(sha256.convert(await zip.readAsBytes()).toString(), pin.digest);
+    },
+  );
+
+  test(
+    'mismatched download is rejected and partial bytes are removed',
+    () async {
+      await expectLater(
+        preparePrebuilt(
+          _pin(_sdk()),
+          cache.path,
+          download: (_, file) async {
+            await file.writeAsString('untrusted bytes');
+          },
+        ),
+        throwsStateError,
+      );
+      expect(
+        await cache
+            .list()
+            .where((file) => !file.path.endsWith('.lock'))
+            .toList(),
+        isEmpty,
+      );
+    },
+  );
+
+  for (final mismatch in [
+    ('wrong architecture', _sdk(target: 'windows-arm64')),
+    ('wrong BoringSSL revision', _sdk(revision: '0' * 40)),
+    ('missing static library', _sdk(omitCrypto: true)),
+    ('missing zlib library', _sdk(omitZlib: true)),
+    ('wrong zlib version', _sdk(zlibVersion: '1.3.1')),
+    ('wrong zlib source digest', _sdk(zlibDigest: '0' * 64)),
+    ('path traversal', _sdk(extra: {'../escaped.txt': 'escape'})),
+    ('Windows absolute path', _sdk(extra: {'C:/escaped.txt': 'escape'})),
+  ]) {
+    test('rejects ${mismatch.$1} even with a matching archive hash', () async {
+      await expectLater(
+        preparePrebuilt(
+          _pin(mismatch.$2),
+          cache.path,
+          download: (_, file) async {
+            await file.writeAsBytes(mismatch.$2);
+          },
+        ),
+        throwsStateError,
+      );
+      expect(
+        await Directory(
+          cache.path,
+        ).list().where((e) => e is Directory).toList(),
+        isEmpty,
+      );
+    });
+  }
+}
