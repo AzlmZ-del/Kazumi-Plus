@@ -88,7 +88,7 @@ class _BangumiInfoCardVState extends State<BangumiInfoCardV> {
         const SizedBox(width: 3),
         _quickActionButton(
           icon: Icons.share_rounded,
-          tooltip: '分享',
+          tooltip: '分享番剧',
           onPressed: () => InfoQuickActions.share(context, widget.bangumiItem),
         ),
       ],
