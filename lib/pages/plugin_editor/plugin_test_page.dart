@@ -57,7 +57,6 @@ class _PluginTestPageState extends State<PluginTestPage>
   List<String> chapterDiagnostics = [];
   final Map<int, String> _itemFragmentMap = {};
   int? _shownFragmentIndex;
-  bool _chapterRawExpanded = true;
 
   /// 当前正在查看播放线路的搜索结果下标（0 基）。
   int _selectedItemIndex = 0;
@@ -617,85 +616,6 @@ class _PluginTestPageState extends State<PluginTestPage>
     );
   }
 
-  /// 播放线路面板里的「响应内容」：做成和「结果解析」条目一样的卡片，
-  /// 标题行可点、右上角箭头收起/展开，收起后只留一条窄卡片。
-  Widget _buildResponseCard({
-    required String raw,
-    required ThemeData theme,
-    required bool expanded,
-    required VoidCallback onToggle,
-    ScrollController? controller,
-    String title = '响应内容',
-  }) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 0,
-      color: theme.colorScheme.surfaceContainerHighest,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          InkWell(
-            onTap: onToggle,
-            child: Padding(
-              padding: const EdgeInsets.only(left: 12, right: 4, top: 4),
-              child: Row(children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w500),
-                  ),
-                ),
-                IconButton(
-                    tooltip: '复制响应内容',
-                    onPressed: () async {
-                      try {
-                        await Clipboard.setData(ClipboardData(text: raw));
-                        if (mounted) {
-                          KazumiDialog.showToast(
-                              context: context, message: '已复制响应内容');
-                        }
-                      } catch (_) {
-                        if (mounted) {
-                          KazumiDialog.showToast(
-                              context: context, message: '复制失败，请重试');
-                        }
-                      }
-                    },
-                    icon: const Icon(Icons.copy_rounded, size: 18)),
-                IconButton(
-                  onPressed: onToggle,
-                  icon: Icon(
-                    expanded ? Icons.keyboard_arrow_up : Icons.code,
-                    size: 18,
-                    color: theme.colorScheme.primary,
-                  ),
-                  tooltip: expanded ? '收起响应内容' : '查看响应内容',
-                ),
-              ]),
-            ),
-          ),
-          if (expanded)
-            SizedBox(
-              height: 220,
-              child: Scrollbar(
-                controller: controller,
-                child: SingleChildScrollView(
-                  controller: controller,
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                  child: SelectableText(raw,
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(fontFamily: 'monospace')),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildSearchContent(ThemeData theme) {
     if (isTesting && !_hasSearchRaw) return _buildLoading(theme);
     if (!_hasSearchRaw) return _buildEmpty('输入关键词后，点击「开始测试」。', theme);
@@ -904,14 +824,8 @@ class _PluginTestPageState extends State<PluginTestPage>
     return Column(
       children: [
         _buildDiagnosticsWidget(chapterDiagnostics, theme),
-        _buildResponseCard(
-          raw: _formattedRaw(chapterRaw),
-          theme: theme,
-          expanded: _chapterRawExpanded,
-          controller: chapterRawScrollController,
-          onToggle: () =>
-              setState(() => _chapterRawExpanded = !_chapterRawExpanded),
-        ),
+        _codePanel(_formattedRaw(chapterRaw), theme,
+            controller: chapterRawScrollController),
       ],
     );
   }
