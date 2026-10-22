@@ -147,7 +147,22 @@
               --dart-define=DANDANAPI_KEY=$env:DANDANAPI_KEY
               --dart-define=KAZUMI_APPID=$env:KAZUMI_APPID
               --dart-define=KAZUMI_KEY=$env:KAZUMI_KEY
-          - run: Compress-Archive build/windows/x64/runner/Release/* Kazumi_windows_${env:tag}.zip
+          # CMake 的 BINARY_NAME 不能带空格（它是 target 名），所以产物叫 KazumiPlus.exe；
+          # 打进便携版时改名为「Kazumi Plus.exe」，与本地 build_local.ps1 -Zip 保持一致。
+          - name: Package windows zip
+            run: |
+              $src   = 'build/windows/x64/runner/Release'
+              $stage = 'build/windows/zip_stage'
+              $exe   = Join-Path $stage 'KazumiPlus.exe'
+              if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force }
+              New-Item -Path $stage -ItemType Directory -Force | Out-Null
+              Get-ChildItem -LiteralPath $src -Force | Copy-Item -Destination $stage -Recurse -Force
+              if (-not (Test-Path -LiteralPath $exe)) {
+                throw "未找到 $exe，请确认 windows/CMakeLists.txt 的 BINARY_NAME 仍是 KazumiPlus"
+              }
+              Rename-Item -LiteralPath $exe -NewName 'Kazumi Plus.exe'
+              Compress-Archive -Path (Join-Path $stage '*') -DestinationPath "Kazumi_windows_${env:tag}.zip" -Force
+              Remove-Item -LiteralPath $stage -Recurse -Force
           - name: Upload windows outputs
             uses: actions/upload-artifact@v4
             id: unsigned-windows-zip-artifacts
@@ -178,8 +193,19 @@
               path: build/windows/zip_signed_output/*.zip
               
           # Replace Unpacked Artifact with Signed Artifact
+          # 签名包里的 exe 叫「Kazumi Plus.exe」，但 Release 目录要留给 msix 用，
+          # 而 msix 是按 CMake 的 BINARY_NAME（KazumiPlus）找 exe 的，所以这里改回去。
           - name: Replace Unpacked Artifact with Signed Artifact
-            run: Expand-Archive -Path "build/windows/zip_signed_output/Kazumi_windows_${env:tag}.zip" -DestinationPath "build/windows/x64/runner/Release" -Force
+            run: |
+              $rel = 'build/windows/x64/runner/Release'
+              Expand-Archive -Path "build/windows/zip_signed_output/Kazumi_windows_${env:tag}.zip" -DestinationPath $rel -Force
+              $spaced = Join-Path $rel 'Kazumi Plus.exe'
+              if (Test-Path -LiteralPath $spaced) {
+                # 解压后目录里会有两个 exe：未签名的 KazumiPlus.exe 和签名的 Kazumi Plus.exe，
+                # 先删前者再改名，确保 msix 打包进去的是签名版本。
+                Remove-Item -LiteralPath (Join-Path $rel 'KazumiPlus.exe') -Force -ErrorAction SilentlyContinue
+                Rename-Item -LiteralPath $spaced -NewName 'KazumiPlus.exe'
+              }
           
           # Build Unsigned MSIX
           - name: Build unsigned msix
