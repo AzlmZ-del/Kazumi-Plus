@@ -411,14 +411,29 @@ class _CommentToggle extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.chat_bubble_outline_rounded, size: 13, color: color),
+              // 两个图标整体下压 1.5px，让图标与「N 条讨论」文字视觉居中对齐。
+              Transform.translate(
+                offset: const Offset(0, 1.5),
+                child: Icon(
+                  Icons.chat_bubble_outline_rounded,
+                  size: 13,
+                  color: color,
+                ),
+              ),
               const SizedBox(width: 4),
               Text(
                 '$count 条讨论',
                 style: theme.textTheme.bodySmall?.copyWith(color: color),
               ),
               const SizedBox(width: 2),
-              Icon(Icons.chevron_right_rounded, size: 14, color: color),
+              Transform.translate(
+                offset: const Offset(0, 1.5),
+                child: Icon(
+                  Icons.chevron_right_rounded,
+                  size: 14,
+                  color: color,
+                ),
+              ),
             ],
           ),
         ),
