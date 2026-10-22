@@ -5,6 +5,7 @@ import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/services/network/proxy_utils.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/services/video_source/video_source_format.dart';
+import 'package:kazumi/utils/http_headers.dart';
 
 class VideoWebviewWindowsImpl
     extends VideoWebviewController<WebviewController> {
@@ -13,12 +14,24 @@ class VideoWebviewWindowsImpl
   HeadlessWebview? headlessWebview;
 
   @override
-  Future<void> init() async {
+  Future<void> init({String userAgent = ''}) async {
     await _setupProxy();
     headlessWebview ??= HeadlessWebview();
     await headlessWebview!.run();
     await headlessWebview!.setPopupWindowPolicy(WebviewPopupWindowPolicy.deny);
+    await _applyUserAgent(userAgent);
     initEventController.add(true);
+  }
+
+  /// WebView2 只能在实例启动后设置 UA，故放在 [HeadlessWebview.run] 之后。
+  Future<void> _applyUserAgent(String ruleUserAgent) async {
+    final resolved = resolveWebviewUserAgent(ruleUserAgent);
+    try {
+      await headlessWebview!.setUserAgent(resolved);
+      KazumiLogger().i('WebView: UA 已设置 $resolved');
+    } catch (e) {
+      KazumiLogger().w('WebView: UA 设置失败 $e');
+    }
   }
 
   Future<void> _setupProxy() async {

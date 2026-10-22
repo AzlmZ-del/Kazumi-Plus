@@ -238,6 +238,8 @@ class Plugin {
         searchApiConfig: searchApiConfig,
         chapterApiConfig: chapterApiConfig,
         antiCrawlerConfig: antiCrawlerConfig,
+        // 规则自带的 UA 对搜索/章节/播放一律生效，空则由请求层用非浏览器 UA 兜底。
+        userAgent: userAgent,
         // 停用的登录流程对运行时完全不可见，但配置本身留在规则里。
         auth: authEnabled ? auth : null,
         play: chapterApiConfig.play,
@@ -335,6 +337,10 @@ class Plugin {
   }
 
   /// Headers used when resolving or downloading the final media resource.
+  ///
+  /// 播放/下载层保持浏览器 UA：媒体 CDN 一般不做 TLS 指纹校验，反而常见按
+  /// 浏览器 UA 做防盗链，换成非浏览器 UA 有被拒的风险。WAF 指纹问题只出现在
+  /// 规则抓取 HTML/API 那一层（见 plugin_site_client）。
   Map<String, String> buildHttpHeaders() {
     return {
       'user-agent': userAgent.isEmpty ? getRandomUA() : userAgent,

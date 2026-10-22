@@ -12,7 +12,7 @@ class VideoWebviewAppleImpl
   bool hasInjectedScripts = false;
 
   @override
-  Future<void> init() async {
+  Future<void> init({String userAgent = ''}) async {
     headlessWebView ??= PlatformHeadlessInAppWebView(
       PlatformHeadlessInAppWebViewCreationParams(
         initialUserScripts: UnmodifiableListView<UserScript>([
@@ -34,7 +34,7 @@ class VideoWebviewAppleImpl
           ),
         ]),
         initialSettings: InAppWebViewSettings(
-          userAgent: getRandomUA(),
+          userAgent: resolveWebviewUserAgent(userAgent),
           mediaPlaybackRequiresUserGesture: true,
           useOnLoadResource: false,
           cacheEnabled: false,

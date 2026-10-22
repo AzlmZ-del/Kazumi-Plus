@@ -40,7 +40,11 @@ abstract class CaptchaWebviewController<T> {
   Stream<String> get onLog => logEventController.stream;
 
   /// 初始化 WebView
-  Future<void> init();
+  ///
+  /// [userAgent] 规则自带的 UA。非空时 WebView 必须用它，否则通过验证后
+  /// 记录下来的 clearance cookie 会与后续 dio 请求的 UA 不一致而立即失效。
+  /// 为空时各平台自行回落到浏览器 UA 池。
+  Future<void> init({String userAgent = ''});
 
   /// 加载指定 URL，并注入监听验证码图片的 JS 脚本（类型1：图片验证码）
   ///

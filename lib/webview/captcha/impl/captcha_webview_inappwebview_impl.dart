@@ -13,11 +13,11 @@ class CaptchaWebviewInAppWebviewImpl
   String _currentInputXpath = '';
 
   @override
-  Future<void> init() async {
+  Future<void> init({String userAgent = ''}) async {
     _headlessWebView ??= PlatformHeadlessInAppWebView(
       PlatformHeadlessInAppWebViewCreationParams(
         initialSettings: InAppWebViewSettings(
-          userAgent: getRandomUA(),
+          userAgent: resolveWebviewUserAgent(userAgent),
           mediaPlaybackRequiresUserGesture: true,
           cacheEnabled: true,
           blockNetworkImage: false,

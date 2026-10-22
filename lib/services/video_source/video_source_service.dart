@@ -85,11 +85,15 @@ abstract class IVideoSourceService {
   /// - [VideoSourceNotFoundException] 未找到视频源
   /// - [VideoSourceTimeoutException] 解析超时
   /// - [VideoSourceCancelledException] 解析被取消
+  ///
+  /// [userAgent] 规则自带的 UA，非空时 WebView 与后续媒体请求共用它，
+  /// 避免站点按 UA 做防盗链时页面内资源与播放请求对不上。
   Future<VideoSource> resolve(
     String episodeUrl, {
     required bool useLegacyParser,
     int offset = 0,
     Duration timeout = const Duration(seconds: 30),
+    String userAgent = '',
   });
 
   /// 取消当前正在进行的解析

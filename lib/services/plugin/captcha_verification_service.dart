@@ -23,6 +23,15 @@ import 'package:kazumi/webview/captcha/captcha_webview_controller.dart';
 class CaptchaVerificationService {
   CaptchaWebviewController? _controller;
 
+  /// 规则自带的 UA。WebView 必须与后续 dio 请求用同一个 UA，
+  /// 否则验证通过的 clearance cookie 会因 UA 不一致而立即失效。
+  String _ruleUserAgent = '';
+
+  /// 设置规则 UA，必须在首次加载页面前调用。
+  void applyRuleUserAgent(String userAgent) {
+    _ruleUserAgent = userAgent;
+  }
+
   final StreamController<String?> _captchaImageStreamController =
       StreamController<String?>.broadcast();
 
@@ -92,7 +101,7 @@ class CaptchaVerificationService {
     final initializedFuture = _controller!.onInitialized.first
         .timeout(const Duration(seconds: 10), onTimeout: () => false);
 
-    await _controller!.init();
+    await _controller!.init(userAgent: _ruleUserAgent);
     if (_disposed) return;
     await initializedFuture;
     if (_disposed) return;

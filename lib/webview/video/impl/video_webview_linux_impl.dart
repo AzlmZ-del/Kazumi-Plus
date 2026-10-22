@@ -10,7 +10,11 @@ class VideoWebviewLinuxImpl extends VideoWebviewController<Webview> {
   bool bridgeInited = false;
 
   @override
-  Future<void> init() async {
+  Future<void> init({String userAgent = ''}) async {
+    // desktop_webview_window 只暴露 setApplicationNameForUserAgent（在默认 UA
+    // 后追加一段），无法整体替换 UA。用 userScript 覆盖 navigator.userAgent
+    // 只能骗过页面 JS，HTTP 请求头仍是 WebKit 默认值，对按请求头校验的 WAF
+    // 无效，反而制造「已对齐」的假象。故 Linux 保持默认 UA。
     final proxyConfig = _getProxyConfiguration();
     webviewController ??= await WebviewWindow.create(
       configuration: CreateConfiguration(

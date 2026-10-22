@@ -112,6 +112,7 @@ class VideoSourceResolverLease {
     required bool useLegacyParser,
     int offset = 0,
     Duration timeout = const Duration(seconds: 30),
+    String userAgent = '',
   }) async {
     if (_isCancelled) {
       throw const VideoSourceCancelledException();
@@ -121,6 +122,7 @@ class VideoSourceResolverLease {
       useLegacyParser: useLegacyParser,
       offset: offset,
       timeout: timeout,
+      userAgent: userAgent,
     );
   }
 
@@ -147,12 +149,14 @@ class _VideoSourceResolverWorker {
     required bool useLegacyParser,
     int offset = 0,
     Duration timeout = const Duration(seconds: 30),
+    String userAgent = '',
   }) {
     return _service.resolve(
       episodeUrl,
       useLegacyParser: useLegacyParser,
       offset: offset,
       timeout: timeout,
+      userAgent: userAgent,
     );
   }
 

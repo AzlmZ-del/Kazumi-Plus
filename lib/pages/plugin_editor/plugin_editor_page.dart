@@ -154,7 +154,8 @@ abstract final class _RuleEditorText {
   static const playPageQueryHelper = '与地址模板可用变量相同，合并进最终 URL 的查询参数。';
 
   static const userAgent = '用户代理（User-Agent）';
-  static const userAgentHelper = '仅用于播放器和下载器。';
+  static const userAgentHelper =
+      '用于搜索、章节、播放、下载与验证 WebView。留空则由内置 UA 池随机选取。';
   static const referer = '播放请求来源（Referer）';
   static const refererHelper = '仅用于播放器和下载器。';
 

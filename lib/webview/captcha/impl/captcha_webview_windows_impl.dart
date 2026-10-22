@@ -5,6 +5,7 @@ import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/services/network/proxy_utils.dart';
 import 'package:kazumi/webview/captcha/captcha_webview_controller.dart';
+import 'package:kazumi/utils/http_headers.dart';
 
 class CaptchaWebviewWindowsImpl
     extends CaptchaWebviewController<WebviewController> {
@@ -17,11 +18,12 @@ class CaptchaWebviewWindowsImpl
   String? _customScript;
 
   @override
-  Future<void> init() async {
+  Future<void> init({String userAgent = ''}) async {
     await _setupProxy();
     _headlessWebview ??= HeadlessWebview();
     await _headlessWebview!.run();
     await _headlessWebview!.setPopupWindowPolicy(WebviewPopupWindowPolicy.deny);
+    await _applyUserAgent(userAgent);
 
     // Listen for messages from JavaScript via window.chrome.webview.postMessage
     _subscriptions.add(
@@ -495,6 +497,17 @@ $script
     } catch (_) {}
     _headlessWebview?.dispose();
     _headlessWebview = null;
+  }
+
+  /// WebView2 只能在实例启动后设置 UA，故放在 [HeadlessWebview.run] 之后。
+  Future<void> _applyUserAgent(String ruleUserAgent) async {
+    final resolved = resolveWebviewUserAgent(ruleUserAgent);
+    try {
+      await _headlessWebview!.setUserAgent(resolved);
+      KazumiLogger().i('[Captcha WebView] UA 已设置: $resolved');
+    } catch (e) {
+      KazumiLogger().w('[Captcha WebView] UA 设置失败 $e');
+    }
   }
 
   Future<void> _setupProxy() async {

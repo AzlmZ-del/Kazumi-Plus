@@ -524,6 +524,13 @@ class DefaultRuleRequestExecutor implements RuleRequestExecutor {
         ? PluginCookieManager.instance.userAgentFor(config.pluginName)
         : null;
     final auth = config.auth;
+    // UA 优先级：clearance cookie 绑定的 UA > 规则自带 UA > 请求层默认值。
+    // Clearance cookies are bound to the User-Agent they were issued to, so the
+    // verified UA must win whenever it exists; sending a different one would
+    // make the site serve the challenge page again.
+    final ruleUserAgent = config.userAgent.trim();
+    final userAgent = verifiedUserAgent ??
+        (ruleUserAgent.isEmpty ? null : ruleUserAgent);
     // Header names are lowercased so a rule-supplied 'User-Agent' collides
     // with ours instead of being sent as a second, conflicting header.
     final headers = <String, dynamic>{
@@ -531,10 +538,7 @@ class DefaultRuleRequestExecutor implements RuleRequestExecutor {
       if (cookieHeader.isNotEmpty) 'cookie': cookieHeader,
       for (final entry in request.headers.entries)
         entry.key.toLowerCase(): entry.value,
-      // Clearance cookies are bound to the User-Agent they were issued to,
-      // so the verified UA overrides the rule's own; sending a different one
-      // would make the site serve the challenge page again.
-      'user-agent': ?verifiedUserAgent,
+      'user-agent': ?userAgent,
     };
     // Auth token goes last so it wins over a rule-supplied static header of
     // the same name (lowercased keys collide by design, see above).

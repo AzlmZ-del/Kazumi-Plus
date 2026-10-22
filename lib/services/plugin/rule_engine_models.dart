@@ -84,8 +84,9 @@ class RuleAuthFailedException implements Exception {
 
 /// Immutable runtime snapshot built from a plugin rule.
 ///
-/// Playback-only headers such as the rule's User-Agent and Referer are
-/// deliberately excluded. API requests can provide their own static headers.
+/// API requests can provide their own static headers. [userAgent] is the
+/// rule's own User-Agent; it applies to every outgoing request (search,
+/// chapter and playback), falling back to a non-browser default when empty.
 class RuleExecutionConfig {
   const RuleExecutionConfig({
     required this.pluginName,
@@ -103,6 +104,7 @@ class RuleExecutionConfig {
     required this.searchApiConfig,
     required this.chapterApiConfig,
     required this.antiCrawlerConfig,
+    this.userAgent = '',
     this.auth,
     this.play,
   });
@@ -125,6 +127,10 @@ class RuleExecutionConfig {
   final ApiSearchConfig searchApiConfig;
   final ApiChapterConfig chapterApiConfig;
   final AntiCrawlerConfig antiCrawlerConfig;
+
+  /// User-Agent declared by the rule. Applies to search, chapter and playback
+  /// requests alike. Empty means "use a non-browser default".
+  final String userAgent;
 
   /// Login flow declared by the rule, or null when the rule needs no auth.
   final ApiAuthConfig? auth;
