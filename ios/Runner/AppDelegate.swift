@@ -1,6 +1,7 @@
 import UIKit
 import Flutter
 import AVKit
+import app_links
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
@@ -9,6 +10,11 @@ import AVKit
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
+        // 未认领的 URL 会让 Flutter 把启动回调重放给旧插件，
+        // 导致 flutter_foreground_task 在冷启动时重复注册后台任务。
+        AppLinks.shared.urlHandledCallBack = { url in
+            url.scheme?.lowercased() == "kazumi"
+        }
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
     }
 
