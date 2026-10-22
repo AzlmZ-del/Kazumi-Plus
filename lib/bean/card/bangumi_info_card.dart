@@ -4,6 +4,7 @@ import 'package:kazumi/bean/widget/collect_button.dart';
 import 'package:kazumi/utils/constants.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/bean/card/network_img_layer.dart';
+import 'package:kazumi/pages/info/info_quick_actions.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
@@ -26,6 +27,73 @@ class BangumiInfoCardV extends StatefulWidget {
 
 class _BangumiInfoCardVState extends State<BangumiInfoCardV> {
   int touchedIndex = -1;
+  bool _savingCover = false;
+
+  Future<void> _saveCover() async {
+    if (_savingCover) return;
+    setState(() => _savingCover = true);
+    try {
+      await InfoQuickActions.saveCover(context, widget.bangumiItem);
+    } finally {
+      if (mounted) setState(() => _savingCover = false);
+    }
+  }
+
+  Widget _quickActionButton({
+    required IconData icon,
+    required String tooltip,
+    VoidCallback? onPressed,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      icon: Icon(icon, size: 18),
+      padding: EdgeInsets.zero,
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints.tightFor(width: 34, height: 30),
+      style: IconButton.styleFrom(
+        backgroundColor: scheme.primary,
+        foregroundColor: Colors.white,
+        disabledForegroundColor: Colors.white70,
+        disabledBackgroundColor: scheme.primary,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
+  }
+
+  Widget get _quickActionsRow {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _quickActionButton(
+          icon: Icons.download_rounded,
+          tooltip: _savingCover ? '保存中…' : '保存封面',
+          onPressed: _savingCover ? null : _saveCover,
+        ),
+        const SizedBox(width: 3),
+        _quickActionButton(
+          icon: Icons.travel_explore_rounded,
+          tooltip: '内部浏览',
+          onPressed: () =>
+              InfoQuickActions.openInternally(context, widget.bangumiItem),
+        ),
+        const SizedBox(width: 3),
+        _quickActionButton(
+          icon: Icons.open_in_new_rounded,
+          tooltip: '外部打开',
+          onPressed: () =>
+              InfoQuickActions.openExternally(context, widget.bangumiItem),
+        ),
+        const SizedBox(width: 3),
+        _quickActionButton(
+          icon: Icons.share_rounded,
+          tooltip: '分享',
+          onPressed: () => InfoQuickActions.share(context, widget.bangumiItem),
+        ),
+      ],
+    );
+  }
 
   Widget get voteBarChart {
     return Flexible(
@@ -264,6 +332,7 @@ class _BangumiInfoCardVState extends State<BangumiInfoCardV> {
                             ),
                           ),
                         ),
+                        _quickActionsRow,
                         SizedBox(
                           width: 120,
                           height: 40,
