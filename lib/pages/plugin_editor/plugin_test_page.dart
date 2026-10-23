@@ -234,13 +234,13 @@ class _PluginTestPageState extends State<PluginTestPage>
                 children: [
                   RulePageIntro(
                     title: plugin.name,
-                    description: '一次测试，检查搜索请求、结果解析和播放线路。',
+                    description: '一次测试，检查搜索请求、番剧条目和播放线路。',
                     icon: Icons.science_outlined,
                   ),
                   const SizedBox(height: 20),
                   RuleSection(
                     title: '试着搜索一部番剧',
-                    description: '点击「结果解析」里的任意一条，即可查看它的播放线路。',
+                    description: '点击「番剧条目」里的任意一条，即可查看它的播放线路。',
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -282,7 +282,7 @@ class _PluginTestPageState extends State<PluginTestPage>
                   _buildExpansionTile(
                       theme: theme,
                       number: 2,
-                      title: '结果解析',
+                      title: '番剧条目',
                       subtitle: _getParseSubtitle(),
                       completed: _hasSearchData,
                       expanded: false,
@@ -776,7 +776,7 @@ class _PluginTestPageState extends State<PluginTestPage>
     return '第 ${_selectedItemIndex + 1} 条 · 获取到 ${chapters?.length ?? 0} 个播放线路$skipped';
   }
 
-  /// 卡片标题直接显示「结果解析」里选中的那条的名称，没选中时退回默认文案。
+  /// 卡片标题直接显示「番剧条目」里选中的那条的名称，没选中时退回默认文案。
   String _getResponseTitle() {
     final data = searchRes?.data;
     if (data == null || data.isEmpty) return '响应内容';
