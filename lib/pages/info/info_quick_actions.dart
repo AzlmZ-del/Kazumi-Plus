@@ -26,12 +26,16 @@ class InfoQuickActions {
       item.nameCn.trim().isEmpty ? item.name : item.nameCn;
 
   /// 复制番剧标题到剪贴板并提示。
+  ///
+  /// 复制成功时给一次轻震动（`lightImpact`），让长按有「按下去了」的实感；
+  /// 桌面端该调用是空操作，不会报错。
   static Future<void> copyTitle(
     BuildContext context,
     BangumiItem item,
   ) async {
     try {
       await Clipboard.setData(ClipboardData(text: displayTitle(item)));
+      HapticFeedback.lightImpact();
       if (!context.mounted) return;
       _toast(context, '标题已复制');
     } catch (error) {
@@ -123,8 +127,10 @@ class InfoQuickActions {
     _toast(context, '无法打开浏览器');
   }
 
-  /// 分享条目：番剧名 + Bangumi 链接 + 中文简介。
+  /// 分享条目：番剧名 + 官方链接 + 两条深链 + 中文简介。
   ///
+  /// 深链格式见 `KazumiDeepLink`：`kazumi://bangumi/<id>` 直开详情页，
+  /// `kazumi://search?query=<关键词>` 以番剧名发起搜索。
   /// Bangumi 的 summary 字段有时会在中文简介后面附上 `[简介原文]` 与日文原文，
   /// 分享时只保留第一段中文简介，原文整块丢掉。
   static Future<void> share(
@@ -132,24 +138,59 @@ class InfoQuickActions {
     BangumiItem item,
   ) async {
     final title = displayTitle(item);
-    final summary = _summaryWithoutOriginal(item.summary);
-    final buffer = StringBuffer()
-      ..writeln(title)
-      ..writeln('https://bangumi.tv/subject/${item.id}');
-    if (summary.isNotEmpty) {
-      buffer
-        ..writeln()
-        ..write(summary);
-    }
     try {
       await SharePlus.instance.share(
-        ShareParams(text: buffer.toString(), subject: title),
+        ShareParams(
+          text: buildShareText(
+            title: title,
+            id: item.id,
+            summary: _summaryWithoutOriginal(item.summary),
+          ),
+          subject: title,
+        ),
       );
     } catch (error) {
       KazumiLogger().w('InfoQuickActions: failed to share', error: error);
       if (!context.mounted) return;
       _toast(context, '分享失败，请重试');
     }
+  }
+
+  /// 拼装分享正文。抽成纯函数，便于单测覆盖格式。
+  ///
+  /// 输出形如：
+  /// ```
+  /// 番剧名
+  /// 官方链接：https://bangumi.tv/subject/1
+  /// 详情直达：kazumi://bangumi/1
+  /// 快速搜索：kazumi://search?query=%E7%95%AA%E5%89%A7%E5%90%8D
+  ///
+  /// 简介
+  /// ```
+  @visibleForTesting
+  static String buildShareText({
+    required String title,
+    required int id,
+    required String summary,
+  }) {
+    final detail = Uri(scheme: 'kazumi', host: 'bangumi', path: '/$id');
+    final search = Uri(
+      scheme: 'kazumi',
+      host: 'search',
+      queryParameters: {'query': title},
+    );
+    final buffer = StringBuffer()
+      ..writeln(title)
+      ..writeln('官方链接：https://bangumi.tv/subject/$id')
+      ..writeln('详情直达：$detail')
+      ..write('快速搜索：$search');
+    if (summary.isNotEmpty) {
+      buffer
+        ..writeln()
+        ..writeln()
+        ..write(summary);
+    }
+    return buffer.toString();
   }
 
   /// 去掉简介里附带的原文（日文）部分，只留中文简介。
