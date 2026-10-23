@@ -283,9 +283,16 @@ class SettingsKeys {
     'ech',
     group: SettingGroup.proxy,
   );
-  // An unset mode inherits the old mirror switch (enabled by default).
+  // Defaults to ECH: it reaches the official API without relying on a mirror.
   static const bangumiAcceleration = SettingKey<String>(
     'bangumiAcceleration',
+    'ech',
+    group: SettingGroup.proxy,
+  );
+  // Rules repository acceleration. An empty value falls back to the legacy
+  // `enableGitProxy` switch so existing installs keep their current behaviour.
+  static const rulesMirror = SettingKey<String>(
+    'rulesMirror',
     '',
     group: SettingGroup.proxy,
   );
@@ -643,6 +650,7 @@ class SettingsKeys {
     enableBangumiProxy,
     imageAcceleration,
     bangumiAcceleration,
+    rulesMirror,
     enableSystemProxy,
     defaultStartupPage,
     webDavEnable,

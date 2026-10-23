@@ -14,9 +14,7 @@ class ProxyAwareImageCacheManager extends CacheManager with ImageCacheManager {
   static final ProxyAwareImageCacheManager instance =
       ProxyAwareImageCacheManager._(
         ImageFileService(
-          acceleration: () => ImageAcceleration.fromSetting(
-            GStorage.getSetting(SettingsKeys.imageAcceleration),
-          ),
+          acceleration: () => ImageAcceleration.current,
           clientFactory: _createHttpClient,
           echService: BangumiEchImageService(proxyForUrl: _currentEchProxy),
         ),

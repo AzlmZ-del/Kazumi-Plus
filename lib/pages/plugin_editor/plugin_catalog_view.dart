@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:kazumi/bean/card/rule_card.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
+import 'package:kazumi/bean/settings/network_mirror_settings.dart';
 import 'package:kazumi/bean/widget/error_widget.dart';
 import 'package:kazumi/bean/widget/kazumi_menu.dart';
 import 'package:kazumi/bean/widget/empty_state_widget.dart';
@@ -15,6 +16,7 @@ import 'package:kazumi/pages/plugin_editor/plugin_update_actions.dart';
 import 'package:kazumi/pages/plugin_editor/rule_management_widgets.dart';
 import 'package:kazumi/plugins/plugins_controller.dart';
 import 'package:kazumi/request/config/rules_repository_config.dart';
+import 'package:kazumi/services/network/rules_mirror.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/utils/date_time.dart';
 
@@ -142,13 +144,18 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
     unawaited(_loadPluginCatalog(forceRefresh: true));
   }
 
-  Future<void> _toggleGitProxyAndRefresh() async {
+  Future<void> _selectMirrorAndRefresh() async {
     try {
-      final enabled = GStorage.getSetting(SettingsKeys.enableGitProxy);
-      await GStorage.putSetting(SettingsKeys.enableGitProxy, !enabled);
-      if (mounted) _refresh();
+      final changed = await selectAccelerationMode<RulesMirror>(
+        context,
+        title: '规则仓库加速',
+        current: RulesMirror.current,
+        modes: RulesMirror.values,
+        setting: SettingsKeys.rulesMirror,
+      );
+      if (changed && mounted) _refresh();
     } catch (_) {
-      KazumiDialog.showToast(message: '切换规则镜像失败，请重试');
+      KazumiDialog.showToast(message: '切换加速方式失败，请重试');
     }
   }
 
@@ -306,7 +313,7 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
                       style: theme.textTheme.bodyMedium
                           ?.copyWith(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 2),
-                  Text('规则仓库镜像只作用于官方仓库，第三方仓库不受影响',
+                  Text('加速只作用于内置仓库，第三方仓库不受影响',
                       style: theme.textTheme.bodySmall
                           ?.copyWith(color: colors.onSurfaceVariant)),
                 ],
@@ -493,19 +500,17 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
             ?manageButton,
             if (widget.onManageRepositories == null)
               StateActionButton.tonal(
-                onPressed: _toggleGitProxyAndRefresh,
+                onPressed: _selectMirrorAndRefresh,
                 icon: Icons.tune_rounded,
-                text: GStorage.getSetting(SettingsKeys.enableGitProxy)
-                    ? '关闭规则镜像'
-                    : '启用规则镜像',
+                text: '切换加速',
               ),
           ],
         );
       }
-      final enabled = GStorage.getSetting(SettingsKeys.enableGitProxy);
       return GeneralErrorWidget(
         title: '无法访问规则仓库',
-        errMsg: '请检查网络连接，或切换规则仓库镜像后重试。',
+        errMsg: '请检查网络连接，或切换规则仓库加速后重试。'
+            '（当前：${RulesMirror.current.label}）',
         icon: Icons.cloud_off_rounded,
         onRetry: _refresh,
         retryText: '重新加载',
@@ -513,9 +518,9 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
           ?manageButton,
           if (widget.onManageRepositories == null)
             StateActionButton.tonal(
-              onPressed: _toggleGitProxyAndRefresh,
+              onPressed: _selectMirrorAndRefresh,
               icon: Icons.tune_rounded,
-              text: enabled ? '关闭规则镜像' : '启用规则镜像',
+              text: '切换加速',
             ),
         ],
       );
