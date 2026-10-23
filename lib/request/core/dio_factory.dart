@@ -1,10 +1,9 @@
 import 'package:dio/dio.dart';
-import 'package:kazumi/request/config/api_endpoints.dart';
 import 'package:kazumi/request/core/bangumi_transport.dart';
 import 'package:kazumi/request/core/dio_logger_interceptor.dart';
 import 'package:kazumi/request/core/network_config.dart';
 import 'package:kazumi/services/logging/logger.dart';
-import 'package:kazumi/services/storage/storage.dart';
+import 'package:kazumi/services/network/rules_mirror.dart';
 import 'package:kazumi/utils/http_headers.dart';
 
 class DioFactory {
@@ -103,31 +102,14 @@ class DioFactory {
 }
 
 class _RulesMirrorInterceptor extends Interceptor {
-  /// Prefix of every built-in repository and the mirror that can stand in for
-  /// it. Both are plain string prefixes, so appending the rest of the request
-  /// path keeps `index.json` and `<rule>.json` addresses working unchanged.
-  static const Map<String, String> _mirrors = <String, String>{
-    ApiEndpoints.pluginShop: ApiEndpoints.pluginShopMirror,
-    ApiEndpoints.personalPluginShop: ApiEndpoints.personalPluginShopMirror,
-  };
-
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    final enableGitProxy = GStorage.getSetting(SettingsKeys.enableGitProxy);
-    if (!enableGitProxy) {
-      handler.next(options);
-      return;
-    }
-
-    final url = options.uri.toString();
-    for (final entry in _mirrors.entries) {
-      if (!url.startsWith(entry.key)) {
-        continue;
-      }
-      final mirrored = entry.value + url.substring(entry.key.length);
+    // The mirror lives in one enum so the settings page and the request path
+    // can never disagree about which host is in use.
+    final mirrored = RulesMirror.current.map(options.uri.toString());
+    if (mirrored != null) {
       KazumiLogger().d('Rules mirror: $mirrored');
       options.path = mirrored;
-      break;
     }
     handler.next(options);
   }

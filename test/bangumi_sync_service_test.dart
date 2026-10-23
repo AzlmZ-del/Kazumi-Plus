@@ -86,11 +86,20 @@ void main() {
     final previousMode = GStorage.getSetting<String>(
       SettingsKeys.imageAcceleration,
     );
+    final previousBangumiMode = GStorage.getSetting<String>(
+      SettingsKeys.bangumiAcceleration,
+    );
     addTearDown(
       () => GStorage.putSetting(SettingsKeys.imageAcceleration, previousMode),
     );
+    addTearDown(
+      () => GStorage.putSetting(
+        SettingsKeys.bangumiAcceleration,
+        previousBangumiMode,
+      ),
+    );
     await GStorage.putSetting(SettingsKeys.imageAcceleration, 'ech');
-    await GStorage.putSetting(SettingsKeys.enableBangumiProxy, true);
+    await GStorage.putSetting(SettingsKeys.bangumiAcceleration, 'mirror');
     for (final url in [
       'https://api.bgm.tv/v0/subjects/1',
       'https://next.bgm.tv/p1/subjects/1?test=value',

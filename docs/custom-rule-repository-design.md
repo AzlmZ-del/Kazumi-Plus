@@ -31,17 +31,19 @@ v2 修订：从「单仓库可选」升级为「多仓库并行加载 + 逐仓�
 | 位置 | 内容 |
 |---|---|
 | `lib/request/config/api_endpoints.dart:20-21` | `pluginShop = 'https://raw.githubusercontent.com/Predidit/KazumiRules/main/'` |
-| `lib/request/config/api_endpoints.dart:24-25` | `pluginShopMirror = 'https://raw.gitcode.com/gh_mirrors/ka/KazumiRules/raw/main/'` |
+| `lib/request/config/api_endpoints.dart:24-33` | 加速站点常量：`ghProxyHost` / `ghProxyMirror` / `ghfastMirror` / `gitcodeMirror` |
+
+镜像不再是绑在某个基址上的单一常量，而是由 `lib/services/network/rules_mirror.dart` 的 `RulesMirror` 枚举在请求时算出：枚举值 `ghProxy` / `ghfast` / `gitcode` / `direct`，`map(url)` 对内置仓库地址返回改写后的 URL、对第三方返回 `null`。
 
 使用点只有三处：
 
 | 位置 | 用法 |
 |---|---|
-| `lib/request/apis/plugin_catalog_api.dart:12` | `'${ApiEndpoints.pluginShop}index.json'` 取目录 |
-| `lib/request/apis/plugin_catalog_api.dart:57` | `'${ApiEndpoints.pluginShop}$name.json'` 取单条规则 |
-| `lib/request/core/dio_factory.dart:113` | `if (!url.startsWith(ApiEndpoints.pluginShop))` 决定是否走镜像 |
+| `lib/request/apis/plugin_catalog_api.dart:22` | `getPluginListFrom(ApiEndpoints.pluginShop)` 取目录 |
+| `lib/request/apis/plugin_catalog_api.dart:88` | `getPluginFromRepository(ApiEndpoints.pluginShop, name)` 取单条规则 |
+| `lib/services/network/rules_mirror.dart:38-39` | `url.startsWith(ApiEndpoints.pluginShop)` / `personalPluginShop` 判断是否内置仓库 |
 
-第三条自带官方的边界：镜像靠前缀判断，第三方地址天然不匹配。多仓库下这条逻辑**完全不用改**，`enableGitProxy` 这个全局开关自动退化为「只影响官方那个仓库」。
+第三条自带官方的边界：镜像靠前缀判断，第三方地址天然不匹配。多仓库下这条逻辑**完全不用改**，加速只作用于内置仓库。
 
 目录数据的下游用法（决定了哪些要改）：
 
@@ -303,11 +305,11 @@ void invalidatePluginCatalog() {
 | `lib/plugins/plugins_controller.dart` | 聚合加载、同名去重、`_shadowedRules`、`_repositoryFailures`、generation、按仓库分发 loader、`_updatablePluginNames` 改签名 |
 | `lib/pages/plugin_editor/plugin_catalog_view.dart` | State 公开化、`reload()`、来源 tag、失败仓库提示条、空态文案 |
 | `lib/pages/plugin_editor/plugin_shop_page.dart` | AppBar 加「管理仓库」入口、顶部状态条 |
-| `lib/bean/settings/network_mirror_settings.dart` | 镜像开关描述改为「仅加速官方仓库」 |
+| `lib/bean/settings/network_mirror_settings.dart` | 镜像开关描述改为「仅加速官方仓库」→ 后续已升级为四选一加速（见 §8.6） |
 
 ### 7.3 不改
 
-- `lib/request/core/dio_factory.dart` —— 前缀判断天然正确，只在注释里说明它与 `RulesRepositoryConfig` 的耦合。
+- `lib/services/network/rules_mirror.dart` —— 前缀判断天然正确，只在注释里说明它与 `RulesRepositoryConfig` 的耦合。（`lib/request/core/dio_factory.dart` 的 `_RulesMirrorInterceptor` 只负责调用 `RulesMirror.current.map()`，不含任何仓库判断。）
 - `lib/pages/onboarding/steps/plugin_shop_step.dart` —— 引导流程不放仓库管理入口。
 - 已安装规则的存储格式 —— `plugins.json` 不动，规则本身不记来源。
 
@@ -435,11 +437,20 @@ void invalidatePluginCatalog() {
 | 全部仓库都加载失败 | 「无法访问任何规则仓库」+ 按钮「管理规则仓库」+ 列出失败的主机名 |
 | 部分失败 | 顶部黄色提示条：「`example.com` 无法访问，正在显示其他仓库的规则。」可关闭 |
 
-`plugin_catalog_view.dart:240-256` 现在的错误页永远只给「启用/关闭规则镜像」按钮，多仓库下这个按钮只对官方有意义，要按情况换成「管理规则仓库」。
+错误页的动作按钮按宿主页是否接入管理入口分流（`lib/pages/plugin_editor/plugin_catalog_view.dart:465-526`）：
 
-### 8.6 设置页的镜像开关
+| 宿主页 | 按钮 |
+|---|---|
+| 接了 `onManageRepositories` | 「管理规则仓库」（外壳 `manageButton`，`:465-471`） |
+| 没接（独立浏览场景） | 「切换加速」，直接弹加速选择框（`_selectMirrorAndRefresh`，`:147-160`） |
 
-`network_mirror_settings.dart:56-63` 保留，description 改为「仅加速官方仓库」。**不隐藏**——隐藏会让人以为开关消失了，置灰或保留可切换但写明作用范围更清楚。
+「没有规则仓库 / 所有仓库已关闭」这类与网络无关的错误只给管理入口或「重新加载」，不给加速按钮——加速改不了空列表。
+
+### 8.6 设置页的加速选择
+
+`lib/bean/settings/network_mirror_settings.dart:111-130` 的「规则仓库加速」行保留，但已从**布尔开关**换成四选一：`gh-proxy` / `ghfast` / `GitCode` / `GitHub`，副标题分别是「默认镜像 / 备用镜像 / 国内镜像 / 直连访问」。**不隐藏**——隐藏会让人以为这个设置消失了。
+
+加速只作用于内置仓库（`lib/services/network/rules_mirror.dart:38-39` 按 `pluginShop` / `personalPluginShop` 两个前缀判断），第三方仓库永远不重写，所以行内的 description 写「规则列表与规则详情」而不是限定某个仓库名。
 
 ---
 
@@ -480,7 +491,7 @@ void invalidatePluginCatalog() {
 7. `plugin_catalog_view.dart`：State 公开 + `reload()` + 来源 tag + 失败提示
 8. `rule_repository_page.dart` 管理页 + 添加弹窗
 9. `plugin_shop_page.dart` 入口与状态条
-10. 空态/错误态文案、镜像开关描述
+10. 空态/错误态文案、加速选择（§8.6，四选一而非布尔开关）
 11. 全量 analyze + 手工回归
 
 第 1-6 步完成后功能已闭环（可以改设置验证），7-10 是界面。

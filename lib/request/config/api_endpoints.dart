@@ -20,16 +20,22 @@ class ApiEndpoints {
   static const String pluginShop =
       'https://raw.githubusercontent.com/Predidit/KazumiRules/main/';
 
-  /// 规则仓库镜像
-  static const String pluginShopMirror = 'https://cdn.gh-proxy.org/$pluginShop';
+  /// gh-proxy 加速站点。裸域名单独留一份，供需要自己拼前缀的调用方使用。
+  static const String ghProxyHost = 'cdn.gh-proxy.org';
+
+  /// 前缀式镜像：把完整 URL 拼在它后面
+  static const String ghProxyMirror = 'https://$ghProxyHost/';
+
+  /// 前缀式镜像的备用站
+  static const String ghfastMirror = 'https://ghfast.top/';
+
+  /// 路径式镜像：只镜像了官方规则仓库，需替换 `pluginShop` 前缀而非拼接
+  static const String gitcodeMirror =
+      'https://raw.gitcode.com/gh_mirrors/ka/KazumiRules/raw/main/';
 
   /// 个人规则仓库，与官方仓库并列内置
   static const String personalPluginShop =
       'https://raw.githubusercontent.com/AzlmZ-del/Kazumi-Plus-Rules/main/';
-
-  /// 个人规则仓库镜像
-  static const String personalPluginShopMirror =
-      'https://cdn.gh-proxy.org/$personalPluginShop';
 
   /// 本版 Releases 所在仓库
   static const String releasesRepo =
