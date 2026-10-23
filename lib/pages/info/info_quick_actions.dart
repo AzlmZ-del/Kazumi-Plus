@@ -1,9 +1,9 @@
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:kazumi/bean/dialog/dialog.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
@@ -24,6 +24,22 @@ class InfoQuickActions {
   /// 番剧显示名，中文名优先。
   static String displayTitle(BangumiItem item) =>
       item.nameCn.trim().isEmpty ? item.name : item.nameCn;
+
+  /// 复制番剧标题到剪贴板并提示。
+  static Future<void> copyTitle(
+    BuildContext context,
+    BangumiItem item,
+  ) async {
+    try {
+      await Clipboard.setData(ClipboardData(text: displayTitle(item)));
+      if (!context.mounted) return;
+      _toast(context, '标题已复制');
+    } catch (error) {
+      KazumiLogger().w('InfoQuickActions: failed to copy title', error: error);
+      if (!context.mounted) return;
+      _toast(context, '复制失败，请重试');
+    }
+  }
 
   /// 把封面原图转成 PNG 存到相册（桌面端弹出另存为对话框）。
   static Future<void> saveCover(
