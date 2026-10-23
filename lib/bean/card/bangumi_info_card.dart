@@ -192,13 +192,18 @@ class _BangumiInfoCardVState extends State<BangumiInfoCardV> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            widget.bangumiItem.nameCn == ''
-                ? widget.bangumiItem.name
-                : (widget.bangumiItem.nameCn),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.headlineSmall,
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onLongPress: () =>
+                InfoQuickActions.copyTitle(context, widget.bangumiItem),
+            child: Text(
+              widget.bangumiItem.nameCn == ''
+                  ? widget.bangumiItem.name
+                  : (widget.bangumiItem.nameCn),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
           ),
           SizedBox(height: 16),
           Expanded(

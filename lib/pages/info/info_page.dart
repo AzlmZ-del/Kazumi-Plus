@@ -2,7 +2,6 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:window_manager/window_manager.dart';
@@ -78,20 +77,6 @@ class _InfoPageState extends State<InfoPage>
       ? infoController.bangumiItem.name
       : infoController.bangumiItem.nameCn;
 
-  /// 长按左上角番剧名复制标题。
-  Future<void> _copyTitleByLongPress() async {
-    try {
-      await Clipboard.setData(ClipboardData(text: _displayTitle));
-      if (mounted) {
-        KazumiDialog.showToast(context: context, message: '标题已复制');
-      }
-    } catch (error) {
-      KazumiLogger().w('InfoPage: failed to copy title', error: error);
-      if (mounted) {
-        KazumiDialog.showToast(context: context, message: '复制失败，请重试');
-      }
-    }
-  }
   bool commentsQueryTimeout = false;
   bool commentsHasLoaded = false;
   bool charactersQueryTimeout = false;
@@ -392,14 +377,10 @@ class _InfoPageState extends State<InfoPage>
               sliver: SliverAppBar.medium(
                 title: EmbeddedNativeControlArea(
                   child: dtb.DragToMoveArea(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onLongPress: _copyTitleByLongPress,
-                      child: Container(
-                        width: double.infinity,
-                        alignment: Alignment.centerLeft,
-                        child: Text(_displayTitle),
-                      ),
+                    child: Container(
+                      width: double.infinity,
+                      alignment: Alignment.centerLeft,
+                      child: Text(_displayTitle),
                     ),
                   ),
                 ),
