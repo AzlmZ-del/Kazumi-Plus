@@ -231,11 +231,10 @@ class RuleRepositoryList {
       if (repository == null) {
         continue;
       }
-      final migrated = _migrateLegacyUrl(repository);
-      if (!seenUrls.add(migrated.url)) {
+      if (!seenUrls.add(repository.url)) {
         continue;
       }
-      repositories.add(migrated);
+      repositories.add(repository);
     }
 
     if (repositories.isEmpty) {
@@ -271,24 +270,6 @@ class RuleRepositoryList {
     }
 
     return reordered;
-  }
-
-  /// Points a repository saved under the personal repository's old address at
-  /// the current one.
-  ///
-  /// The repository was renamed, and old configurations still carry the old
-  /// URL. Migrating instead of coexisting keeps one personal repository in the
-  /// list: without it the stale entry survives *and* [_withBuiltIns] adds the
-  /// new address right next to it.
-  static RuleRepository _migrateLegacyUrl(RuleRepository repository) {
-    if (repository.url != ApiEndpoints.legacyPersonalPluginShop) {
-      return repository;
-    }
-    return RuleRepository(
-      url: personalUrl,
-      label: repository.label,
-      enabled: repository.enabled,
-    );
   }
 
   static RuleRepository? _decodeEntry(Object? entry) {
