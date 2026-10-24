@@ -64,13 +64,18 @@ class _BangumiInfoCardVState extends State<BangumiInfoCardV> {
       icon: Icon(icon, size: 18),
       padding: EdgeInsets.zero,
       visualDensity: VisualDensity.compact,
-      constraints: const BoxConstraints.tightFor(width: 34, height: 30),
+      constraints: const BoxConstraints.tightFor(width: 35, height: 35),
       style: IconButton.styleFrom(
         backgroundColor: scheme.primary,
         foregroundColor: Colors.white,
         disabledForegroundColor: Colors.white70,
         disabledBackgroundColor: scheme.primary,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        // 安卓默认 padded 会把每个按钮的占位撑到 48dp（compact 下 40dp），
+        // 于是 35dp 的方块之间只剩 8dp 的间距被触摸区吃成 14dp 左右，
+        // 整排还会整体内缩、与下方「在看」按钮左缘错开。
+        // 收成 shrinkWrap 后占位即方块本身，间距与左对齐都回到代码写的值。
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
     );
   }
@@ -84,21 +89,21 @@ class _BangumiInfoCardVState extends State<BangumiInfoCardV> {
           tooltip: _savingCover ? '保存中…' : '保存封面',
           onPressed: _savingCover ? null : _saveCover,
         ),
-        const SizedBox(width: 3),
+        const SizedBox(width: 8),
         _quickActionButton(
           icon: Icons.travel_explore_rounded,
           tooltip: '内部浏览',
           onPressed: () =>
               InfoQuickActions.openInternally(context, widget.bangumiItem),
         ),
-        const SizedBox(width: 3),
+        const SizedBox(width: 8),
         _quickActionButton(
           icon: Icons.open_in_new_rounded,
           tooltip: '外部打开',
           onPressed: () =>
               InfoQuickActions.openExternally(context, widget.bangumiItem),
         ),
-        const SizedBox(width: 3),
+        const SizedBox(width: 8),
         _quickActionButton(
           icon: Icons.share_rounded,
           tooltip: '分享番剧',
@@ -496,7 +501,12 @@ class _BangumiInfoCardVState extends State<BangumiInfoCardV> {
                           ),
                         ),
                       ),
-                      _quickActionsRow,
+                      // 视觉上移 5dp：只挪绘制位置，不占布局，
+                      // 因此 spaceBetween 分出的空隙不变，「在看」不会被挤动。
+                      Transform.translate(
+                        offset: const Offset(0, -5),
+                        child: _quickActionsRow,
+                      ),
                       SizedBox(
                         width: 120,
                         height: 40,
