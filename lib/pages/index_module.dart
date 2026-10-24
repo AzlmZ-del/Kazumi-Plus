@@ -8,12 +8,10 @@ import 'package:kazumi/pages/info/info_module.dart';
 import 'package:kazumi/pages/init_page.dart';
 import 'package:kazumi/pages/my/my_module.dart';
 import 'package:kazumi/pages/onboarding/onboarding_page.dart';
-import 'package:kazumi/pages/popular/popular_controller.dart';
 import 'package:kazumi/pages/popular/popular_module.dart';
 import 'package:kazumi/pages/route_error_page.dart';
 import 'package:kazumi/pages/search/search_module.dart';
 import 'package:kazumi/pages/settings/settings_module.dart';
-import 'package:kazumi/pages/timeline/timeline_controller.dart';
 import 'package:kazumi/pages/timeline/timeline_module.dart';
 import 'package:kazumi/pages/video/video_module.dart';
 import 'package:kazumi/services/storage/storage.dart';
@@ -41,29 +39,25 @@ final _imagePreviewTransition = CustomTransition(
 final tabModule = createModule(
   path: '/tab',
   register: (c) {
-    c
-      // Tab state survives tab switches, but is released with the whole shell.
-      ..addSingleton<PopularController>(PopularController.new)
-      ..addSingleton<TimelineController>(TimelineController.new)
-      ..route(
-        '/',
-        child: (context, state) => IndexPage(location: state.uri.path),
-        transition: _tabTransition,
-        children: (sub) {
-          sub
-            ..route(
-              '/',
-              guards: [
-                (state) => GStorage.getSetting(SettingsKeys.defaultStartupPage),
-              ],
-              child: (context, state) => const SizedBox.shrink(),
-            )
-            ..module(popularModule)
-            ..module(timelineModule)
-            ..module(collectModule)
-            ..module(myModule);
-        },
-      );
+    c.route(
+      '/',
+      child: (context, state) => IndexPage(location: state.uri.path),
+      transition: _tabTransition,
+      children: (sub) {
+        sub
+          ..route(
+            '/',
+            guards: [
+              (state) => GStorage.getSetting(SettingsKeys.defaultStartupPage),
+            ],
+            child: (context, state) => const SizedBox.shrink(),
+          )
+          ..module(popularModule)
+          ..module(timelineModule)
+          ..module(collectModule)
+          ..module(myModule);
+      },
+    );
   },
 );
 

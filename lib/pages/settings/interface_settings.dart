@@ -18,6 +18,7 @@ class _InterfaceSettingsPageState extends State<InterfaceSettingsPage> {
   late bool showRating;
   late bool showR18;
   late bool showUntranslated;
+  late bool deepLinkReturnHome;
   late String defaultPage;
   late CollectLayout _defaultCollectLayout;
   bool _savingCollectLayout = false;
@@ -39,6 +40,7 @@ class _InterfaceSettingsPageState extends State<InterfaceSettingsPage> {
     showR18 = GStorage.getSetting(SettingsKeys.bangumiShowR18);
     showUntranslated =
         GStorage.getSetting(SettingsKeys.bangumiShowUntranslated);
+    deepLinkReturnHome = GStorage.getSetting(SettingsKeys.deepLinkReturnHome);
     defaultPage = GStorage.getSetting(SettingsKeys.defaultStartupPage);
     _defaultCollectLayout = CollectLayout.fromValue(
       GStorage.getSetting(SettingsKeys.defaultCollectLayout),
@@ -80,6 +82,18 @@ class _InterfaceSettingsPageState extends State<InterfaceSettingsPage> {
               options: defaultPageMap,
               fallbackLabel: '推荐',
               onChanged: updateDefaultPage,
+            ),
+            SettingsTile.switchTile(
+              leading: Icons.link_rounded,
+              onToggle: (value) async {
+                deepLinkReturnHome = value ?? !deepLinkReturnHome;
+                await GStorage.putSetting(
+                    SettingsKeys.deepLinkReturnHome, deepLinkReturnHome);
+                setState(() {});
+              },
+              title: const Text('深链返回首页'),
+              description: const Text('关闭时返回原来那一页，开启后先回到启动页再打开深链'),
+              initialValue: deepLinkReturnHome,
             ),
           ]),
           SettingsSection(title: Text('展示信息'), tiles: [

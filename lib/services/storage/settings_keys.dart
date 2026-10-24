@@ -306,6 +306,14 @@ class SettingsKeys {
     '/tab/popular/',
     group: SettingGroup.interface,
   );
+  // Deep links open on top of whatever page the app was showing, so Back
+  // returns there. Opt in to reset the stack to the start page first, which
+  // costs the current tab position but makes Back land on the home tab.
+  static const deepLinkReturnHome = SettingKey<bool>(
+    'deepLinkReturnHome',
+    false,
+    group: SettingGroup.interface,
+  );
   static const webDavEnable = SettingKey<bool>(
     _SettingBoxKey.webDavEnable,
     false,
@@ -653,6 +661,7 @@ class SettingsKeys {
     rulesMirror,
     enableSystemProxy,
     defaultStartupPage,
+    deepLinkReturnHome,
     webDavEnable,
     webDavEnableHistory,
     webDavEnableCollect,
