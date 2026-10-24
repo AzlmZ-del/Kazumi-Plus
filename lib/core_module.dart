@@ -3,6 +3,8 @@ import 'package:kazumi/pages/collect/collect_controller.dart';
 import 'package:kazumi/pages/download/download_controller.dart';
 import 'package:kazumi/pages/history/history_controller.dart';
 import 'package:kazumi/pages/my/my_controller.dart';
+import 'package:kazumi/pages/popular/popular_controller.dart';
+import 'package:kazumi/pages/timeline/timeline_controller.dart';
 import 'package:kazumi/plugins/plugins_controller.dart';
 import 'package:kazumi/repositories/collect_crud_repository.dart';
 import 'package:kazumi/repositories/collect_repository.dart';
@@ -44,6 +46,11 @@ final coreModule = createModule(
       ..addSingleton<CollectController>(CollectController.new)
       ..addSingleton<HistoryController>(HistoryController.new)
       ..addSingleton<MyController>(MyController.new)
-      ..addSingleton<DownloadController>(DownloadController.new);
+      ..addSingleton<DownloadController>(DownloadController.new)
+      // Tab content state that outlives the shell. Deep links replace the root
+      // stack, which disposes the `/tab` module; keeping these two here lets the
+      // 推荐 and 时间表 tabs reopen with their data and scroll position intact.
+      ..addSingleton<PopularController>(PopularController.new)
+      ..addSingleton<TimelineController>(TimelineController.new);
   },
 );

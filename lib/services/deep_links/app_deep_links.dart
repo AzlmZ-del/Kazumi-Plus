@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:app_links/app_links.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/navigation.dart';
 import 'package:kazumi/request/apis/bangumi_api.dart';
 import 'package:kazumi/services/logging/logger.dart';
+import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/utils/async_session.dart';
 import 'package:kazumi/utils/device.dart';
 import 'package:window_manager/window_manager.dart';
@@ -90,6 +92,23 @@ class AppDeepLinks {
       KazumiDialog.showToast(message: '当前操作进行中，未打开链接');
       return;
     }
+    if (GStorage.getSetting(SettingsKeys.deepLinkReturnHome)) {
+      _resetToStartPage(navigator);
+    }
     unawaited(navigator.context.pushNamed(path, arguments: arguments));
+  }
+
+  /// 深链默认压在原来那一页之上，返回就回到原页面。开启「深链返回首页」后
+  /// 先把根栈换成启动页，再压深链目标，返回便落在首页标签。
+  ///
+  /// 代价是当前标签位置与栈内页面都会重建，因此该行为默认关闭。
+  void _resetToStartPage(NavigatorState navigator) {
+    final startPage = GStorage.getSetting(SettingsKeys.defaultStartupPage);
+    if (startPage.isEmpty || startPage == '/') return;
+    try {
+      navigator.context.navigate(startPage);
+    } catch (error) {
+      KazumiLogger().w('Deep link: failed to reset to start page', error: error);
+    }
   }
 }
