@@ -67,7 +67,7 @@ class BangumiEchAdapter implements HttpClientAdapter {
 
   final HttpClientAdapter _fallback;
   final NetworkConfig _config;
-  final _resolvers = <Uri?, DohEchResolver>{};
+  final _resolvers = <Uri?, RetryingEchResolver>{};
   final _clients = <(Uri?, Uri?, Duration, Duration), EchClient>{};
   final _activeRequests = <Completer<void>>{};
   bool _closed = false;
