@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -15,6 +16,7 @@ import 'package:kazumi/bean/dialog/exit_confirmation_dialog.dart';
 import 'package:kazumi/bean/dialog/kazumi_toast_host.dart';
 import 'package:kazumi/bean/settings/theme_provider.dart';
 import 'package:kazumi/navigation.dart';
+import 'package:kazumi/services/sync/bangumi_web_session.dart';
 import 'package:kazumi/utils/constants.dart';
 import 'package:kazumi/utils/device.dart';
 import 'package:kazumi/utils/theme.dart';
@@ -40,6 +42,9 @@ class _AppWidgetState extends State<AppWidget>
     windowManager.addListener(this);
     WidgetsBinding.instance.addObserver(this);
     _initializePlatformIntegrations();
+    // 启动就预热一次网页登录状态，免得进设置页才现查。
+    // 缓存窗口内（窗口 = 检测间隔滑块）不重复请求，不阻塞 UI。
+    unawaited(BangumiWebSession().warmUpOnStartup());
   }
 
   Future<void> _initializePlatformIntegrations() async {
