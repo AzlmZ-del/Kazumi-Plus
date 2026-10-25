@@ -315,6 +315,26 @@ class BangumiWebSession {
     return ok;
   }
 
+  /// App 启动时预热一次登录状态。
+  ///
+  /// 判据和进设置页时完全一致：缓存窗口内直接沿用上次结论，过期才真发一次
+  /// `/subject/1`。窗口长度就是「网页登录」卡片里那个检测间隔滑块。
+  /// 没有存过 cookie（从没登录 / 已退出）时直接返回，不发请求。
+  Future<void> warmUpOnStartup() async {
+    if (!hasStoredCookie) {
+      return;
+    }
+    if (cachedValidation != null) {
+      return;
+    }
+    try {
+      final ok = await validate();
+      KazumiLogger().i('BangumiWeb: startup warm-up -> $ok');
+    } catch (e) {
+      KazumiLogger().w('BangumiWeb: startup warm-up failed. $e');
+    }
+  }
+
   /// 检测登录状态的间隔（小时），默认 6，范围 1~24。
   int get _cacheHours {
     try {
