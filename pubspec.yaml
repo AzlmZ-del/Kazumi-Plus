@@ -104,6 +104,7 @@ dependencies:
       path: ./media_kit_video
   macos_secure_bookmarks: ^0.2.1
   share_plus: ^12.0.2
+  fluttertoast: ^10.0.2
 
 # Local vendored copy of ech_http 0.2.3 with only the CA-bundle generation
 # reverted to the 0.2.2 chunked implementation. Upstream 0.2.3 emits the whole

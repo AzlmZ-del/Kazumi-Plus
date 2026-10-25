@@ -573,6 +573,70 @@ class SettingsKeys {
     true,
     group: SettingGroup.bangumi,
   );
+  static const bangumiWebCookie = SettingKey<String>(
+    'bangumiWebCookie',
+    '',
+    group: SettingGroup.bangumi,
+  );
+  static const bangumiWebEmail = SettingKey<String>(
+    'bangumiWebEmail',
+    '',
+    group: SettingGroup.bangumi,
+  );
+  static const bangumiWebPassword = SettingKey<String>(
+    'bangumiWebPassword',
+    '',
+    group: SettingGroup.bangumi,
+  );
+
+  /// 网页登录拿到 `chii_auth` 的本地时间（毫秒时间戳），0 表示没记录过。
+  ///
+  /// 只用于在卡片上显示「已登录 · 2026-10-25 23:49」，不参与任何判断：
+  /// cookie 是否有效一律以服务端返回的 `CHOBITS_UID` 为准。
+  static const bangumiWebLoginAt = SettingKey<int>(
+    'bangumiWebLoginAt',
+    0,
+    group: SettingGroup.bangumi,
+  );
+
+  /// 上一次校验登录态（请求 `/subject/1` 读 `CHOBITS_UID`）的时间，
+  /// 毫秒时间戳，0 表示从没校验过。
+  ///
+  /// 进页面时如果这个时间在 [bangumiWebValidateCacheMinutes] 以内，就直接沿用
+  /// 上次结果，不再发请求；「重新检查」按钮永远绕过缓存。
+  static const bangumiWebValidatedAt = SettingKey<int>(
+    'bangumiWebValidatedAt',
+    0,
+    group: SettingGroup.bangumi,
+  );
+
+  /// 上一次校验的结论：true 有效、false 失效。只在 [bangumiWebValidatedAt]
+  /// 落在缓存窗口内时才可信。
+  static const bangumiWebValidatedOk = SettingKey<bool>(
+    'bangumiWebValidatedOk',
+    false,
+    group: SettingGroup.bangumi,
+  );
+
+  /// 上一次校验读到的 UID（`CHOBITS_UID`），0 表示没记录。
+  ///
+  /// 命中缓存时靠它把副标题的「UID 808296」补回来，否则会退化成
+  /// 「已登录，可删除 Bangumi 收藏」。
+  static const bangumiWebUid = SettingKey<int>(
+    'bangumiWebUid',
+    0,
+    group: SettingGroup.bangumi,
+  );
+
+  /// 登录态校验结果的缓存时长（小时），范围 1~24。
+  ///
+  /// 进页面时如果上次校验时间在这个窗口内，就直接沿用上次结论，不再发请求；
+  /// 「重新检查」按钮永远绕过缓存。
+  static const bangumiWebValidateIntervalHours = SettingKey<int>(
+    'bangumiWebValidateIntervalHours',
+    6,
+    group: SettingGroup.bangumi,
+  );
   static const brightnessVolumeGesture = SettingKey<bool>(
     _SettingBoxKey.brightnessVolumeGesture,
     true,
@@ -712,6 +776,14 @@ class SettingsKeys {
     bangumiAccessToken,
     bangumiSyncPriority,
     bangumiImmediateSyncToastEnable,
+    bangumiWebCookie,
+    bangumiWebEmail,
+    bangumiWebPassword,
+    bangumiWebLoginAt,
+    bangumiWebValidatedAt,
+    bangumiWebValidatedOk,
+    bangumiWebUid,
+    bangumiWebValidateIntervalHours,
     brightnessVolumeGesture,
     historySyncDeviceId,
     historySyncSequence,

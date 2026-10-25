@@ -5,6 +5,7 @@ import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/modules/collect/collect_module.dart';
 import 'package:kazumi/modules/collect/collect_type.dart';
 import 'package:kazumi/services/sync/bangumi_sync_service.dart';
+import 'package:kazumi/services/sync/bangumi_web_session.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/services/sync/webdav.dart';
 import 'package:kazumi/repositories/collect_crud_repository.dart';
@@ -69,6 +70,29 @@ abstract class _CollectController with Store {
 
   @action
   Future<void> deleteCollect(BangumiItem bangumiItem) async {
+    final bool webSyncEnable =
+        GStorage.getSetting(SettingsKeys.bangumiSyncEnable);
+    if (webSyncEnable) {
+      final session = BangumiWebSession();
+      if (session.hasStoredCookie) {
+        final result = await _deleteBangumiCollectRemotely(
+          session,
+          bangumiItem.id,
+        );
+        if (result == BangumiWebDeleteResult.deleted ||
+            result == BangumiWebDeleteResult.notCollected) {
+          await _deleteCollectLocally(bangumiItem);
+          KazumiDialog.showToast(message: '已同步删除 Bangumi 收藏');
+          return;
+        }
+        if (result == BangumiWebDeleteResult.expired) {
+          KazumiDialog.showToast(
+            message: '网页登录已失效，请在设置中重新登录后重试',
+          );
+        }
+      }
+    }
+
     final action = await _resolveBangumiDeleteSyncAction(bangumiItem);
     switch (action) {
       case _BangumiDeleteSyncAction.markAbandoned:
@@ -93,6 +117,22 @@ abstract class _CollectController with Store {
     }
   }
 
+  Future<BangumiWebDeleteResult> _deleteBangumiCollectRemotely(
+    BangumiWebSession session,
+    int bangumiId,
+  ) async {
+    try {
+      return await session.deleteCollection(bangumiId);
+    } catch (e, stackTrace) {
+      KazumiLogger().e(
+        'Bangumi: web delete failed. bangumiId=$bangumiId',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      return BangumiWebDeleteResult.failed;
+    }
+  }
+
   Future<void> _deleteCollectLocally(BangumiItem bangumiItem) async {
     await _collectCrudRepository.deleteCollectible(bangumiItem.id);
     await GStorage.appendCollectChange(
@@ -113,9 +153,10 @@ abstract class _CollectController with Store {
     return KazumiDialog.show<_BangumiDeleteSyncAction>(
       clickMaskDismiss: true,
       builder: (context) => AlertDialog(
-        title: const Text('Bangumi 不支持删除收藏'),
+        title: const Text('无法删除 Bangumi 收藏'),
         content: const Text(
-          '因为安全考虑，Bangumi 未提供删除接口，您可以选择把本地和远端标记为“抛弃”，或者选择仅删除本地收藏并打开网页后手动删除 Bangumi 数据。',
+          '删除远端收藏需要在「设置 - 追番同步 - 网页登录」里登录 bgm.tv。'
+          '未登录时您可以选择把本地和远端标记为“抛弃”，或者仅删除本地收藏并打开网页后手动删除 Bangumi 数据。',
         ),
         actions: [
           TextButton(

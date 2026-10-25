@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
+import 'package:kazumi/bean/dialog/kazumi_toast.dart';
 import 'package:kazumi/navigation.dart';
-import 'package:kazumi/utils/constants.dart';
 
 /// Single-use ownership of a route, including before its first frame.
 class KazumiDialogHandle<T> {
@@ -93,43 +93,23 @@ class KazumiDialog {
     VoidCallback? onActionPressed,
     Duration duration = const Duration(seconds: 2),
   }) {
-    final messenger = _resolveScaffoldMessenger(context);
-    if (messenger != null && messenger.mounted) {
-      final toastContext =
-          context != null && context.mounted ? context : messenger.context;
-      try {
-        _toastRevision++;
-        messenger
-          ..removeCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
-              content: Text(message),
-              behavior: SnackBarBehavior.floating,
-              width: MediaQuery.sizeOf(toastContext).width >
-                      LayoutBreakpoint.medium['width']!
-                  ? 600
-                  : null,
-              duration: duration,
-              persist: false,
-              action: showActionButton
-                  ? SnackBarAction(
-                      label: actionLabel ?? 'Dismiss',
-                      onPressed: () {
-                        // Let SnackBarAction close the old toast before replacing it.
-                        if (onActionPressed != null) {
-                          scheduleMicrotask(onActionPressed);
-                        }
-                      },
-                    )
-                  : null,
-            ),
-          );
-      } catch (e) {
-        debugPrint('Kazumi Dialog Error: Failed to show toast: $e');
-      }
-    } else {
-      debugPrint(
-          'Kazumi Dialog Error: No ScaffoldMessenger available to show Toast');
+    try {
+      _toastRevision++;
+      showKazumiToast(
+        message: message,
+        anchorContext: context,
+        actionLabel: showActionButton ? (actionLabel ?? '确定') : null,
+        onActionPressed: showActionButton
+            ? () {
+                // 点按钮先收提示，再执行动作，避免两个都留在屏幕上。
+                dismissKazumiToast();
+                onActionPressed?.call();
+              }
+            : null,
+        duration: duration,
+      );
+    } catch (e) {
+      debugPrint('Kazumi Dialog Error: Failed to show toast: $e');
     }
   }
 
@@ -161,6 +141,9 @@ class KazumiDialog {
     }
   }
 
+  // 保留给仍在使用 ScaffoldMessenger 的调用方（如需要清理页面残留
+  // SnackBar 的场景），当前 toast 已改走 FToast。
+  // ignore: unused_element
   static ScaffoldMessengerState? _resolveScaffoldMessenger(
     BuildContext? context,
   ) {
@@ -260,6 +243,7 @@ class KazumiDialogObserver extends NavigatorObserver {
       // Only clear the old page's toast, never one posted after navigation.
       if (revision == KazumiDialog._toastRevision) {
         rootScaffoldMessengerKey.currentState?.removeCurrentSnackBar();
+        dismissKazumiToast();
       }
     });
   }
