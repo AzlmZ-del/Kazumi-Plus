@@ -6,6 +6,7 @@ import 'package:kazumi/bean/settings/settings_list.dart';
 import 'package:kazumi/bean/widget/state_presentation.dart';
 import 'package:kazumi/bean/widget/tonal_card.dart';
 import 'package:kazumi/modules/bangumi/sync_priority.dart';
+import 'package:kazumi/pages/settings/sync/bangumi_web_login_card.dart';
 import 'package:kazumi/pages/settings/sync/sync_settings_widgets.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/services/sync/bangumi_sync_service.dart';
@@ -20,6 +21,9 @@ class BangumiSyncPage extends StatefulWidget {
 }
 
 class _BangumiSyncPageState extends State<BangumiSyncPage> {
+  /// Access Token 输入框高度，与「网页登录」卡片里的输入框统一为 48。
+  static const double _tokenFieldHeight = 48;
+
   final _tokenController = TextEditingController();
   final _bangumi = BangumiSyncService();
   bool _passwordVisible = false;
@@ -171,6 +175,7 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
                     description: '同步想看、在看、看过等追番状态。',
                   ),
                   _accountCard(configured),
+                  const BangumiWebLoginCard(),
                   _syncControls(configured, enabled),
                   StateActionButton(
                     onPressed: enabled && configured && !_busy ? _sync : null,
@@ -271,29 +276,6 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
               ),
             ],
           ),
-          if (configured)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 8, 0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      _action == _BangumiAction.connect || _bangumi.isConnecting
-                          ? '正在连接…'
-                          : _bangumi.initialized
-                              ? '已连接 · ${_bangumi.username}'
-                              : '尚未验证连接',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  TextButton(
-                    onPressed: _busy ? null : () => _connect(_bangumi.ping),
-                    child: Text(_bangumi.lastError != null ? '重试连接' : '测试连接'),
-                  ),
-                ],
-              ),
-            ),
         ],
       );
 
@@ -314,35 +296,57 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
                   : '使用 Access Token 授权'),
           children: [
             const SizedBox(height: 12),
-            TextField(
-              controller: _tokenController,
-              enabled: !_busy,
-              obscureText: !_passwordVisible,
-              autocorrect: false,
-              enableSuggestions: false,
-              onChanged: (_) => setState(() {
-                _tokenError = null;
-                _tokenStatus = null;
-              }),
-              onSubmitted: (_) => _saveToken(),
-              decoration: InputDecoration(
-                labelText: 'Access Token',
-                errorText: _tokenError,
-                errorMaxLines: 5,
-                helperText:
-                    _action == _BangumiAction.verify ? '正在验证…' : _tokenStatus,
-                helperMaxLines: 3,
-                border: const OutlineInputBorder(),
-                suffixIcon: IconButton(
-                  tooltip: _passwordVisible ? '隐藏授权码' : '显示授权码',
-                  onPressed: () =>
-                      setState(() => _passwordVisible = !_passwordVisible),
-                  icon: Icon(_passwordVisible
-                      ? Icons.visibility_off_rounded
-                      : Icons.visibility_rounded),
+            // 输入框本体固定 48 高，与「网页登录」卡片里的三个输入框保持一致。
+            // 报错/提示文字排在框外（errorText 会把框撑高，所以这里只在无错误时锁高）。
+            SizedBox(
+              height: _tokenFieldHeight,
+              child: TextField(
+                controller: _tokenController,
+                enabled: !_busy,
+                obscureText: !_passwordVisible,
+                autocorrect: false,
+                enableSuggestions: false,
+                onChanged: (_) => setState(() {
+                  _tokenError = null;
+                  _tokenStatus = null;
+                }),
+                onSubmitted: (_) => _saveToken(),
+                decoration: InputDecoration(
+                  labelText: 'Access Token',
+                  isDense: true,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    tooltip: _passwordVisible ? '隐藏授权码' : '显示授权码',
+                    onPressed: () =>
+                        setState(() => _passwordVisible = !_passwordVisible),
+                    // 图标表示「当前状态」：密文时画斜杠眼（已隐藏），
+                    // 明文时画睁眼（已显示）。之前反着来，看着像状态标错了。
+                    icon: Icon(_passwordVisible
+                        ? Icons.visibility_rounded
+                        : Icons.visibility_off_rounded),
+                  ),
                 ),
               ),
             ),
+            if (_tokenError != null ||
+                _tokenStatus != null ||
+                _action == _BangumiAction.verify) ...[
+              const SizedBox(height: 6),
+              Text(
+                _tokenError ??
+                    (_action == _BangumiAction.verify
+                        ? '正在验证…'
+                        : _tokenStatus!),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: _tokenError != null
+                          ? Theme.of(context).colorScheme.error
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                maxLines: 5,
+              ),
+            ],
             const SizedBox(height: 16),
             Wrap(
               alignment: WrapAlignment.end,
@@ -361,6 +365,37 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
                 ),
               ],
             ),
+            // 连接状态 + 测试连接：原本挂在「自动同步追番」卡片下面，
+            // 用户要求收进本卡片；并让左侧文字贴输入框左边缘、右侧按钮贴右边缘。
+            // TextButton 默认左右各留 8dp 内边距，会把文字推进来，故 padding 归零 +
+            // shrinkWrap，保证「测试连接」的字右缘与输入框右缘重合。
+            if (configured) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _action == _BangumiAction.connect || _bangumi.isConnecting
+                          ? '正在连接…'
+                          : _bangumi.initialized
+                              ? '已连接 · ${_bangumi.username}'
+                              : '尚未验证连接',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(0, 0),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    onPressed: _busy ? null : () => _connect(_bangumi.ping),
+                    child: Text(_bangumi.lastError != null ? '重试连接' : '测试连接'),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       );

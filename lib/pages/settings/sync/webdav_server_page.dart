@@ -17,6 +17,9 @@ class WebDavServerPage extends StatefulWidget {
 }
 
 class _WebDavServerPageState extends State<WebDavServerPage> {
+  /// 输入框统一高度，与「追番同步」页保持一致。
+  static const double _fieldHeight = 48;
+
   final _formKey = GlobalKey<FormState>();
   final _url = TextEditingController();
   final _username = TextEditingController();
@@ -92,55 +95,71 @@ class _WebDavServerPageState extends State<WebDavServerPage> {
                   child: Column(
                     spacing: 20,
                     children: [
-                      TextFormField(
-                        controller: _url,
-                        enabled: !_busy,
-                        keyboardType: TextInputType.url,
-                        textInputAction: TextInputAction.next,
-                        autocorrect: false,
-                        decoration: const InputDecoration(
-                          labelText: '服务器地址',
-                          hintText: 'https://example.com/dav/',
-                          border: OutlineInputBorder(),
-                          errorMaxLines: 3,
-                        ),
-                        validator: (value) {
-                          final uri = Uri.tryParse(value?.trim() ?? '');
-                          if (uri == null ||
-                              !['http', 'https'].contains(uri.scheme) ||
-                              uri.host.isEmpty) {
-                            return '请输入完整的 http:// 或 https:// 地址';
-                          }
-                          return null;
-                        },
-                      ),
-                      TextFormField(
-                        controller: _username,
-                        enabled: !_busy,
-                        textInputAction: TextInputAction.next,
-                        autocorrect: false,
-                        decoration: const InputDecoration(
-                          labelText: '用户名',
-                          border: OutlineInputBorder(),
+                      // 三个输入框统一固定 48 高，与「追番同步」页保持一致。
+                      // 报错文字由 InputDecoration 自带，会临时把框撑高，属正常现象。
+                      SizedBox(
+                        height: _fieldHeight,
+                        child: TextFormField(
+                          controller: _url,
+                          enabled: !_busy,
+                          keyboardType: TextInputType.url,
+                          textInputAction: TextInputAction.next,
+                          autocorrect: false,
+                          decoration: const InputDecoration(
+                            labelText: '服务器地址',
+                            hintText: 'https://example.com/dav/',
+                            isDense: true,
+                            border: OutlineInputBorder(),
+                            errorMaxLines: 3,
+                          ),
+                          validator: (value) {
+                            final uri = Uri.tryParse(value?.trim() ?? '');
+                            if (uri == null ||
+                                !['http', 'https'].contains(uri.scheme) ||
+                                uri.host.isEmpty) {
+                              return '请输入完整的 http:// 或 https:// 地址';
+                            }
+                            return null;
+                          },
                         ),
                       ),
-                      TextFormField(
-                        controller: _password,
-                        enabled: !_busy,
-                        obscureText: !_passwordVisible,
-                        autocorrect: false,
-                        enableSuggestions: false,
-                        onFieldSubmitted: (_) => _save(),
-                        decoration: InputDecoration(
-                          labelText: '密码或应用授权码',
-                          border: const OutlineInputBorder(),
-                          suffixIcon: IconButton(
-                            tooltip: _passwordVisible ? '隐藏密码' : '显示密码',
-                            onPressed: () => setState(
-                                () => _passwordVisible = !_passwordVisible),
-                            icon: Icon(_passwordVisible
-                                ? Icons.visibility_off_rounded
-                                : Icons.visibility_rounded),
+                      SizedBox(
+                        height: _fieldHeight,
+                        child: TextFormField(
+                          controller: _username,
+                          enabled: !_busy,
+                          textInputAction: TextInputAction.next,
+                          autocorrect: false,
+                          decoration: const InputDecoration(
+                            labelText: '用户名',
+                            isDense: true,
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        height: _fieldHeight,
+                        child: TextFormField(
+                          controller: _password,
+                          enabled: !_busy,
+                          obscureText: !_passwordVisible,
+                          autocorrect: false,
+                          enableSuggestions: false,
+                          onFieldSubmitted: (_) => _save(),
+                          decoration: InputDecoration(
+                            labelText: '密码或应用授权码',
+                            isDense: true,
+                            border: const OutlineInputBorder(),
+                            suffixIcon: IconButton(
+                              tooltip: _passwordVisible ? '隐藏密码' : '显示密码',
+                              onPressed: () => setState(
+                                  () => _passwordVisible = !_passwordVisible),
+                              // 与「追番同步」页一致：图标表示当前状态，
+                              // 密文画斜杠眼、明文画睁眼。
+                              icon: Icon(_passwordVisible
+                                  ? Icons.visibility_rounded
+                                  : Icons.visibility_off_rounded),
+                            ),
                           ),
                         ),
                       ),
