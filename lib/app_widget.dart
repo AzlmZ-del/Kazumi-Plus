@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:kazumi/services/logging/logger.dart';
@@ -11,6 +12,7 @@ import 'package:kazumi/services/network/metered_network_service.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/bean/dialog/exit_confirmation_dialog.dart';
+import 'package:kazumi/bean/dialog/kazumi_toast_host.dart';
 import 'package:kazumi/bean/settings/theme_provider.dart';
 import 'package:kazumi/navigation.dart';
 import 'package:kazumi/utils/constants.dart';
@@ -314,6 +316,16 @@ class _AppWidgetState extends State<AppWidget>
           darkTheme: effectiveDarkTheme,
           themeMode: themeProvider.themeMode,
           scaffoldMessengerKey: rootScaffoldMessengerKey,
+          // FToast 需要一个自己的 Overlay 才能插入胶囊提示；把它挂在
+          // Navigator 外面，锚点 KazumiToastHost 位于该 Overlay 内部，
+          // 因此任何页面（含不传 context 的调用）都能借它弹 toast。
+          builder: (context, child) => FToastBuilder()(
+            context,
+            KazumiToastHost(
+              key: toastAnchorKey,
+              child: child ?? const SizedBox.shrink(),
+            ),
+          ),
           routerConfig: ModularApp.routerConfigOf(context),
         );
       },
