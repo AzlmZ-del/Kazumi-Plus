@@ -105,6 +105,11 @@ dependencies:
   macos_secure_bookmarks: ^0.2.1
   share_plus: ^12.0.2
   fluttertoast: ^10.0.2
+  # 必须放在 dependencies，不能放 dev_dependencies。
+  # Flutter 3.47.7 的 release 构建会跳过 dev 依赖插件（Gradle 侧
+  # PluginHandler.kt:220），但 GeneratedPluginRegistrant.java 仍会注册它，
+  # 于是 javac 报「程序包 net.jonhanson.flutter_native_splash 不存在」。
+  flutter_native_splash: ^2.4.3
 
 # Local vendored copy of ech_http 0.2.3 with only the CA-bundle generation
 # reverted to the 0.2.2 chunked implementation. Upstream 0.2.3 emits the whole
@@ -126,7 +131,6 @@ dev_dependencies:
   mobx_codegen: ^2.7.5
   hive_ce_generator: ^1.10.0
   flutter_launcher_icons: ^0.14.3
-  flutter_native_splash: ^2.4.3
   msix: ^3.16.12
 
 flutter_launcher_icons:
