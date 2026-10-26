@@ -18,10 +18,7 @@ import 'package:kazumi/pages/collect/collect_sync_dialog.dart';
 import 'package:kazumi/services/storage/storage.dart';
 
 class CollectPage extends StatefulWidget {
-  const CollectPage({
-    super.key,
-    required this.controller,
-  });
+  const CollectPage({super.key, required this.controller});
 
   final CollectController controller;
 
@@ -39,19 +36,18 @@ class _CollectPageState extends State<CollectPage> with KazumiDialogOwner {
     CollectSyncStep step, {
     required ValueChanged<String> onError,
     required void Function(String message, int current, int total) onProgress,
-  }) =>
-      switch (step) {
-        CollectSyncStep.webDav => collectController.syncCollectibles(
-            onError: onError,
-          ),
-        CollectSyncStep.bangumi => collectController.syncCollectiblesBangumi(
-            onError: onError,
-            onProgress: onProgress,
-          ),
-        CollectSyncStep.upload => collectController.uploadCollectiblesToWebDav(
-            onError: onError,
-          ),
-      };
+  }) => switch (step) {
+    CollectSyncStep.webDav => collectController.syncCollectibles(
+      onError: onError,
+    ),
+    CollectSyncStep.bangumi => collectController.syncCollectiblesBangumi(
+      onError: onError,
+      onProgress: onProgress,
+    ),
+    CollectSyncStep.upload => collectController.uploadCollectiblesToWebDav(
+      onError: onError,
+    ),
+  };
 
   @override
   void initState() {
@@ -84,8 +80,9 @@ class _CollectPageState extends State<CollectPage> with KazumiDialogOwner {
     if (_syncDialogOpen || _pendingIds.isNotEmpty) return;
     final plan = CollectSyncPlan(
       webDavEnabled: GStorage.getSetting(SettingsKeys.webDavEnable),
-      webDavCollectiblesEnabled:
-          GStorage.getSetting(SettingsKeys.webDavEnableCollect),
+      webDavCollectiblesEnabled: GStorage.getSetting(
+        SettingsKeys.webDavEnableCollect,
+      ),
       bangumiEnabled: GStorage.getSetting(SettingsKeys.bangumiSyncEnable),
     );
     await dialogs.run((task) async {
@@ -98,10 +95,12 @@ class _CollectPageState extends State<CollectPage> with KazumiDialogOwner {
           onSync: _syncStep,
         ),
       );
-      task.withContext((context) => context.pushNamed(switch (destination) {
-            CollectSyncDestination.webDavSettings => '/settings/webdav/',
-            CollectSyncDestination.bangumiSettings => '/settings/bangumi/',
-          }));
+      task.withContext(
+        (context) => context.pushNamed(switch (destination) {
+          CollectSyncDestination.webDavSettings => '/settings/webdav/',
+          CollectSyncDestination.bangumiSettings => '/settings/bangumi/',
+        }),
+      );
     }, errorMessage: '同步未完成，请稍后重试');
   }
 
@@ -113,20 +112,20 @@ class _CollectPageState extends State<CollectPage> with KazumiDialogOwner {
         toolbarHeight: 72,
         title: Text(
           '追番',
-          style: Theme.of(context)
-              .textTheme
-              .headlineSmall
-              ?.copyWith(fontWeight: FontWeight.w700),
+          style: Theme.of(
+            context,
+          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
         ),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: Tooltip(
-              message: '同步收藏',
+              message: '同步收藏列表',
               child: StateActionButton.tonal(
                 text: '同步',
-                onPressed:
-                    _syncDialogOpen || _pendingIds.isNotEmpty ? null : _sync,
+                onPressed: _syncDialogOpen || _pendingIds.isNotEmpty
+                    ? null
+                    : _sync,
                 icon: Icons.sync_rounded,
               ),
             ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
+import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/bean/widget/kazumi_menu.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/modules/collect/collect_type.dart';
@@ -52,7 +53,12 @@ class _CollectButtonState extends State<CollectButton> {
         type.value == _collectController.getCollectType(widget.bangumiItem)) {
       return;
     }
-    await _collectController.addCollect(widget.bangumiItem, type: type.value);
+    try {
+      await _collectController.addCollect(widget.bangumiItem, type: type.value);
+    } catch (_) {
+      // 与收藏页保持一致：失败也给一条提示，不要静默吞掉。
+      KazumiDialog.showToast(message: '修改收藏状态失败，请稍后重试');
+    }
     if (mounted) setState(() {});
   }
 
