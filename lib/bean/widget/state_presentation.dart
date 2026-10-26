@@ -1,6 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:material_new_shapes/material_new_shapes.dart';
 
+/// [StateActionButton] 的图标边长统一值（18dp）。
+///
+/// 全局统一的一处开关：`StateActionButton` / `StateActionButton.tonal` 的
+/// `iconSize` 默认值就是它，21 个带图标的调用点全部跟随。
+///
+/// 为什么不是 M3 默认的 20dp：Material Icons 的字形几乎写满方框（20dp 时
+/// 实际墨迹 16.8~17.5dp），而 MiSans 汉字的墨迹高只有 `0.92 × fontSize`
+/// （14sp → 12.9dp），并排时图标看着比文字块头大 30%。
+const double kStateActionButtonIconSize = 18;
+
 class StateIconBadge extends StatelessWidget {
   const StateIconBadge({
     super.key,
@@ -52,6 +62,7 @@ class StateActionButton extends StatelessWidget {
     required this.onPressed,
     required this.text,
     this.icon,
+    this.iconSize = kStateActionButtonIconSize,
     this.reserveText,
     this.style,
   }) : _tonal = false;
@@ -61,6 +72,7 @@ class StateActionButton extends StatelessWidget {
     required this.onPressed,
     required this.text,
     this.icon,
+    this.iconSize = kStateActionButtonIconSize,
     this.reserveText,
     this.style,
   }) : _tonal = true;
@@ -68,6 +80,16 @@ class StateActionButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final String text;
   final IconData? icon;
+
+  /// 图标边长，默认 [kStateActionButtonIconSize]（18dp）。
+  ///
+  /// 需要「图标视觉上与 14sp 文字等高」时才有意义 —— 实测 MiSans 的汉字
+  /// 墨迹高约 `0.92 × fontSize`（14sp → 12.9dp），而 Material Icons 的字形几乎写满
+  /// 整个方框（20dp 时墨迹 16.8~17.5dp，比字大 30%），所以并排时图标显得块头压过文字。
+  ///
+  /// 不能靠 `ButtonStyle.iconSize` 覆盖：下面 `build` 里的 `Icon` 显式传了 `size`，
+  /// 会盖掉 `AnimatedTheme` 下发的 `IconTheme`（`button_style_button.dart:553`）。
+  final double iconSize;
 
   /// Reserves label space for a longer status without changing button size.
   final String? reserveText;
@@ -103,7 +125,7 @@ class StateActionButton extends StatelessWidget {
     return button(
       onPressed: onPressed,
       style: style ?? styleOf(context),
-      icon: icon == null ? null : Icon(icon, size: 20),
+      icon: icon == null ? null : Icon(icon, size: iconSize),
       label: reserveText == null
           ? label
           : Stack(
