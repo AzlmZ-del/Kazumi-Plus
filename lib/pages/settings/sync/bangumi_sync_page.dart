@@ -413,8 +413,12 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
           ),
         ],
         const SizedBox(height: 16),
+        // 「获取授权码」是 M3 默认的 `TextButton.icon`（`minimumSize` 40dp），
+        // 「验证并保存」统一走 `syncBundledButtonStyle` 收到同样的 40dp，
+        // 两颗按钮上下沿才对得齐。
         Wrap(
           alignment: WrapAlignment.end,
+          crossAxisAlignment: WrapCrossAlignment.center,
           spacing: 12,
           runSpacing: 8,
           children: [
@@ -423,10 +427,14 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
               icon: const Icon(Icons.open_in_new_rounded, size: 18),
               label: const Text('获取授权码'),
             ),
-            StateActionButton.tonal(
-              onPressed: _busy ? null : _saveToken,
-              text: _action == _BangumiAction.verify ? '正在验证…' : '验证并保存',
-              icon: Icons.check_rounded,
+            SizedBox(
+              height: kSyncBundledButtonHeight,
+              child: StateActionButton.tonal(
+                onPressed: _busy ? null : _saveToken,
+                text: _action == _BangumiAction.verify ? '正在验证…' : '验证并保存',
+                icon: Icons.check_rounded,
+                style: syncBundledButtonStyle(context),
+              ),
             ),
           ],
         ),
@@ -436,7 +444,7 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
   );
 
   /// 卡片头部的「测试连接」小按钮，样式沿用 `StateActionButton.tonal`
-  /// 但压缩到 32dp 高、左右 12dp，塞进 72dp 高的头部里不撑高。
+  /// 但压缩到 28dp 高、左右 8dp、12sp 字号，塞进 72dp 高的头部里不撑高。
   Widget _testConnectButton() {
     final label = _action == _BangumiAction.connect || _bangumi.isConnecting
         ? '连接中…'
@@ -444,7 +452,7 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
         ? '重试连接'
         : '测试连接';
     return SizedBox(
-      height: 32,
+      height: 28,
       child: StateActionButton.tonal(
         onPressed: _busy ? null : () => _connect(_bangumi.ping),
         text: label,
