@@ -4,6 +4,7 @@ import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/bean/settings/settings_list.dart';
 import 'package:kazumi/bean/widget/state_presentation.dart';
 import 'package:kazumi/bean/widget/tonal_card.dart';
+import 'package:kazumi/pages/settings/sync/sync_settings_widgets.dart';
 import 'package:kazumi/request/apis/bangumi_api.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/services/storage/storage.dart';
@@ -32,6 +33,14 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
   bool _loggingIn = false;
   bool _checking = false;
   bool _loggedIn = false;
+
+  /// cookie 还在本地、但服务端判定已失效。此时副标题给「Cookie 失效，请重新登录」，
+  /// 与「从没登录过」区分开——后者是「登录后删除收藏可同步到 Bangumi」。
+  bool _expired = false;
+
+  /// 校验请求本身出错（断网 / 超时）。这时**不能**断言 cookie 失效，
+  /// 否则用户会以为要重新登录，白填一次验证码。
+  bool _checkFailed = false;
   String? _error;
 
   /// Bangumi 昵称。网页登录只拿得到 UID，昵称要拿 Access Token 打一次
@@ -41,21 +50,28 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
   /// 检测登录状态的间隔（小时），1~24，默认 6。
   late int _intervalHours;
 
+  /// 卡片展开态，仅用于驱动右侧箭头。null 时退回 `initiallyExpanded`。
+  bool? _expanded;
+
   @override
   void initState() {
     super.initState();
     // 「登录并保存」会把账号密码记下来，下次进来直接回填，不用再敲一遍。
     _emailController.text = _session.savedEmail;
     _passwordController.text = _session.savedPassword;
-    _intervalHours =
-        GStorage.getSetting(SettingsKeys.bangumiWebValidateIntervalHours)
-            .clamp(1, 24);
+    _intervalHours = GStorage.getSetting(
+      SettingsKeys.bangumiWebValidateIntervalHours,
+    ).clamp(1, 24);
     if (_session.hasStoredCookie) {
+      // 昵称先同步读本地缓存，首帧就是「昵称 · UID」，不会先闪一下「已登录」。
+      // 真正的更新在下面 `_loadNickname()` 里做，界面不会跳。
+      _nickname = _session.savedNickname;
       // 缓存窗口内直接用上次结论，省掉进页面那次 /subject/1 请求；
       // 没有缓存（从没校验过 / 已过期）才真去查。
       final cached = _session.cachedValidation;
       if (cached != null) {
         _loggedIn = cached;
+        _expired = !cached;
         if (cached) _loadNickname();
       } else {
         _validate();
@@ -75,12 +91,17 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
     setState(() {
       _checking = true;
       _error = null;
+      _checkFailed = false;
     });
     try {
       final ok = await _session.validate();
       KazumiLogger().i('BangumiWebUI: session validate -> $ok');
       if (mounted) {
-        setState(() => _loggedIn = ok);
+        setState(() {
+          _loggedIn = ok;
+          // cookie 还在但校验失败 = 过期；从没登录过的情况根本不会走到这里。
+          _expired = !ok && _session.hasStoredCookie;
+        });
       }
       if (ok) await _loadNickname();
     } catch (e, stackTrace) {
@@ -89,7 +110,11 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
         error: e,
         stackTrace: stackTrace,
       );
-      if (mounted) setState(() => _loggedIn = false);
+      if (mounted) {
+        // 请求本身失败（断网 / 超时）不代表 cookie 失效，只标记「检查失败」，
+        // 保留上一次的登录态，避免误报「请重新登录」。
+        setState(() => _checkFailed = true);
+      }
     } finally {
       if (mounted) setState(() => _checking = false);
     }
@@ -104,9 +129,10 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
     try {
       final user = await BangumiApi.getCurrentUser(accessToken: token);
       final name = user?.nickname.trim() ?? '';
-      if (mounted && name.isNotEmpty) {
-        setState(() => _nickname = name);
-      }
+      if (name.isEmpty) return;
+      // 落盘一份，下次进页面首帧就能直接显示，不用等这次请求。
+      await _session.saveNickname(name);
+      if (mounted) setState(() => _nickname = name);
     } catch (e) {
       KazumiLogger().w('BangumiWebUI: load nickname failed', error: e);
     }
@@ -171,6 +197,7 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
       if (mounted) {
         setState(() {
           _loggedIn = true;
+          _expired = false;
           // 「登录并保存」：账号与密码留在输入框里，不随登录成功清空。
           _captchaController.clear();
           _captcha = null;
@@ -199,6 +226,7 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
     if (!mounted) return;
     setState(() {
       _loggedIn = false;
+      _expired = false;
       _nickname = '';
       _captcha = null;
       _captchaController.clear();
@@ -249,214 +277,238 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
   InputDecoration _fieldDecoration({
     required String labelText,
     Widget? suffixIcon,
-  }) =>
-      InputDecoration(
-        labelText: labelText,
-        border: const OutlineInputBorder(),
-        isDense: true,
-        // 垂直内边距留小一点：外面已经用 SizedBox 锁死 _fieldHeight，
-        // 这里只要保证文字放得下，剩余高度由 InputDecorator 自己居中，
-        // 系统字体放大时也不会撑破 48。
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        suffixIcon: suffixIcon,
-      );
+  }) => InputDecoration(
+    labelText: labelText,
+    border: const OutlineInputBorder(),
+    isDense: true,
+    // 垂直内边距留小一点：外面已经用 SizedBox 锁死 _fieldHeight，
+    // 这里只要保证文字放得下，剩余高度由 InputDecorator 自己居中，
+    // 系统字体放大时也不会撑破 48。
+    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    suffixIcon: suffixIcon,
+  );
 
   @override
   Widget build(BuildContext context) => TonalCard(
-        child: ExpansionTile(
-          // 用同步读本地 cookie 判断，而不是异步校验出来的 `_loggedIn`：
-          // `initiallyExpanded` 只在首帧读一次，等 `_validate()` 回来时已经晚了，
-          // 结果就是「明明已登录却仍然展开」。`hasStoredCookie` 直接看设置项，
-          // 首帧就是对的，与上方「Bangumi 账号」卡片的 `!configured` 行为一致。
-          initiallyExpanded: !_session.hasStoredCookie,
-          maintainState: true,
-          shape: const Border(),
-          collapsedShape: const Border(),
-          tilePadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-          childrenPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-          leading: const Icon(Icons.language_rounded),
-          title: const Text('网页登录'),
-          subtitle: Text(
-            _checking
-                ? '正在检查登录状态…'
-                : _loggedIn
-                    ? _accountLabel
-                    : '登录后删除收藏可同步到 Bangumi',
-          ),
-          children: [
-            const SizedBox(height: 8),
-            const Text(
-              'Bangumi 未提供删除收藏的开放接口，只能通过网页端删除。'
-              '这里的账号密码仅用于向 bgm.tv 换取登录凭证，凭证保存在本机。',
-              style: TextStyle(fontSize: 12),
-            ),
-            const SizedBox(height: 16),
-            if (_loggedIn) _loggedInView() else _loginForm(),
-            const SizedBox(height: 20),
-            Divider(height: 1, color: Theme.of(context).dividerColor),
-            // 滑块往下沉一点，避免和分隔线贴在一起。
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: SettingsSliderTile(
-                leading: Icons.timer_outlined,
-                title: const Text('检测间隔'),
-                description: const Text('进页面时检查登录状态的间隔，超过就重新校验'),
-                value: _intervalHours.toDouble(),
-                min: 1,
-                max: 24,
-                divisions: 23,
-                valueLabel: '$_intervalHours 小时',
-                onChanged: (value) {
-                  setState(() => _intervalHours = value.round());
-                  GStorage.putSetting(
-                    SettingsKeys.bangumiWebValidateIntervalHours,
-                    _intervalHours,
-                  );
-                },
-              ),
-            ),
-          ],
+    elevation: kSyncCardElevation,
+    child: ExpansionTile(
+      // 用同步读本地 cookie 判断，而不是异步校验出来的 `_loggedIn`：
+      // `initiallyExpanded` 只在首帧读一次，等 `_validate()` 回来时已经晚了，
+      // 结果就是「明明已登录却仍然展开」。`hasStoredCookie` 直接看设置项，
+      // 首帧就是对的，与上方「Bangumi 账号」卡片的 `!configured` 行为一致。
+      initiallyExpanded: !_session.hasStoredCookie,
+      maintainState: true,
+      shape: const Border(),
+      collapsedShape: const Border(),
+      trailing: SyncExpandChevron(
+        expanded: _expanded ?? !_session.hasStoredCookie,
+      ),
+      onExpansionChanged: (value) => setState(() => _expanded = value),
+      minTileHeight: kSyncCardTileHeight,
+      tilePadding: const EdgeInsets.symmetric(horizontal: 20),
+      // 展开区四边统一 12dp（与其余五张卡一致）。
+      childrenPadding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      leading: const Icon(Icons.language_rounded),
+      title: const SyncCardTitle('网页登录'),
+      subtitle: SyncCardSubtitle(
+        _checking
+            ? '正在检查登录状态…'
+            : _loggedIn
+            ? _accountLabel
+            : _expired
+            ? 'Cookie 失效，请重新登录'
+            : _checkFailed
+            ? '登录状态检查失败，可稍后重试'
+            : '登录后删除收藏可同步到 Bangumi',
+      ),
+      children: [
+        // 顶部间距统一由 `childrenPadding` 的 12dp 提供，这里不再塞占位。
+        const Text(
+          'Bangumi 未提供删除收藏的开放接口，只能通过网页端删除。'
+          '这里的账号密码仅用于向 bgm.tv 换取登录凭证，凭证保存在本机。',
+          style: TextStyle(fontSize: 12),
         ),
-      );
+        const SizedBox(height: 16),
+        if (_loggedIn) _loggedInView() else _loginForm(),
+        const SizedBox(height: 20),
+        const Divider(height: 1, indent: 16, endIndent: 16),
+        // 滑块往下沉一点，避免和分隔线贴在一起。
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: SettingsSliderTile(
+            leading: Icons.timer_outlined,
+            title: const Text('检测间隔'),
+            description: const Text('进页面时检查登录状态的间隔，超过就重新校验'),
+            value: _intervalHours.toDouble(),
+            min: 1,
+            max: 24,
+            divisions: 23,
+            valueLabel: '$_intervalHours 小时',
+            onChanged: (value) {
+              setState(() => _intervalHours = value.round());
+              GStorage.putSetting(
+                SettingsKeys.bangumiWebValidateIntervalHours,
+                _intervalHours,
+              );
+            },
+          ),
+        ),
+      ],
+    ),
+  );
 
   Widget _loggedInView() => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Row(
         children: [
-          Row(
-            children: [
-              const Icon(Icons.check_circle_rounded, size: 18),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  _loginLabel,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ),
-            ],
+          const Icon(Icons.check_circle_rounded, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _loginLabel,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
           ),
-          const SizedBox(height: 12),
-          Wrap(
-            alignment: WrapAlignment.end,
-            spacing: 12,
-            runSpacing: 8,
-            children: [
-              TextButton.icon(
+        ],
+      ),
+      const SizedBox(height: 12),
+      // 两个按钮等宽平分整行、等高 48dp。
+      // 用 `Expanded` + `SizedBox(height:)` 而不是 `stretch`：`FilledButton` 内部的
+      // `_InputPadding` 会把约束放松成「至多父级宽度」，只靠 stretch 拿不到满宽，
+      // 必须由 `Expanded` 给紧宽度、`SizedBox` 只钉高度。
+      Row(
+        children: [
+          Expanded(
+            child: SizedBox(
+              height: 48,
+              child: StateActionButton.tonal(
                 onPressed: _busy ? null : _validate,
-                icon: const Icon(Icons.refresh_rounded, size: 18),
-                label: const Text('重新检查'),
+                text: '重新检查',
+                icon: Icons.refresh_rounded,
               ),
-              StateActionButton.tonal(
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: SizedBox(
+              height: 48,
+              child: StateActionButton.tonal(
                 onPressed: _busy ? null : _logout,
                 text: '退出登录',
                 icon: Icons.logout_rounded,
               ),
-            ],
+            ),
           ),
         ],
-      );
+      ),
+    ],
+  );
 
   Widget _loginForm() => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            height: _fieldHeight,
-            child: TextField(
-              controller: _emailController,
-              enabled: !_busy,
-              autocorrect: false,
-              enableSuggestions: false,
-              keyboardType: TextInputType.emailAddress,
-              decoration: _fieldDecoration(labelText: '邮箱 / 用户名'),
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: _fieldHeight,
-            child: TextField(
-              controller: _passwordController,
-              enabled: !_busy,
-              obscureText: _obscure,
-              autocorrect: false,
-              enableSuggestions: false,
-              decoration: _fieldDecoration(
-                labelText: '密码',
-                suffixIcon: IconButton(
-                  tooltip: _obscure ? '显示密码' : '隐藏密码',
-                  onPressed: () => setState(() => _obscure = !_obscure),
-                  iconSize: 20,
-                  padding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
-                  icon: Icon(_obscure
-                      ? Icons.visibility_off_rounded
-                      : Icons.visibility_rounded),
-                ),
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      SizedBox(
+        height: _fieldHeight,
+        child: TextField(
+          controller: _emailController,
+          enabled: !_busy,
+          autocorrect: false,
+          enableSuggestions: false,
+          keyboardType: TextInputType.emailAddress,
+          decoration: _fieldDecoration(labelText: '邮箱 / 用户名'),
+        ),
+      ),
+      const SizedBox(height: 12),
+      SizedBox(
+        height: _fieldHeight,
+        child: TextField(
+          controller: _passwordController,
+          enabled: !_busy,
+          obscureText: _obscure,
+          autocorrect: false,
+          enableSuggestions: false,
+          decoration: _fieldDecoration(
+            labelText: '密码',
+            suffixIcon: IconButton(
+              tooltip: _obscure ? '显示密码' : '隐藏密码',
+              onPressed: () => setState(() => _obscure = !_obscure),
+              iconSize: 20,
+              padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+              icon: Icon(
+                _obscure
+                    ? Icons.visibility_off_rounded
+                    : Icons.visibility_rounded,
               ),
             ),
           ),
-          const SizedBox(height: 12),
-          // 用 IntrinsicHeight 让这一行的高度由左侧输入框的真实高度决定，
-          // 右侧图片框只负责撑满同一高度；左侧不再被外面写死的 SizedBox 约束，
-          // 也不再自己定高，两边就严格等高。
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _captchaController,
-                    enabled: !_busy,
-                    autocorrect: false,
-                    enableSuggestions: false,
-                    onSubmitted: (_) => _login(),
-                    decoration: _fieldDecoration(labelText: '验证码'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                _captchaBox(),
-              ],
-            ),
-          ),
-          const SizedBox(height: 6),
-          // 提示文字对齐到左侧「验证码」输入框的正中，右侧留出图片框同宽的占位。
-          Row(
-            children: [
-              Expanded(
-                child: Center(
-                  child: Text(
-                    _captcha == null ? '请先点右侧获取验证码' : '看不清就点图片换一张',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              const SizedBox(width: 120),
-            ],
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              _error!,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.error,
-                fontSize: 12,
+        ),
+      ),
+      const SizedBox(height: 12),
+      // 用 IntrinsicHeight 让这一行的高度由左侧输入框的真实高度决定，
+      // 右侧图片框只负责撑满同一高度；左侧不再被外面写死的 SizedBox 约束，
+      // 也不再自己定高，两边就严格等高。
+      IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _captchaController,
+                enabled: !_busy,
+                autocorrect: false,
+                enableSuggestions: false,
+                onSubmitted: (_) => _login(),
+                decoration: _fieldDecoration(labelText: '验证码'),
               ),
             ),
+            const SizedBox(width: 12),
+            _captchaBox(),
           ],
-          const SizedBox(height: 16),
-          // 「获取验证码」按钮已去掉：点右侧验证码框即可获取/刷新，功能重复。
-          Align(
-            alignment: Alignment.centerRight,
-            child: StateActionButton.tonal(
-              onPressed: _busy ? null : _login,
-              text: _loggingIn ? '正在登录…' : '登录并保存',
-              icon: Icons.login_rounded,
+        ),
+      ),
+      const SizedBox(height: 6),
+      // 提示文字对齐到左侧「验证码」输入框的正中，右侧留出图片框同宽的占位。
+      Row(
+        children: [
+          Expanded(
+            child: Center(
+              child: Text(
+                _captcha == null ? '请先点右侧获取验证码' : '看不清就点图片换一张',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
             ),
           ),
+          const SizedBox(width: 12),
+          const SizedBox(width: 120),
         ],
-      );
+      ),
+      if (_error != null) ...[
+        const SizedBox(height: 12),
+        Text(
+          _error!,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.error,
+            fontSize: 12,
+          ),
+        ),
+      ],
+      const SizedBox(height: 16),
+      // 「获取验证码」按钮已去掉：点右侧验证码框即可获取/刷新，功能重复。
+      Align(
+        alignment: Alignment.centerRight,
+        child: StateActionButton.tonal(
+          onPressed: _busy ? null : _login,
+          text: _loggingIn ? '正在登录…' : '登录并保存',
+          icon: Icons.login_rounded,
+        ),
+      ),
+    ],
+  );
 
   Widget _captchaBox() {
     final captcha = _captcha;
