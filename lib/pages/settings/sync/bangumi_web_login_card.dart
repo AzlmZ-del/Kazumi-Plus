@@ -389,17 +389,22 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
   Widget _loggedInView() => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      Row(
-        children: [
-          const Icon(Icons.check_circle_rounded, size: 18),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              _loginLabel,
-              style: Theme.of(context).textTheme.bodyMedium,
+      // 「已登录 · 日期」行与下方按钮组、分隔线同缩进：补 16dp 内缩，
+      // 勾图标左缘对齐「重新检查」按钮与 `Divider(indent: 16)`。
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: _buttonInset),
+        child: Row(
+          children: [
+            const Icon(Icons.check_circle_rounded, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _loginLabel,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
       const SizedBox(height: 12),
       // 按钮组的左右边缘统一对齐下方那条分隔线：`Divider(indent: 16, endIndent: 16)`

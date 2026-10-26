@@ -255,13 +255,19 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
                                   '以 Bangumi 为准',
                                 BangumiSyncPriority.timeFirst => '保留最近更新',
                               }),
-                              subtitle: Text(switch (option) {
-                                BangumiSyncPriority.localFirst =>
-                                  '用本机状态更新 Bangumi',
-                                BangumiSyncPriority.bangumiFirst =>
-                                  '用 Bangumi 状态更新本机',
-                                BangumiSyncPriority.timeFirst => '比较两边的更新时间',
-                              }),
+                              subtitle: Text(
+                                switch (option) {
+                                  BangumiSyncPriority.localFirst =>
+                                    '用本机状态更新 Bangumi',
+                                  BangumiSyncPriority.bangumiFirst =>
+                                    '用 Bangumi 状态更新本机',
+                                  BangumiSyncPriority.timeFirst =>
+                                    '比较两边的更新时间',
+                                },
+                                // 与卡片头部副标题同款：12sp + 置灰，
+                                // 盖掉 `ListTile` 默认的 14sp 同色。
+                                style: syncSwitchSubtitleStyle(context),
+                              ),
                             ),
                         ],
                       ),
@@ -269,7 +275,12 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
                     const Divider(height: 1, indent: 16, endIndent: 16),
                     SwitchListTile(
                       title: const Text('同步结果提示'),
-                      subtitle: const Text('修改追番状态后显示同步结果'),
+                      // 与卡片头部副标题同款：12sp + 置灰，
+                      // 盖掉 `ListTile` 默认的 14sp 同色。
+                      subtitle: Text(
+                        '修改追番状态后显示同步结果',
+                        style: syncSwitchSubtitleStyle(context),
+                      ),
                       value: showToast,
                       onChanged: _busy
                           ? null
