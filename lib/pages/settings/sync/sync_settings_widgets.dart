@@ -151,9 +151,15 @@ ButtonStyle syncActionButtonStyle(BuildContext context) {
 
 /// 卡片头部里的小号动作按钮（如「测试连接」）。
 ///
-/// 与 `syncActionButtonStyle` 同配色，但字号降到 `labelLarge`（14sp）、
-/// 左右内边距 12dp、圆角 16dp —— 卡片头部只有 72dp 高，
-/// 用 16sp 的大按钮会把标题栏顶得比别的卡高。
+/// 与 `syncActionButtonStyle` 同配色，但整体收紧一档：
+/// 字号 12sp、左右内边距 8dp、圆角 14dp，配合调用方把高度钉到 28dp。
+/// 卡片头部只有 72dp 高，用 16sp 的大按钮会把标题栏顶得比别的卡高。
+///
+/// 字重保持 `labelLarge` 的 w500 **不降**：12sp 若跟着降到 w400，
+/// 在 `secondaryContainer` 上会显得发虚。
+///
+/// 目前两个调用点（「Bangumi 账号」与「同步服务器」）都走这一份，
+/// 两边尺寸必须一致，所以这里不再留开关。
 ButtonStyle syncHeaderButtonStyle(BuildContext context) {
   final theme = Theme.of(context);
   final colors = theme.colorScheme;
@@ -180,12 +186,48 @@ ButtonStyle syncHeaderButtonStyle(BuildContext context) {
       }
       return null;
     }),
-    textStyle: WidgetStatePropertyAll(theme.textTheme.labelLarge),
-    padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 12)),
+    textStyle: WidgetStatePropertyAll(
+      theme.textTheme.labelLarge?.copyWith(fontSize: 12, height: 1.2),
+    ),
+    padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 8)),
     minimumSize: const WidgetStatePropertyAll(Size(0, 0)),
     shape: WidgetStatePropertyAll(
-      RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
     ),
+  );
+}
+
+/// 并排 / 紧凑场景下动作按钮的高度（dp）。
+///
+/// 比 [StateActionButton.styleOf] 默认的 48dp 矮一档，正好与 M3 `TextButton`
+/// 的默认 `minimumSize: Size(64, 40)`（`text_button.dart:362`）齐平，
+/// 因此和「获取授权码」这类 `TextButton.icon` 并排时上下沿能对齐。
+const double kSyncBundledButtonHeight = 40;
+
+/// 并排 / 紧凑动作按钮的样式：`StateActionButton.styleOf` 收紧一档后的版本。
+///
+/// 只改三处，配色、字号（`labelLarge` 14sp）、圆角（28 / 按下 16）全不动：
+///
+/// - `minimumSize` 从 `Size(64, 48)` 收到 `Size(64, kSyncBundledButtonHeight)`：
+///   只改外层 `SizedBox` 没用 —— `button_style_button.dart:473-480` 会把解析出的
+///   约束和这个最小尺寸取大值，必须在这里一起覆盖。
+/// - 左右内边距 24 → 8：半行宽约 141dp，扣掉内边距 48 + 图标 18 + 图标文字间距 8
+///   后文字只剩 67dp，四字（`labelLarge` 14sp 约 56~60dp）加 `_InputPadding` 刚好放得下。
+///   垂直 12 → 8：图标 18 与单行文字 14 的行高里，18 + 8×2 = 34 < 40，余量充足。
+/// - `tapTargetSize` 收成 `shrinkWrap`：M3 默认 `padded` 会把可点区域撑到 48dp，
+///   视觉 40dp 却按 48dp 占位，并排时多出一圈透明边距。
+///
+/// 目前两个调用点：『网页登录』卡的三颗按钮、『Bangumi 账号』的「验证并保存」。
+/// 两边必须一致，所以不再留开关。
+ButtonStyle syncBundledButtonStyle(BuildContext context) {
+  return StateActionButton.styleOf(context).copyWith(
+    minimumSize: const WidgetStatePropertyAll(
+      Size(64, kSyncBundledButtonHeight),
+    ),
+    padding: const WidgetStatePropertyAll(
+      EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+    ),
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
   );
 }
 
