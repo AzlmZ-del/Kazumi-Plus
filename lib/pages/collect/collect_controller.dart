@@ -70,11 +70,20 @@ abstract class _CollectController with Store {
 
   @action
   Future<void> deleteCollect(BangumiItem bangumiItem) async {
-    final bool webSyncEnable =
-        GStorage.getSetting(SettingsKeys.bangumiSyncEnable);
+    final bool webSyncEnable = GStorage.getSetting(
+      SettingsKeys.bangumiSyncEnable,
+    );
+    // 与「添加/修改收藏」保持同一套反馈：进度提示受「同步结果提示」开关控制，
+    // 最终结果（删成功 / 只删了本地 / 登录失效）一律给一条，不做静默操作。
+    final bool showProgressToast = GStorage.getSetting(
+      SettingsKeys.bangumiImmediateSyncToastEnable,
+    );
     if (webSyncEnable) {
       final session = BangumiWebSession();
       if (session.hasStoredCookie) {
+        if (showProgressToast) {
+          KazumiDialog.showToast(message: '正在同步删除 Bangumi 收藏…');
+        }
         final result = await _deleteBangumiCollectRemotely(
           session,
           bangumiItem.id,
@@ -86,9 +95,7 @@ abstract class _CollectController with Store {
           return;
         }
         if (result == BangumiWebDeleteResult.expired) {
-          KazumiDialog.showToast(
-            message: '网页登录已失效，请在设置中重新登录后重试',
-          );
+          KazumiDialog.showToast(message: '网页登录已失效，请在设置中重新登录后重试');
         }
       }
     }
@@ -96,19 +103,18 @@ abstract class _CollectController with Store {
     final action = await _resolveBangumiDeleteSyncAction(bangumiItem);
     switch (action) {
       case _BangumiDeleteSyncAction.markAbandoned:
-        await addCollect(
-          bangumiItem,
-          type: CollectType.abandoned.value,
-        );
+        await addCollect(bangumiItem, type: CollectType.abandoned.value);
         return;
 
       case _BangumiDeleteSyncAction.openWeb:
         await _deleteCollectLocally(bangumiItem);
+        KazumiDialog.showToast(message: '已取消追番');
         await _openBangumiSubjectPage(bangumiItem.id);
         return;
 
       case _BangumiDeleteSyncAction.deleteLocalOnly:
         await _deleteCollectLocally(bangumiItem);
+        KazumiDialog.showToast(message: '已取消追番');
         return;
 
       case _BangumiDeleteSyncAction.cancel:
@@ -144,7 +150,8 @@ abstract class _CollectController with Store {
   }
 
   Future<_BangumiDeleteSyncAction?> _resolveBangumiDeleteSyncAction(
-      BangumiItem bangumiItem) async {
+    BangumiItem bangumiItem,
+  ) async {
     final bool syncEnable = GStorage.getSetting(SettingsKeys.bangumiSyncEnable);
     if (!syncEnable) {
       return _BangumiDeleteSyncAction.deleteLocalOnly;
@@ -192,10 +199,13 @@ abstract class _CollectController with Store {
   }
 
   Future<bool> _syncBangumiCollectIfEnabled(
-      int bangumiId, int localType) async {
+    int bangumiId,
+    int localType,
+  ) async {
     final bool syncEnable = GStorage.getSetting(SettingsKeys.bangumiSyncEnable);
-    final bool showImmediateSyncToast =
-        GStorage.getSetting(SettingsKeys.bangumiImmediateSyncToastEnable);
+    final bool showImmediateSyncToast = GStorage.getSetting(
+      SettingsKeys.bangumiImmediateSyncToastEnable,
+    );
 
     if (!syncEnable) {
       return true;
@@ -206,8 +216,10 @@ abstract class _CollectController with Store {
       if (showImmediateSyncToast) {
         KazumiDialog.showToast(message: '正在同步到 Bangumi...');
       }
-      final bool synced =
-          await bangumi.syncCollectibleWhenIdle(bangumiId, localType);
+      final bool synced = await bangumi.syncCollectibleWhenIdle(
+        bangumiId,
+        localType,
+      );
       if (synced && showImmediateSyncToast) {
         KazumiDialog.showToast(message: '已同步到 Bangumi');
         return true;
@@ -221,8 +233,9 @@ abstract class _CollectController with Store {
       return true;
     } catch (e, stackTrace) {
       KazumiDialog.showToast(
-          message:
-              '同步到 Bangumi 失败，已取消本次状态修改：${BangumiSyncService.describeError(e)}');
+        message:
+            '同步到 Bangumi 失败，已取消本次状态修改：${BangumiSyncService.describeError(e)}',
+      );
       KazumiLogger().e(
         'Bangumi: immediate collect sync failed. bangumiId=$bangumiId, type=$localType',
         error: e,
@@ -237,8 +250,11 @@ abstract class _CollectController with Store {
     loadCollectibles();
   }
 
-  void _reportSyncError(String message, ValueChanged<String> onError,
-      {Object? error}) {
+  void _reportSyncError(
+    String message,
+    ValueChanged<String> onError, {
+    Object? error,
+  }) {
     if (error != null) {
       KazumiLogger().e(message, error: error);
     }
@@ -246,10 +262,11 @@ abstract class _CollectController with Store {
   }
 
   Future<bool> _connectWebDav(ValueChanged<String> onError) async {
-    final bool webDavCollectEnable =
-        GStorage.getSetting(SettingsKeys.webDavEnableCollect);
+    final bool webDavCollectEnable = GStorage.getSetting(
+      SettingsKeys.webDavEnableCollect,
+    );
     if (!webDavCollectEnable) {
-      _reportSyncError('请开启 WebDAV 收藏同步', onError);
+      _reportSyncError('请开启 WebDAV 收藏列表同步', onError);
       return false;
     }
     if (!WebDav().initialized) {
@@ -265,9 +282,7 @@ abstract class _CollectController with Store {
     return true;
   }
 
-  Future<bool> syncCollectibles({
-    required ValueChanged<String> onError,
-  }) async {
+  Future<bool> syncCollectibles({required ValueChanged<String> onError}) async {
     if (!await _connectWebDav(onError)) return false;
     try {
       await WebDav().syncCollectibles();
@@ -312,7 +327,8 @@ abstract class _CollectController with Store {
       await _collectCrudRepository.clearFavorites();
       loadCollectibles();
       KazumiLogger().d(
-          'GStorage: detected $count uncategorized favorites, migrated to collectibles');
+        'GStorage: detected $count uncategorized favorites, migrated to collectibles',
+      );
     }
   }
 
