@@ -127,6 +127,9 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
 
   /// 「立即同步追番」与 WebDAV 页三个同步按钮同款：开始、成功、失败都弹
   /// 胶囊提示（toast），不再往页面里塞常驻反馈条。
+  ///
+  /// 同步期间的进度也走 toast：onProgress 每次回调都换文案（新 toast 会顶掉
+  /// 旧的，见 `kazumi_toast.dart:103-104`），长任务不至于黑盒干等。
   Future<void> _sync() async {
     if (_busy) return;
     if (_tokenController.text.trim() !=
@@ -144,7 +147,15 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
     });
     KazumiDialog.showToast(message: '正在连接 Bangumi…');
     try {
-      await _bangumi.syncCollectibles();
+      await _bangumi.syncCollectibles(
+        onProgress: (message, current, total) {
+          if (!mounted) return;
+          KazumiDialog.showToast(
+            message: total > 0 ? '$message（$current/$total）' : message,
+            duration: const Duration(seconds: 30),
+          );
+        },
+      );
       KazumiDialog.showToast(message: '追番状态已同步');
     } catch (e) {
       KazumiLogger().w('Bangumi settings sync failed', error: e);
