@@ -75,6 +75,9 @@ class _WebDavServerCardState extends State<WebDavServerCard> {
   ///
   /// 之所以分开，是因为头部按钮在折叠状态下也能点，那时候表单里的内容
   /// 可能正是半截改动，直接拿去覆盖已保存的配置太危险。
+  ///
+  /// **不再弹 toast**：结果已经由卡片副标题反映（`_testFailed` / 连接成功态），
+  /// 头部那颗按钮在折叠状态下就能点，副标题就在同一行，再弹一条提示是重复的。
   Future<void> _testConnection() async {
     if (_testing || _busy) return;
     // 先起请求，服务层会在第一个 await 之前就把 isPinging 置 true，
@@ -83,12 +86,8 @@ class _WebDavServerCardState extends State<WebDavServerCard> {
     setState(() {});
     try {
       await future;
-      if (!mounted) return;
-      KazumiDialog.showToast(message: '连接正常');
     } catch (e) {
       KazumiLogger().w('WebDAV ping failed', error: e);
-      if (!mounted) return;
-      KazumiDialog.showToast(message: '连接失败，请检查服务器地址、账号和密码');
     } finally {
       if (mounted) setState(() {});
     }
@@ -261,7 +260,7 @@ class _WebDavServerCardState extends State<WebDavServerCard> {
   }
 
   /// 卡片头部的【测试连接】小按钮，样式与「Bangumi 账号」那颗完全一致：
-  /// `StateActionButton.tonal` + `syncHeaderButtonStyle`，压到 32dp 高，
+  /// `StateActionButton.tonal` + `syncHeaderButtonStyle`，压到 28dp 高、12sp 字号，
   /// 塞进 72dp 的头部里不会把它撑高。
   ///
   /// 文案三态与 Bangumi 那颗对齐：测试中 → 重试连接（上次失败）→ 测试连接。
@@ -272,7 +271,7 @@ class _WebDavServerCardState extends State<WebDavServerCard> {
         ? '重试连接'
         : '测试连接';
     return SizedBox(
-      height: 32,
+      height: 28,
       child: StateActionButton.tonal(
         onPressed: _testing || _busy ? null : _testConnection,
         text: label,
