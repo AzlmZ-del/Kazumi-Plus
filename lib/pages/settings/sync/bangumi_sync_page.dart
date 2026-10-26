@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:kazumi/bean/dialog/dialog.dart';
 import 'package:kazumi/bean/settings/settings_detail_scaffold.dart';
 import 'package:kazumi/bean/widget/state_presentation.dart';
 import 'package:kazumi/bean/widget/tonal_card.dart';
@@ -9,6 +10,7 @@ import 'package:kazumi/pages/settings/sync/bangumi_web_login_card.dart';
 import 'package:kazumi/pages/settings/sync/sync_settings_widgets.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/services/sync/bangumi_sync_service.dart';
+import 'package:kazumi/services/logging/logger.dart';
 
 enum _BangumiAction { verify, connect, sync }
 
@@ -35,7 +37,6 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
   String? _tokenStatus;
   String? _message;
   bool _failed = false;
-  double? _progress;
 
   /// 两个可折叠卡片的展开态，仅用于驱动右侧箭头（箭头要跟着转）。
   /// 为 null 时退回 `initiallyExpanded` 的默认值。
@@ -124,6 +125,8 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
     }
   }
 
+  /// 「立即同步追番」与 WebDAV 页三个同步按钮同款：开始、成功、失败都弹
+  /// 胶囊提示（toast），不再往页面里塞常驻反馈条。
   Future<void> _sync() async {
     if (_busy) return;
     if (_tokenController.text.trim() !=
@@ -137,25 +140,15 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
     setState(() {
       _action = _BangumiAction.sync;
       _failed = false;
-      _progress = null;
-      _message = '正在连接 Bangumi…';
+      _message = null;
     });
+    KazumiDialog.showToast(message: '正在连接 Bangumi…');
     try {
-      await _bangumi.syncCollectibles(
-        onProgress: (message, current, total) {
-          if (!mounted) return;
-          setState(() {
-            _message = total > 0 ? '$message · $current / $total' : message;
-            _progress = total > 0
-                ? (current / total).clamp(0.0, 1.0).toDouble()
-                : null;
-          });
-        },
-      );
-      _message = '追番状态已同步';
+      await _bangumi.syncCollectibles();
+      KazumiDialog.showToast(message: '追番状态已同步');
     } catch (e) {
-      _failed = true;
-      _message = BangumiSyncService.describeError(e);
+      KazumiLogger().w('Bangumi settings sync failed', error: e);
+      KazumiDialog.showToast(message: BangumiSyncService.describeError(e));
     } finally {
       if (mounted) setState(() => _action = null);
     }
@@ -175,6 +168,8 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
       final showToast = GStorage.getSetting(
         SettingsKeys.bangumiImmediateSyncToastEnable,
       );
+      // 常驻反馈条只剩错误兜底职责：开关切换（_connect）等失败的错误消息，
+      // 以及服务层 lastError。同步操作本身已改走胶囊提示，见 `_sync`。
       final message =
           _message ?? (_tokenError == null ? _bangumi.lastError : null);
       return PopScope(
@@ -197,8 +192,6 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
                 SyncFeedback(
                   message: message,
                   error: _failed || _bangumi.lastError != null,
-                  busy: _action == _BangumiAction.sync,
-                  progress: _progress,
                 ),
               TonalCard(
                 elevation: kSyncCardElevation,
