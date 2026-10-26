@@ -113,8 +113,25 @@ class KazumiDialog {
     }
   }
 
-  static void dismiss<T>({BuildContext? context, T? popWith}) {
-    if (context != null && !context.mounted) return;
+  /// 显示一条可原地更新文字的常驻胶囊（长任务进度用）。
+  ///
+  /// 与 [showToast] 的区别：不自动消失、每次 [UpdatableKazumiToast.update]
+  /// 只换文字不重建胶囊（无闪烁）。调用方任务结束后必须 [UpdatableKazumiToast.dismiss]。
+  /// 失败（无 Overlay 锚点）返回 null，调用方需自行兜底。
+  static UpdatableKazumiToast? showPersistentToast({
+    required String message,
+    BuildContext? context,
+  }) {
+    try {
+      _toastRevision++;
+      return UpdatableKazumiToast.show(message: message, anchorContext: context);
+    } catch (e) {
+      debugPrint('Kazumi Dialog Error: Failed to show persistent toast: $e');
+      return null;
+    }
+  }
+
+  static void dismiss<T>({BuildContext? context, T? popWith}) {    if (context != null && !context.mounted) return;
     final route =
         context == null ? observer._lastDialogRoute : ModalRoute.of(context);
     if (route != null && route.settings.name == routeSettings.name) {

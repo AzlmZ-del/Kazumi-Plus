@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:kazumi/bean/dialog/dialog.dart';
+import 'package:kazumi/bean/dialog/kazumi_toast.dart';
 import 'package:kazumi/bean/settings/settings_detail_scaffold.dart';
 import 'package:kazumi/bean/widget/state_presentation.dart';
 import 'package:kazumi/bean/widget/tonal_card.dart';
@@ -128,8 +129,8 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
   /// 「立即同步追番」与 WebDAV 页三个同步按钮同款：开始、成功、失败都弹
   /// 胶囊提示（toast），不再往页面里塞常驻反馈条。
   ///
-  /// 同步期间的进度也走 toast：onProgress 每次回调都换文案（新 toast 会顶掉
-  /// 旧的，见 `kazumi_toast.dart:103-104`），长任务不至于黑盒干等。
+  /// 同步进度走「可更新胶囊」：整条胶囊只插一次，onProgress 每次回调只换
+  /// 文字不重建（避免逐条重弹的闪烁），结束时换上成功/失败文案再收掉。
   Future<void> _sync() async {
     if (_busy) return;
     if (_tokenController.text.trim() !=
@@ -146,21 +147,29 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
       _message = null;
     });
     KazumiDialog.showToast(message: '正在连接 Bangumi…');
+    // 第一条进度回调到达前胶囊先不显示；连上后由 onProgress 常驻刷新。
+    UpdatableKazumiToast? progressToast;
     try {
       await _bangumi.syncCollectibles(
         onProgress: (message, current, total) {
-          if (!mounted) return;
-          KazumiDialog.showToast(
+          progressToast ??= KazumiDialog.showPersistentToast(
             message: total > 0 ? '$message（$current/$total）' : message,
-            duration: const Duration(seconds: 30),
+          );
+          progressToast?.update(
+            total > 0 ? '$message（$current/$total）' : message,
           );
         },
       );
+      progressToast?.dismiss();
+      progressToast = null;
       KazumiDialog.showToast(message: '追番状态已同步');
     } catch (e) {
       KazumiLogger().w('Bangumi settings sync failed', error: e);
+      progressToast?.dismiss();
+      progressToast = null;
       KazumiDialog.showToast(message: BangumiSyncService.describeError(e));
     } finally {
+      progressToast?.dismiss();
       if (mounted) setState(() => _action = null);
     }
   }
