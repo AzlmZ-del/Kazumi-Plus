@@ -19,7 +19,6 @@ import 'package:kazumi/pages/settings/storage_settings.dart';
 import 'package:kazumi/pages/settings/super_resolution_settings.dart';
 import 'package:kazumi/pages/settings/sync/bangumi_sync_page.dart';
 import 'package:kazumi/pages/settings/sync/sync_settings_page.dart';
-import 'package:kazumi/pages/settings/sync/webdav_server_page.dart';
 import 'package:kazumi/pages/settings/sync/webdav_sync_page.dart';
 import 'package:kazumi/pages/settings/theme_settings_page.dart';
 import 'package:kazumi/pages/settings/update_settings.dart';
@@ -42,8 +41,6 @@ final settingsModule = createModule(
               child: (context, state) => WebDavSyncPage(
                     danmakuShieldSync: inject<DanmakuShieldSyncService>(),
                   ))
-          ..route('/webdav/editor',
-              child: (context, state) => const WebDavServerPage())
           ..route(
             '/update',
             child: (context, state) => const UpdateSettingsPage(),
