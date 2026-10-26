@@ -23,6 +23,10 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
   /// Access Token 输入框高度，与「网页登录」卡片里的输入框统一为 48。
   static const double _tokenFieldHeight = 48;
 
+  /// 按钮组与卡片内分隔线的左右内缩一致：分隔线是 `indent: 16 / endIndent: 16`。
+  /// 与「网页登录」卡的同名常量 `_buttonInset` 取同一个值。
+  static const double _buttonInset = 16;
+
   final _tokenController = TextEditingController();
   final _bangumi = BangumiSyncService();
   bool _passwordVisible = false;
@@ -413,30 +417,45 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
           ),
         ],
         const SizedBox(height: 16),
-        // 「获取授权码」是 M3 默认的 `TextButton.icon`（`minimumSize` 40dp），
-        // 「验证并保存」统一走 `syncBundledButtonStyle` 收到同样的 40dp，
-        // 两颗按钮上下沿才对得齐。
-        Wrap(
-          alignment: WrapAlignment.end,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: 12,
-          runSpacing: 8,
-          children: [
-            TextButton.icon(
-              onPressed: _busy ? null : _getToken,
-              icon: const Icon(Icons.open_in_new_rounded, size: 18),
-              label: const Text('获取授权码'),
-            ),
-            SizedBox(
-              height: kSyncBundledButtonHeight,
-              child: StateActionButton.tonal(
-                onPressed: _busy ? null : _saveToken,
-                text: _action == _BangumiAction.verify ? '正在验证…' : '验证并保存',
-                icon: Icons.check_rounded,
-                style: syncBundledButtonStyle(context),
+        // 按钮组的左右边缘与「网页登录」卡的分隔线对齐：那里是
+        // `Divider(indent: 16, endIndent: 16)`，即从 `childrenPadding` 的 12dp
+        // 再往里缩 16dp，所以这里补上同样的 `_buttonInset`。
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: _buttonInset),
+          // 两颗按钮等宽平分整行、等高 `kSyncBundledButtonHeight`，与
+          // 「网页登录」卡的「重新检查 / 退出登录」保持同一套规格：
+          // `Expanded` 给紧宽度、`SizedBox` 只钉高度（`FilledButton` 内部的
+          // `_InputPadding` 会放松约束，单靠 `stretch` 拿不到满宽）。
+          // 左边那颗仍是 M3 默认的裸 `TextButton.icon`（无底色），
+          // 但同样占半行，右边「验证并保存」才能与「退出登录」完全同宽。
+          child: Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: kSyncBundledButtonHeight,
+                  child: TextButton.icon(
+                    onPressed: _busy ? null : _getToken,
+                    icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                    label: const Text('获取授权码'),
+                  ),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: SizedBox(
+                  height: kSyncBundledButtonHeight,
+                  child: StateActionButton.tonal(
+                    onPressed: _busy ? null : _saveToken,
+                    text: _action == _BangumiAction.verify
+                        ? '正在验证…'
+                        : '验证并保存',
+                    icon: Icons.check_rounded,
+                    style: syncBundledButtonStyle(context),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         // 「测试连接」已移到卡片头部的箭头左侧，这里不再重复一行状态文字。
       ],
