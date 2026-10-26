@@ -14,15 +14,18 @@ import 'package:kazumi/services/storage/storage.dart';
 /// 登录必须直连：镜像站点不提供登录，加密 SNI（ECH）通道也不保证能过。
 class BangumiWebSession {
   BangumiWebSession({Dio? dio})
-      : _dio = dio ??
-            Dio(BaseOptions(
+    : _dio =
+          dio ??
+          Dio(
+            BaseOptions(
               baseUrl: _origin,
               // 删除接口靠 302 的 Location 判结果，必须自己接管跳转。
               followRedirects: false,
               validateStatus: (_) => true,
               responseType: ResponseType.plain,
               headers: {'User-Agent': _browserUserAgent},
-            ));
+            ),
+          );
 
   static const String _origin = 'https://bgm.tv';
 
@@ -60,10 +63,7 @@ class BangumiWebSession {
   /// 组装请求头；没有 cookie 时不要发空的 `Cookie:`。
   Map<String, String> _headers([Map<String, String> extra = const {}]) {
     final cookie = _cookieHeader;
-    return {
-      if (cookie.isNotEmpty) 'Cookie': cookie,
-      ...extra,
-    };
+    return {if (cookie.isNotEmpty) 'Cookie': cookie, ...extra};
   }
 
   String get _storedAuth {
@@ -76,6 +76,31 @@ class BangumiWebSession {
 
   /// 本地是否保存过登录 cookie（不代表仍然有效）。
   bool get hasStoredCookie => _storedAuth.isNotEmpty;
+
+  /// 上次成功取到的昵称，空字符串表示没记录过。
+  ///
+  /// 昵称不在登录链路里，要拿 Access Token 单独请求 `/v0/me`；
+  /// 缓存一份到本地，进页面首帧就能显示「昵称 · UID」，不会先闪一下「已登录」。
+  String get savedNickname {
+    try {
+      return GStorage.getSetting(SettingsKeys.bangumiWebNickname).trim();
+    } catch (_) {
+      return '';
+    }
+  }
+
+  /// 记住昵称，供下次进页面直接显示。
+  Future<void> saveNickname(String nickname) async {
+    final value = nickname.trim();
+    if (value.isEmpty) {
+      return;
+    }
+    try {
+      await GStorage.putSetting(SettingsKeys.bangumiWebNickname, value);
+    } catch (e) {
+      KazumiLogger().w('BangumiWeb: save nickname failed. $e');
+    }
+  }
 
   /// 上次成功登录时记住的账号（用于回填输入框）。
   String get savedEmail {
@@ -146,21 +171,19 @@ class BangumiWebSession {
     KazumiLogger().i('BangumiWeb: fetching captcha');
     final loginPage = await _dio.get<String>(
       '/login',
-      options: Options(
-        headers: _headers(),
-      ),
+      options: Options(headers: _headers()),
     );
     _absorbCookies(loginPage);
 
     final html = loginPage.data ?? '';
-    final formhash = _matchGroup(html, RegExp(r'name="formhash"\s+value="([^"]+)"'));
+    final formhash = _matchGroup(
+      html,
+      RegExp(r'name="formhash"\s+value="([^"]+)"'),
+    );
 
     final captcha = await _dio.get<List<int>>(
       '/signup/captcha',
-      options: Options(
-        headers: _headers(),
-        responseType: ResponseType.bytes,
-      ),
+      options: Options(headers: _headers(), responseType: ResponseType.bytes),
     );
     _absorbCookies(captcha);
 
@@ -173,10 +196,7 @@ class BangumiWebSession {
       forceLog: true,
     );
 
-    return BangumiWebCaptcha(
-      image: image,
-      formhash: formhash,
-    );
+    return BangumiWebCaptcha(image: image, formhash: formhash);
   }
 
   /// 提交登录。成功时把 `chii_auth` 落盘并记录 uid。
@@ -338,8 +358,9 @@ class BangumiWebSession {
   /// 检测登录状态的间隔（小时），默认 6，范围 1~24。
   int get _cacheHours {
     try {
-      final v =
-          GStorage.getSetting(SettingsKeys.bangumiWebValidateIntervalHours);
+      final v = GStorage.getSetting(
+        SettingsKeys.bangumiWebValidateIntervalHours,
+      );
       return v.clamp(1, 24);
     } catch (_) {
       return 6;
@@ -404,10 +425,7 @@ class BangumiWebSession {
       options: Options(headers: _headers()),
     );
     _absorbCookies(response);
-    final uidText = _matchGroup(
-      response.data ?? '',
-      _chobitsUidPattern,
-    );
+    final uidText = _matchGroup(response.data ?? '', _chobitsUidPattern);
     _uid = int.tryParse(uidText) ?? 0;
     return _uid > 0;
   }
@@ -418,6 +436,8 @@ class BangumiWebSession {
     await GStorage.putSetting(SettingsKeys.bangumiWebCookie, '');
     // 时间戳跟着登录态一起清掉，避免下次登录前还显示上一次的时间。
     await GStorage.putSetting(SettingsKeys.bangumiWebLoginAt, 0);
+    // 昵称也跟着清，否则下次进页面会先显示上一个账号的昵称。
+    await GStorage.putSetting(SettingsKeys.bangumiWebNickname, '');
     // 缓存也跟着作废，否则退出登录后再进页面会先闪一下「已登录」。
     await invalidateValidationCache();
   }

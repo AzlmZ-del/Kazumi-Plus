@@ -103,6 +103,7 @@ class SettingsKeys {
     true,
     group: SettingGroup.danmaku,
   );
+
   /// Off on desktop and on on mobile, like the B 站 client.
   static final pauseOnDanmakuEdit = SettingKey<bool>(
     'pauseOnDanmakuEdit',
@@ -599,6 +600,16 @@ class SettingsKeys {
     group: SettingGroup.bangumi,
   );
 
+  /// 上次成功取到的 Bangumi 昵称，空字符串表示没记录过。
+  ///
+  /// 昵称只能拿 Access Token 打一次 `/v0/me` 才拿得到（网页登录本身只给 UID）。
+  /// 落盘是为了进页面首帧就能显示「昵称 · UID」，不必等网络回来再刷一次。
+  static const bangumiWebNickname = SettingKey<String>(
+    'bangumiWebNickname',
+    '',
+    group: SettingGroup.bangumi,
+  );
+
   /// 上一次校验登录态（请求 `/subject/1` 读 `CHOBITS_UID`）的时间，
   /// 毫秒时间戳，0 表示从没校验过。
   ///
@@ -780,6 +791,7 @@ class SettingsKeys {
     bangumiWebEmail,
     bangumiWebPassword,
     bangumiWebLoginAt,
+    bangumiWebNickname,
     bangumiWebValidatedAt,
     bangumiWebValidatedOk,
     bangumiWebUid,
@@ -796,7 +808,7 @@ class SettingsKeys {
   static List<SettingKey<Object?>> byGroup(SettingGroup group) {
     return [
       for (final key in all)
-        if (key.group == group) key
+        if (key.group == group) key,
     ];
   }
 
