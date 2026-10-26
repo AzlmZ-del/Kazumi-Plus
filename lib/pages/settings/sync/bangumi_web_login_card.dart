@@ -77,6 +77,21 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
         _validate();
       }
     }
+    // 验证码不在这里预取：卡片默认收起，`_ensureCaptcha` 会自己判定
+    // 「折叠就不请求」，等用户真的展开（`onExpansionChanged`）时再拉。
+  }
+
+  /// 验证码按需加载：没有图、没在加载、且不在登录中时才发请求。
+  ///
+  /// 验证码与登录必须共用同一条 cookie 会话（见 `fetchCaptcha` 的注释），
+  /// 所以不能提前缓存一张反复用，每次展开都重新抓。
+  void _ensureCaptcha() {
+    if (!mounted) return;
+    if (_captcha != null || _loadingCaptcha || _loggingIn || _checking) return;
+    if (_loggedIn) return;
+    // 折叠状态下表单根本看不见，别白花两条请求。
+    if (!_isExpanded) return;
+    _refreshCaptcha();
   }
 
   @override
@@ -116,7 +131,11 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
         setState(() => _checkFailed = true);
       }
     } finally {
-      if (mounted) setState(() => _checking = false);
+      if (mounted) {
+        setState(() => _checking = false);
+        // 校验完才发现 cookie 过期时，表单这时才露出来，补一张验证码。
+        if (!_loggedIn) _ensureCaptcha();
+      }
     }
   }
 
@@ -233,6 +252,8 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
       // 退出的是登录态，不是「已保存的账号密码」——两回事，输入框保持原样。
     });
     KazumiDialog.showToast(message: '已退出网页登录');
+    // 退出后表单重新露出来，同样先把验证码摆好。
+    _ensureCaptcha();
   }
 
   static String _describe(Object error) {
@@ -243,6 +264,15 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
   }
 
   bool get _busy => _loggingIn || _loadingCaptcha || _checking;
+
+  /// 三个输入框的可用性：验证码在后台加载时**不能**把它们一起锁掉。
+  /// 卡片一展开就自动抓图，若沿用 `!_busy`，输入框会在用户刚要点进去的
+  /// 那一刻变成 disabled——焦点丢失、键盘收起，看着像「点了没反应」。
+  bool get _formEnabled => !_loggingIn && !_checking;
+
+  /// 当前是否展开。`_expanded` 只有用户手动点过才有值，
+  /// 首帧前一律按 `initiallyExpanded`（恒为 false）推算。
+  bool get _isExpanded => _expanded ?? false;
 
   /// 副标题里的账号标识：优先「昵称 · UID 808296」，没有昵称就只给 UID。
   ///
@@ -274,6 +304,9 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
   /// 圆角跟另外三个输入框对齐：`const OutlineInputBorder()` 的默认值就是 4。
   static const BorderRadius _fieldRadius = BorderRadius.all(Radius.circular(4));
 
+  /// 按钮组与下方分隔线的左右内缩一致：分隔线是 `indent: 16 / endIndent: 16`。
+  static const double _buttonInset = 16;
+
   InputDecoration _fieldDecoration({
     required String labelText,
     Widget? suffixIcon,
@@ -292,18 +325,19 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
   Widget build(BuildContext context) => TonalCard(
     elevation: kSyncCardElevation,
     child: ExpansionTile(
-      // 用同步读本地 cookie 判断，而不是异步校验出来的 `_loggedIn`：
-      // `initiallyExpanded` 只在首帧读一次，等 `_validate()` 回来时已经晚了，
-      // 结果就是「明明已登录却仍然展开」。`hasStoredCookie` 直接看设置项，
-      // 首帧就是对的，与上方「Bangumi 账号」卡片的 `!configured` 行为一致。
-      initiallyExpanded: !_session.hasStoredCookie,
+      // 一律默认收起，与是否登录无关：这张卡平时只是「看一眼登录状态」，
+      // 表单摊开会把页面挤得很长。要看表单就点一下展开。
+      initiallyExpanded: false,
       maintainState: true,
       shape: const Border(),
       collapsedShape: const Border(),
-      trailing: SyncExpandChevron(
-        expanded: _expanded ?? !_session.hasStoredCookie,
-      ),
-      onExpansionChanged: (value) => setState(() => _expanded = value),
+      trailing: SyncExpandChevron(expanded: _isExpanded),
+      onExpansionChanged: (value) {
+        setState(() => _expanded = value);
+        // 每次展开都补一张：与网页端一致，表单露出来就能直接填。
+        // 已有图时不重复请求，由 `_ensureCaptcha` 自己判。
+        if (value) _ensureCaptcha();
+      },
       minTileHeight: kSyncCardTileHeight,
       tilePadding: const EdgeInsets.symmetric(horizontal: 20),
       // 展开区四边统一 12dp（与其余五张卡一致）。
@@ -323,12 +357,7 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
       ),
       children: [
         // 顶部间距统一由 `childrenPadding` 的 12dp 提供，这里不再塞占位。
-        const Text(
-          'Bangumi 未提供删除收藏的开放接口，只能通过网页端删除。'
-          '这里的账号密码仅用于向 bgm.tv 换取登录凭证，凭证保存在本机。',
-          style: TextStyle(fontSize: 12),
-        ),
-        const SizedBox(height: 16),
+        // 原来那两行「Bangumi 未提供删除收藏的开放接口…」的说明已按用户要求删除。
         if (_loggedIn) _loggedInView() else _loginForm(),
         const SizedBox(height: 20),
         const Divider(height: 1, indent: 16, endIndent: 16),
@@ -373,34 +402,41 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
         ],
       ),
       const SizedBox(height: 12),
-      // 两个按钮等宽平分整行、等高 48dp。
-      // 用 `Expanded` + `SizedBox(height:)` 而不是 `stretch`：`FilledButton` 内部的
-      // `_InputPadding` 会把约束放松成「至多父级宽度」，只靠 stretch 拿不到满宽，
-      // 必须由 `Expanded` 给紧宽度、`SizedBox` 只钉高度。
-      Row(
-        children: [
-          Expanded(
-            child: SizedBox(
-              height: 48,
-              child: StateActionButton.tonal(
-                onPressed: _busy ? null : _validate,
-                text: '重新检查',
-                icon: Icons.refresh_rounded,
+      // 按钮组的左右边缘统一对齐下方那条分隔线：`Divider(indent: 16, endIndent: 16)`
+      // 是从 `childrenPadding` 的 12dp 再往里缩 16dp，所以这里补上同样的 16dp。
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: _buttonInset),
+        // 两个按钮等宽平分整行、等高 `kSyncBundledButtonHeight`。
+        // 用 `Expanded` + `SizedBox(height:)` 而不是 `stretch`：`FilledButton` 内部的
+        // `_InputPadding` 会把约束放松成「至多父级宽度」，只靠 stretch 拿不到满宽，
+        // 必须由 `Expanded` 给紧宽度、`SizedBox` 只钉高度。
+        child: Row(
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: kSyncBundledButtonHeight,
+                child: StateActionButton.tonal(
+                  onPressed: _busy ? null : _validate,
+                  text: '重新检查',
+                  icon: Icons.refresh_rounded,
+                  style: syncBundledButtonStyle(context),
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: SizedBox(
-              height: 48,
-              child: StateActionButton.tonal(
-                onPressed: _busy ? null : _logout,
-                text: '退出登录',
-                icon: Icons.logout_rounded,
+            const SizedBox(width: 12),
+            Expanded(
+              child: SizedBox(
+                height: kSyncBundledButtonHeight,
+                child: StateActionButton.tonal(
+                  onPressed: _busy ? null : _logout,
+                  text: '退出登录',
+                  icon: Icons.logout_rounded,
+                  style: syncBundledButtonStyle(context),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     ],
   );
@@ -412,7 +448,7 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
         height: _fieldHeight,
         child: TextField(
           controller: _emailController,
-          enabled: !_busy,
+          enabled: _formEnabled,
           autocorrect: false,
           enableSuggestions: false,
           keyboardType: TextInputType.emailAddress,
@@ -424,7 +460,7 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
         height: _fieldHeight,
         child: TextField(
           controller: _passwordController,
-          enabled: !_busy,
+          enabled: _formEnabled,
           obscureText: _obscure,
           autocorrect: false,
           enableSuggestions: false,
@@ -456,7 +492,7 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
             Expanded(
               child: TextField(
                 controller: _captchaController,
-                enabled: !_busy,
+                enabled: _formEnabled,
                 autocorrect: false,
                 enableSuggestions: false,
                 onSubmitted: (_) => _login(),
@@ -475,7 +511,7 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
           Expanded(
             child: Center(
               child: Text(
-                _captcha == null ? '请先点右侧获取验证码' : '看不清就点图片换一张',
+                _captcha == null ? '正在获取验证码…' : '看不清就点图片换一张',
                 style: TextStyle(
                   fontSize: 12,
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -499,12 +535,29 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
       ],
       const SizedBox(height: 16),
       // 「获取验证码」按钮已去掉：点右侧验证码框即可获取/刷新，功能重复。
-      Align(
-        alignment: Alignment.centerRight,
-        child: StateActionButton.tonal(
-          onPressed: _busy ? null : _login,
-          text: _loggingIn ? '正在登录…' : '登录并保存',
-          icon: Icons.login_rounded,
+      //
+      // 与已登录态的「重新检查 / 退出登录」保持同一规格：左右边缘对齐下方分隔线，
+      // 宽度只占半行。原来靠 `Align(centerRight)` 拿右边缘，宽度是内容自适应；
+      // 这里改成「左侧等宽占位 + 右侧 Expanded」，右边缘仍贴在分隔线右端，
+      // 但宽度固定为半行（扣掉中间 12dp 间距），与「退出登录」那颗完全同宽。
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: _buttonInset),
+        child: Row(
+          children: [
+            const Expanded(child: SizedBox.shrink()),
+            const SizedBox(width: 12),
+            Expanded(
+              child: SizedBox(
+                height: kSyncBundledButtonHeight,
+                child: StateActionButton.tonal(
+                  onPressed: _busy ? null : _login,
+                  text: _loggingIn ? '正在登录…' : '登录并保存',
+                  icon: Icons.login_rounded,
+                  style: syncBundledButtonStyle(context),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     ],
