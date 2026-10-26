@@ -19,17 +19,17 @@ class StateIconBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ExcludeSemantics(
-        child: ClipPath(
-          clipper: const _StateShapeClipper(),
-          child: ColoredBox(
-            color: backgroundColor,
-            child: SizedBox.square(
-              dimension: size,
-              child: Icon(icon, size: iconSize, color: foregroundColor),
-            ),
-          ),
+    child: ClipPath(
+      clipper: const _StateShapeClipper(),
+      child: ColoredBox(
+        color: backgroundColor,
+        child: SizedBox.square(
+          dimension: size,
+          child: Icon(icon, size: iconSize, color: foregroundColor),
         ),
-      );
+      ),
+    ),
+  );
 }
 
 class _StateShapeClipper extends CustomClipper<Path> {
@@ -38,8 +38,9 @@ class _StateShapeClipper extends CustomClipper<Path> {
   static final _path = MaterialShapes.cookie4Sided.toPath();
 
   @override
-  Path getClip(Size size) => _path
-      .transform(Matrix4.diagonal3Values(size.width, size.height, 1).storage);
+  Path getClip(Size size) => _path.transform(
+    Matrix4.diagonal3Values(size.width, size.height, 1).storage,
+  );
 
   @override
   bool shouldReclip(_StateShapeClipper oldClipper) => false;
@@ -52,6 +53,7 @@ class StateActionButton extends StatelessWidget {
     required this.text,
     this.icon,
     this.reserveText,
+    this.style,
   }) : _tonal = false;
 
   const StateActionButton.tonal({
@@ -60,6 +62,7 @@ class StateActionButton extends StatelessWidget {
     required this.text,
     this.icon,
     this.reserveText,
+    this.style,
   }) : _tonal = true;
 
   final VoidCallback? onPressed;
@@ -68,17 +71,25 @@ class StateActionButton extends StatelessWidget {
 
   /// Reserves label space for a longer status without changing button size.
   final String? reserveText;
+
+  /// 覆盖默认样式（`styleOf`）。传了就完全以这里为准，
+  /// 用于「同步设置」这类需要统一规格的局部场景。
+  final ButtonStyle? style;
   final bool _tonal;
 
   static ButtonStyle styleOf(BuildContext context) {
     return ButtonStyle(
       minimumSize: const WidgetStatePropertyAll(Size(64, 48)),
       padding: const WidgetStatePropertyAll(
-          EdgeInsets.symmetric(horizontal: 24, vertical: 12)),
-      shape: WidgetStateProperty.resolveWith((states) => RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(
-                states.contains(WidgetState.pressed) ? 16 : 28),
-          )),
+        EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      ),
+      shape: WidgetStateProperty.resolveWith(
+        (states) => RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(
+            states.contains(WidgetState.pressed) ? 16 : 28,
+          ),
+        ),
+      ),
       animationDuration: MediaQuery.disableAnimationsOf(context)
           ? Duration.zero
           : const Duration(milliseconds: 200),
@@ -91,7 +102,7 @@ class StateActionButton extends StatelessWidget {
     final label = Text(text, textAlign: TextAlign.center);
     return button(
       onPressed: onPressed,
-      style: styleOf(context),
+      style: style ?? styleOf(context),
       icon: icon == null ? null : Icon(icon, size: 20),
       label: reserveText == null
           ? label
