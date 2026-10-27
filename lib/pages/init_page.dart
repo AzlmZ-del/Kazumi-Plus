@@ -6,6 +6,7 @@ import 'package:kazumi/pages/my/my_controller.dart';
 import 'package:kazumi/services/sync/bangumi_sync_service.dart';
 import 'package:kazumi/services/sync/danmaku_shield_sync_service.dart';
 import 'package:kazumi/services/sync/webdav.dart';
+import 'package:kazumi/services/backup/local_backup_service.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/plugins/plugins_controller.dart';
 import 'package:flutter_modular/flutter_modular.dart';
@@ -29,6 +30,7 @@ class InitPage extends StatefulWidget {
     required this.myController,
     required this.downloadController,
     required this.danmakuShieldSync,
+    required this.localBackup,
   });
 
   final PluginsController pluginsController;
@@ -37,6 +39,7 @@ class InitPage extends StatefulWidget {
   final MyController myController;
   final DownloadController downloadController;
   final DanmakuShieldSyncService danmakuShieldSync;
+  final LocalBackupService localBackup;
 
   @override
   State<InitPage> createState() => _InitPageState();
@@ -57,6 +60,7 @@ class _InitPageState extends State<InitPage> {
 
   Future<void> _initializeApp() async {
     widget.danmakuShieldSync.start();
+    widget.localBackup.start();
     _migrateStorage();
     _loadShaders();
     unawaited(myController.loadShieldList());

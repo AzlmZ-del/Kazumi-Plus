@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_modular/flutter_modular.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:kazumi/bean/dialog/dialog.dart';
@@ -11,6 +12,7 @@ import 'package:kazumi/bean/widget/tonal_card.dart';
 import 'package:kazumi/modules/bangumi/sync_priority.dart';
 import 'package:kazumi/pages/settings/sync/bangumi_web_login_card.dart';
 import 'package:kazumi/pages/settings/sync/sync_settings_widgets.dart';
+import 'package:kazumi/services/backup/local_backup_service.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/services/sync/bangumi_sync_service.dart';
 import 'package:kazumi/services/sync/webdav.dart';
@@ -96,6 +98,7 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
       // Token 验证并保存成功 → 自动备份一次凭据（用户凭据开关开启时）。
       // fire-and-forget：面板收起不等云端上传，失败由服务层弹提示。
       unawaited(WebDav().autoBackupCredentialsAfterSave());
+      unawaited(inject<LocalBackupService>().autoBackupCredentialsAfterSave());
       // 配好就收起来（与「同步服务器」卡同款）：挪到本帧结束后执行，
       // 避免被 toast/状态刷新触发的 rebuild 盖回去。
       if (mounted) {

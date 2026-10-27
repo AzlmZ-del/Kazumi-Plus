@@ -1,11 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_modular/flutter_modular.dart';
 
 import 'package:kazumi/bean/dialog/dialog.dart';
 import 'package:kazumi/bean/widget/state_presentation.dart';
 import 'package:kazumi/bean/widget/tonal_card.dart';
 import 'package:kazumi/pages/settings/sync/sync_settings_widgets.dart';
+import 'package:kazumi/services/backup/local_backup_service.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/services/sync/webdav.dart';
@@ -136,6 +138,8 @@ class _WebDavServerCardState extends State<WebDavServerCard> {
       // 见 `WebDav.autoBackupCredentialsAfterSave`。
       // fire-and-forget：收起与按钮复位不等云端上传，失败由服务层弹提示。
       unawaited(WebDav().autoBackupCredentialsAfterSave());
+      // 本地备份跟着走同一套规则：凭据改了就把本地快照也刷一遍。
+      unawaited(inject<LocalBackupService>().autoBackupCredentialsAfterSave());
     } catch (e) {
       KazumiLogger().w('WebDAV configuration failed', error: e);
       await WebDav().setEnabled(false);
