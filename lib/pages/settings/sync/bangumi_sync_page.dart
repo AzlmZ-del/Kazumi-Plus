@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -11,6 +13,7 @@ import 'package:kazumi/pages/settings/sync/bangumi_web_login_card.dart';
 import 'package:kazumi/pages/settings/sync/sync_settings_widgets.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/services/sync/bangumi_sync_service.dart';
+import 'package:kazumi/services/sync/webdav.dart';
 import 'package:kazumi/services/logging/logger.dart';
 
 enum _BangumiAction { verify, connect, sync }
@@ -43,6 +46,11 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
   bool? _accountExpanded;
   bool? _prefsExpanded;
 
+  /// 「Bangumi 账号」卡面板展开/收起的真控制器：保存成功后的自动收起
+  /// 必须走 `collapse()`，只改 `_accountExpanded` 布尔只会转箭头、
+  /// 面板纹丝不动（`ExpansionTile` 的展开动画由控制器驱动）。
+  final ExpansibleController _accountController = ExpansibleController();
+
   /// 「自动同步追番」卡片展开态：展开后露出「立即同步追番」按钮。
   bool _autoExpanded = false;
 
@@ -58,6 +66,7 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
 
   @override
   void dispose() {
+    _accountController.dispose();
     _tokenController.dispose();
     super.dispose();
   }
@@ -83,6 +92,18 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
         _tokenController.text = GStorage.getSetting(
           SettingsKeys.bangumiAccessToken,
         );
+      }
+      // Token 验证并保存成功 → 自动备份一次凭据（用户凭据开关开启时）。
+      // fire-and-forget：面板收起不等云端上传，失败由服务层弹提示。
+      unawaited(WebDav().autoBackupCredentialsAfterSave());
+      // 配好就收起来（与「同步服务器」卡同款）：挪到本帧结束后执行，
+      // 避免被 toast/状态刷新触发的 rebuild 盖回去。
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _accountController.collapse();
+          setState(() => _accountExpanded = false);
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -359,6 +380,7 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
   Widget _accountCard(bool configured) => TonalCard(
     elevation: kSyncCardElevation,
     child: ExpansionTile(
+      controller: _accountController,
       initiallyExpanded: !configured,
       maintainState: true,
       shape: const Border(),

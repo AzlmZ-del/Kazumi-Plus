@@ -438,7 +438,25 @@ class BangumiWebSession {
     await GStorage.putSetting(SettingsKeys.bangumiWebLoginAt, 0);
     // 昵称也跟着清，否则下次进页面会先显示上一个账号的昵称。
     await GStorage.putSetting(SettingsKeys.bangumiWebNickname, '');
+    // 记住的账号密码同样清掉：用户点「退出登录」就是要彻底退干净，
+    // 输入框里留着上一次的邮箱密码等于没退（2026-10-28 用户要求）。
+    await GStorage.putSetting(SettingsKeys.bangumiWebEmail, '');
+    await GStorage.putSetting(SettingsKeys.bangumiWebPassword, '');
     // 缓存也跟着作废，否则退出登录后再进页面会先闪一下「已登录」。
+    await invalidateValidationCache();
+  }
+
+  /// 检测到 cookie 已失效时调用：清掉本地这份过期 cookie。
+  ///
+  /// 与 [logout] 的区别是**只清登录态**：记住的账号密码、检测间隔都保留，
+  /// 用户重新登录时输入框还是回填好的。时间戳/昵称/UID 一并清掉，
+  /// 免得界面上还挂着上一次登录的痕迹。
+  Future<void> clearInvalidCookie() async {
+    _cookies.clear();
+    _uid = 0;
+    await GStorage.putSetting(SettingsKeys.bangumiWebCookie, '');
+    await GStorage.putSetting(SettingsKeys.bangumiWebLoginAt, 0);
+    await GStorage.putSetting(SettingsKeys.bangumiWebNickname, '');
     await invalidateValidationCache();
   }
 

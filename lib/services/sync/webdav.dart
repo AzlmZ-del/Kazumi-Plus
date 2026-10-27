@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:webdav_client/webdav_client.dart' as webdav;
 import 'package:path_provider/path_provider.dart';
+import 'package:kazumi/bean/dialog/dialog.dart';
 import 'package:kazumi/modules/history/history_sync.dart';
 import 'package:kazumi/modules/danmaku/danmaku_shield_sync.dart';
 import 'package:kazumi/services/storage/storage.dart';
@@ -221,6 +222,32 @@ class WebDav {
     (key) => GStorage.getSetting(key).trim().isNotEmpty,
   );
 
+  /// 「凭据保存成功后自动备份」的统一入口。
+  ///
+  /// 三个保存时机共用：Bangumi Token「验证并保存」、「网页登录」的
+  /// 「登录并保存」、WebDAV「保存并测试」。
+  ///
+  /// 规则：
+  /// - 只在「用户凭据」开关开启时触发（`webDavEnableCredentials`）：
+  ///   这是用户明确同意过「把凭据上云」的功能位，开关没开就不动云端。
+  /// - 本地一个凭据都没有时静默跳过——刚配好服务器还没登录账号
+  ///   属于正常状态，弹「没有可备份的信息」反而吓人。
+  /// - 调用方以 fire-and-forget 方式触发（不 await）：保存后的界面
+  ///   收起不等云端上传。失败（网络抖动等）只记日志并弹一次胶囊提示，
+  ///   不该让用户以为配置没存上；想手动补可以去「启用 WebDAV」卡
+  ///   点「备份账号信息到云端」。
+  Future<void> autoBackupCredentialsAfterSave() async {
+    final enabled = GStorage.getSetting(SettingsKeys.webDavEnableCredentials);
+    if (!enabled) return;
+    if (!hasAnyCredential) return;
+    try {
+      await uploadCredentials();
+    } catch (e) {
+      KazumiLogger().w('WebDAV auto credential backup failed', error: e);
+      KazumiDialog.showToast(message: '自动备份账号信息失败，请检查网络或服务器配置');
+    }
+  }
+
   /// 把本地凭据快照上传到云端（整文件原子覆盖）。
   ///
   /// 上传的是**当前生效值**的 JSON 快照（AES 加密后落盘），不是 Hive
@@ -261,6 +288,73 @@ class WebDav {
         'WebDav: credentials uploaded. keys=${credentialsMap.length}',
       );
     });
+  }
+
+  /// 从云端删除凭据备份文件（退出登录后本地已无任何凭据时用）。
+  ///
+  /// 云端本来就没有这个文件时静默返回，不算失败。
+  Future<void> removeCredentials() {
+    return _runWebDavExclusive(() async {
+      if (!await _remoteEntryExists(_credentialsPath)) {
+        return;
+      }
+      await client.remove(_credentialsPath);
+      KazumiLogger().i('WebDav: credentials backup removed from cloud');
+    });
+  }
+
+  /// 「网页登录」退出登录后，把云端备份一起更新掉。
+  ///
+  /// 退出登录清空了 cookie 与账号密码，云端那份快照就过期了：
+  /// - 本地还有别的凭据（Bangumi Token / WebDAV 账号）→ 用当前快照覆盖云端；
+  /// - 本地一个凭据都不剩 → 直接删掉云端备份文件。
+  ///
+  /// 只在「用户凭据」开关开启时触发；失败只记日志并弹提示，不影响本地退出。
+  Future<void> syncCredentialsAfterLogout() => _syncCredentialsAfterAuthChange(
+    logTag: 'logout',
+    failureMessage: '本地已退出，但云端备份未能更新，请检查网络或服务器配置',
+  );
+
+  /// 检测到 cookie 失效、本地已清掉过期 cookie 后，把云端备份一起更新掉。
+  ///
+  /// 与退出登录的区别只在提示文案：这里用户没主动退出，账号密码还留着，
+  /// 所以只说「已清理过期 Cookie」。云端处理规则完全一致——
+  /// 空值不会进快照（`uploadCredentials` 只写非空键），过期 cookie
+  /// 自然从云端消失，不会再被恢复回本地。
+  Future<void> syncCredentialsAfterCookieExpired() =>
+      _syncCredentialsAfterAuthChange(
+        logTag: 'cookie expired',
+        failureMessage: '已清理过期 Cookie，但云端备份未能更新，请检查网络或服务器配置',
+      );
+
+  /// 登录态变化（退出登录 / cookie 失效）后同步云端凭据备份的共用实现。
+  ///
+  /// 规则：
+  /// - 本地还有别的凭据（Bangumi Token / 记住的账号密码 / WebDAV 账号）
+  ///   → 用当前快照覆盖云端，空值自动从快照里消失；
+  /// - 本地一个凭据都不剩 → 直接删掉云端备份文件。
+  ///
+  /// 只在「用户凭据」开关开启时触发；失败只记日志并弹提示，不影响本地清理。
+  Future<void> _syncCredentialsAfterAuthChange({
+    required String logTag,
+    required String failureMessage,
+  }) async {
+    final enabled = GStorage.getSetting(SettingsKeys.webDavEnableCredentials);
+    if (!enabled) return;
+    try {
+      if (!initialized) await init();
+      if (hasAnyCredential) {
+        await uploadCredentials();
+      } else {
+        await removeCredentials();
+      }
+    } catch (e) {
+      KazumiLogger().w(
+        'WebDAV credential cleanup after $logTag failed',
+        error: e,
+      );
+      KazumiDialog.showToast(message: failureMessage);
+    }
   }
 
   /// 从云端下载凭据快照（AES 密文）并解密回填本地（只覆盖云端有的键）。
