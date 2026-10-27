@@ -366,6 +366,19 @@ class SettingsKeys {
     false,
     group: SettingGroup.sync,
   );
+
+  /// 「同步云端开关」：本地备份要备份哪几项，直接跟随【启用 WebDAV】的四个开关。
+  ///
+  /// 开着的时候下面那四个 `localBackupEnableXxx` 不参与判断（`LocalBackupService`
+  /// 的四个 getter 会改读 `webDavEnableXxx`），界面上也会把它们藏起来 ——
+  /// 两处同时可改会让「到底以谁为准」变得说不清。
+  ///
+  /// 关着时退回原来那四个独立开关，各存各的。
+  static const localBackupFollowWebDav = SettingKey<bool>(
+    'localBackupFollowWebDav',
+    false,
+    group: SettingGroup.sync,
+  );
   static const localBackupEnableHistory = SettingKey<bool>(
     'localBackupEnableHistory',
     false,
@@ -855,6 +868,7 @@ class SettingsKeys {
     localBackupDirectory,
     localBackupDirectoryBookmark,
     localBackupEnable,
+    localBackupFollowWebDav,
     localBackupEnableHistory,
     localBackupEnableCollect,
     localBackupEnableDanmakuShield,
