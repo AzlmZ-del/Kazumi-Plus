@@ -171,8 +171,9 @@ class _LocalBackupDirectoryCardState extends State<LocalBackupDirectoryCard> {
                   ),
                 ),
               ),
-              // 与【网页登录】卡的按钮组同一套排法：两颗等宽平分整行、
-              // 等高 `kSyncBundledButtonHeight`、左右内缩 16dp 对齐卡内分隔线。
+              // 与【网页登录】卡的按钮组完全一致：两颗等宽平分整行、
+              // 等高 `kSyncBundledButtonHeight`、左右内缩 16dp 对齐卡内分隔线，
+              // 忙时只禁用不改文案（文字换了宽度会跳，`reserveText` 那套也不再需要）。
               // 用 `Expanded` + `SizedBox(height:)` 而不是 stretch，理由同那张卡：
               // `FilledButton` 内部的 `_InputPadding` 会把约束放松，必须靠 `Expanded`
               // 给紧宽度。
@@ -185,9 +186,8 @@ class _LocalBackupDirectoryCardState extends State<LocalBackupDirectoryCard> {
                         height: kSyncBundledButtonHeight,
                         child: StateActionButton.tonal(
                           onPressed: _busy ? null : _save,
-                          text: _saving ? '正在保存…' : '保存',
+                          text: '保存目录',
                           icon: Icons.check_rounded,
-                          reserveText: '正在保存…',
                           style: syncBundledButtonStyle(context),
                         ),
                       ),
@@ -198,9 +198,8 @@ class _LocalBackupDirectoryCardState extends State<LocalBackupDirectoryCard> {
                         height: kSyncBundledButtonHeight,
                         child: StateActionButton.tonal(
                           onPressed: _busy ? null : _select,
-                          text: _selecting ? '正在选择…' : '选择目录',
+                          text: '选择目录',
                           icon: Icons.folder_open_rounded,
-                          reserveText: '正在选择…',
                           style: syncBundledButtonStyle(context),
                         ),
                       ),
@@ -369,11 +368,11 @@ class _LocalBackupSettingsCardState extends State<LocalBackupSettingsCard> {
         ),
         onExpansionChanged: (value) => setState(() => _expanded = value),
         children: [
-          // 「同步云端开关」放在分割线上方：它是「怎么决定备份哪几项」的
+          // 「同步选项」放在分割线上方：它是「怎么决定备份哪几项」的
           // 选择器，逻辑上属于整张卡的前置，而不是下面四项中的一个。
           SwitchListTile(
             secondary: Icon(Icons.cloud_sync_rounded, size: 24, color: secondary),
-            title: const Text('同步云端开关'),
+            title: const Text('同步选项'),
             subtitle: Text(
               '让备份选项与云端同步',
               style: syncSwitchSubtitleStyle(context),

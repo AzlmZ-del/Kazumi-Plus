@@ -367,7 +367,7 @@ class SettingsKeys {
     group: SettingGroup.sync,
   );
 
-  /// 「同步云端开关」：本地备份要备份哪几项，直接跟随【启用 WebDAV】的四个开关。
+  /// 「同步选项」：本地备份要备份哪几项，直接跟随【启用 WebDAV】的四个开关。
   ///
   /// 开着的时候下面那四个 `localBackupEnableXxx` 不参与判断（`LocalBackupService`
   /// 的四个 getter 会改读 `webDavEnableXxx`），界面上也会把它们藏起来 ——
