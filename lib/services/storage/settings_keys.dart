@@ -340,6 +340,52 @@ class SettingsKeys {
     false,
     group: SettingGroup.webdav,
   );
+  /// 本地备份目录（空 = 尚未选择）。
+  ///
+  /// 存的是原生侧拿到的绝对路径，不是文档树 URI —— 备份就是普通的文件拷贝，
+  /// 需要能直接 `File.copy`。
+  static const localBackupDirectory = SettingKey<String>(
+    'localBackupDirectory',
+    '',
+    group: SettingGroup.sync,
+  );
+
+  /// macOS 沙盒下的持久目录授权，仅在 macOS 写入。
+  static const localBackupDirectoryBookmark = SettingKey<String>(
+    'localBackupDirectoryBookmark',
+    '',
+    group: SettingGroup.sync,
+  );
+
+  /// 本地备份/恢复勾选的四类内容。
+  ///
+  /// 与 WebDAV 那四个开关分开存：两边想备份的东西往往不一样，
+  /// 本地常常只留一份轻量的观看记录。
+  static const localBackupEnable = SettingKey<bool>(
+    'localBackupEnable',
+    false,
+    group: SettingGroup.sync,
+  );
+  static const localBackupEnableHistory = SettingKey<bool>(
+    'localBackupEnableHistory',
+    false,
+    group: SettingGroup.sync,
+  );
+  static const localBackupEnableCollect = SettingKey<bool>(
+    'localBackupEnableCollect',
+    false,
+    group: SettingGroup.sync,
+  );
+  static const localBackupEnableDanmakuShield = SettingKey<bool>(
+    'localBackupEnableDanmakuShield',
+    false,
+    group: SettingGroup.sync,
+  );
+  static const localBackupEnableCredentials = SettingKey<bool>(
+    'localBackupEnableCredentials',
+    false,
+    group: SettingGroup.sync,
+  );
   static const danmakuShieldSyncDeviceId = SettingKey<String>(
     'danmakuShieldSyncDeviceId',
     '',
@@ -806,6 +852,13 @@ class SettingsKeys {
     historySyncDeviceId,
     historySyncSequence,
     historySyncSnapshotInitialized,
+    localBackupDirectory,
+    localBackupDirectoryBookmark,
+    localBackupEnable,
+    localBackupEnableHistory,
+    localBackupEnableCollect,
+    localBackupEnableDanmakuShield,
+    localBackupEnableCredentials,
     playerControllerLayerDisappearTime,
     defaultVolume,
     playerMuted,
