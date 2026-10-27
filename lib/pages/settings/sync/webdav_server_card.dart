@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:kazumi/bean/dialog/dialog.dart';
@@ -45,6 +47,11 @@ class _WebDavServerCardState extends State<WebDavServerCard> {
   /// 展开态。null 时退回 `initiallyExpanded`（未配置就展开）。
   bool? _expanded;
 
+  /// 面板展开/收起的真控制器：保存成功后的自动收起必须走 `collapse()`，
+  /// 只改 `_expanded` 布尔只会转箭头、面板纹丝不动
+  /// （`ExpansionTile` 的展开动画由控制器驱动）。
+  final ExpansibleController _tileController = ExpansibleController();
+
   /// 头部【测试连接】的进度与失败原因都取自服务层（`WebDav.isPinging` /
   /// `WebDav.lastPingError`），不放组件本地 —— 测试要跑好几秒，
   /// 中途切走页面再回来，按钮仍要显示「测试中…」，跟 Bangumi 那颗一致。
@@ -62,6 +69,7 @@ class _WebDavServerCardState extends State<WebDavServerCard> {
 
   @override
   void dispose() {
+    _tileController.dispose();
     _url.dispose();
     _username.dispose();
     _password.dispose();
@@ -114,8 +122,20 @@ class _WebDavServerCardState extends State<WebDavServerCard> {
       // 存好就收起来：展开区本来就是「改配置」用的，配完该让位给下面的开关。
       // 失败标记由 `WebDav.init()` 自己清（它成功了就把 lastPingError 置空），
       // 配置都换成新的了，旧结论自然作废。
-      setState(() => _expanded = false);
+      //
+      // 收起动作挪到**本帧结束后**再执行：紧跟的 toast 与自动备份会触发
+      // 额外 rebuild，同步 setState 有概率被后续的展开态刷新盖回去，
+      // 延迟一帧保证视觉上一定看到表单收起。
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _tileController.collapse();
+        setState(() => _expanded = false);
+      });
       widget.onConfigurationChanged();
+      // 保存成功即自动备份一次账号信息（若「用户凭据」功能已开启），
+      // 见 `WebDav.autoBackupCredentialsAfterSave`。
+      // fire-and-forget：收起与按钮复位不等云端上传，失败由服务层弹提示。
+      unawaited(WebDav().autoBackupCredentialsAfterSave());
     } catch (e) {
       KazumiLogger().w('WebDAV configuration failed', error: e);
       await WebDav().setEnabled(false);
@@ -139,6 +159,7 @@ class _WebDavServerCardState extends State<WebDavServerCard> {
       child: ExpansionTile(
         // 未配置时直接展开，省掉一次「点开再填」；
         // 只在首帧读一次，之后由 `_expanded` 接管。
+        controller: _tileController,
         initiallyExpanded: !configured,
         maintainState: true,
         shape: const Border(),

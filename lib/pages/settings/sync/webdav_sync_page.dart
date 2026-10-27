@@ -24,7 +24,16 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
   /// 与「追番同步」页各卡的同名常量取同一个值。
   static const double _buttonInset = 16;
 
-  bool _busy = false;
+  /// 正在执行的动作标识。每个动作一个 key，`_runAction` 期间置为该 key：
+  /// 只有对应按钮显示忙碌态，其余按钮保持原样（互斥由 `_busy` 判定拦截）。
+  ///
+  /// `null` = 空闲。`'other'` = 「启用 WebDAV」开关拨动这类没有独立按钮的
+  /// 页级动作，此时所有动作按钮都进忙碌态。
+  String? _busyAction;
+
+  /// 任意动作在跑即视为忙碌（互斥 + `PopScope` 返回拦截共用）。
+  bool get _busy => _busyAction != null;
+
   bool _failed = false;
   String? _message;
 
@@ -44,12 +53,21 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
     super.dispose();
   }
 
-  Future<void> _run(Future<void> Function() action) async {
+  /// 页级动作统一入口：跑 [action] 前把 `_busyAction` 置为 [busyKey]。
+  ///
+  /// [busyKey] 决定哪颗按钮显示忙碌态（`'other'` = 无独立按钮的页级动作，
+  /// 全部按钮进忙碌态）。忙碌期间再点任何动作都会在这里被拦掉（互斥），
+  /// 但 UI 上只有 busyKey 对应的按钮变化。
+  Future<void> _runAction({
+    required String busyKey,
+    required Future<void> Function() action,
+    bool showBusyFeedback = false,
+  }) async {
     if (_busy) return;
     setState(() {
-      _busy = true;
+      _busyAction = busyKey;
       _failed = false;
-      _message = '正在连接 WebDAV…';
+      _message = showBusyFeedback ? '正在连接 WebDAV…' : null;
     });
     try {
       await action();
@@ -57,44 +75,49 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
       KazumiLogger().w('WebDAV settings operation failed', error: e);
       if (mounted) {
         _failed = true;
-        _message = '未能完成，请检查网络或服务器配置后重试。';
+        _message = showBusyFeedback
+            ? '未能完成，请检查网络或服务器配置后重试。'
+            : _message;
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) setState(() => _busyAction = null);
     }
   }
 
-  /// 三个同步按钮统一走胶囊提示：开始、成功、失败都弹 toast，
-  /// 不再往页面里塞常驻反馈条（同步耗时长时那条会一直挂着，反而碍眼）。
+  /// 同步/备份动作统一走胶囊提示：开始、成功、失败都弹 toast，
+  /// 不往页面里塞常驻反馈条（同步耗时长时那条会一直挂着，反而碍眼）。
+  ///
+  /// 忙碌态只标在触发按钮上（[busyKey]），其余按钮视觉不变；
+  /// 互斥仍由 `_busy` 判定，忙碌期间的点击在这里直接忽略。
   Future<void> _runSync({
+    required String busyKey,
     required String startMessage,
     required String successMessage,
     required Future<void> Function() action,
-  }) async {
-    if (_busy) return;
-    setState(() {
-      _busy = true;
-      _failed = false;
-      _message = null;
-    });
-    KazumiDialog.showToast(message: startMessage);
-    try {
-      await action();
-      KazumiDialog.showToast(message: successMessage);
-    } catch (e) {
-      KazumiLogger().w('WebDAV settings operation failed', error: e);
-      KazumiDialog.showToast(message: '未能完成，请检查网络或服务器配置后重试。');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+  }) {
+    return _runAction(
+      busyKey: busyKey,
+      action: () async {
+        KazumiDialog.showToast(message: startMessage);
+        try {
+          await action();
+          KazumiDialog.showToast(message: successMessage);
+        } catch (e) {
+          KazumiLogger().w('WebDAV settings operation failed', error: e);
+          KazumiDialog.showToast(message: '未能完成，请检查网络或服务器配置后重试。');
+        }
+      },
+    );
   }
 
-  Future<void> _setEnabled(bool enabled) => _run(() async {
-    await WebDav().setEnabled(enabled);
-    _message = null;
-  });
+  Future<void> _setEnabled(bool enabled) =>
+      _runAction(busyKey: 'other', action: () async {
+        await WebDav().setEnabled(enabled);
+        _message = null;
+      });
 
   Future<void> _syncHistory() => _runSync(
+    busyKey: 'history',
     startMessage: '正在同步观看记录…',
     successMessage: '观看记录已同步',
     action: () async {
@@ -120,6 +143,7 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
   }
 
   Future<void> _syncCollectibles() => _runSync(
+    busyKey: 'collect',
     startMessage: '正在同步收藏列表…',
     successMessage: '收藏列表已同步',
     action: () async {
@@ -134,6 +158,7 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
   );
 
   Future<void> _syncDanmakuShield() => _runSync(
+    busyKey: 'shield',
     startMessage: '正在同步弹幕屏蔽词…',
     successMessage: '弹幕屏蔽词已同步',
     action: () => widget.danmakuShieldSync.sync(),
@@ -143,6 +168,7 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
   bool get _hasAnyCredential => WebDav().hasAnyCredential;
 
   Future<void> _uploadCredentials() => _runSync(
+    busyKey: 'uploadCredentials',
     startMessage: '正在备份账号信息…',
     successMessage: '账号信息已备份到云端',
     action: () async {
@@ -160,6 +186,7 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
   );
 
   Future<void> _restoreCredentials() => _runSync(
+    busyKey: 'restoreCredentials',
     startMessage: '正在恢复账号信息…',
     successMessage: '账号信息已恢复',
     action: () async {
@@ -180,6 +207,9 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
     final history = GStorage.getSetting(SettingsKeys.webDavEnableHistory);
     final collect = GStorage.getSetting(SettingsKeys.webDavEnableCollect);
     final shield = GStorage.getSetting(SettingsKeys.webDavEnableDanmakuShield);
+    final credentials = GStorage.getSetting(
+      SettingsKeys.webDavEnableCredentials,
+    );
     final url = GStorage.getSetting(SettingsKeys.webDavURL).trim();
     final configured = url.isNotEmpty;
     return PopScope(
@@ -202,6 +232,7 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
               history: history,
               collect: collect,
               shield: shield,
+              credentials: credentials,
             ),
             if (_message != null)
               SyncFeedback(message: _message!, error: _failed, busy: _busy),
@@ -218,6 +249,7 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
     required bool history,
     required bool collect,
     required bool shield,
+    required bool credentials,
   }) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
@@ -314,72 +346,109 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
                       SettingsKeys.webDavEnableDanmakuShield,
                       value,
                     );
-                    if (!mounted) return;
-                    setState(() {});
-                    if (value) await _syncDanmakuShield();
+                    if (mounted) setState(() {});
                   }
                 : null,
           ),
-          Padding(
-            // 横向在 childrenPadding 的 12dp 之上再缩 16dp，对齐卡内
-            // `Divider(indent: 16, endIndent: 16)`；顶部 10dp 与上面的开关列表拉开。
-            padding: const EdgeInsets.symmetric(horizontal: _buttonInset),
-            child: Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                spacing: 10,
-                children: [
+          SwitchListTile(
+            secondary: Icon(Icons.key_rounded, size: 24, color: secondary),
+            title: const Text('用户凭据'),
+            subtitle: Text(
+              '开启后可备份/恢复 Bangumi 与服务器账号信息（AES 加密存储）',
+              style: syncSwitchSubtitleStyle(context),
+            ),
+            value: credentials,
+            onChanged: enabled && !_busy
+                ? (value) async {
+                    await GStorage.putSetting(
+                      SettingsKeys.webDavEnableCredentials,
+                      value,
+                    );
+                    if (mounted) setState(() {});
+                  }
+                : null,
+          ),
+          // 总开关关闭时不显示动作按钮区：开关都禁用了，按钮留着也没法点。
+          if (enabled)
+            Padding(
+              // 横向在 childrenPadding 的 12dp 之上再缩 16dp，对齐卡内
+              // `Divider(indent: 16, endIndent: 16)`；顶部 10dp 与上面的开关列表拉开。
+              padding: const EdgeInsets.symmetric(horizontal: _buttonInset),
+              child: Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  spacing: 10,
+                  children: [
+                    SyncActionButton(
+                      onPressed: history && _busyAction == null
+                          ? _syncHistory
+                          : null,
+                      text: _busyAction == 'history' || _busyAction == 'other'
+                          ? '请稍候…'
+                          : '立即同步观看记录',
+                      icon: Icons.sync_rounded,
+                    ),
                   SyncActionButton(
-                    onPressed: enabled && !_busy ? _syncHistory : null,
-                    text: _busy ? '请稍候…' : '立即同步观看记录',
-                    icon: Icons.sync_rounded,
-                  ),
-                  SyncActionButton(
-                    onPressed: enabled && collect && !_busy
+                    onPressed: collect && _busyAction == null
                         ? _syncCollectibles
                         : null,
-                    text: '立即同步收藏列表',
+                    text: _busyAction == 'collect' || _busyAction == 'other'
+                        ? '请稍候…'
+                        : '立即同步收藏列表',
                     icon: Icons.sync_rounded,
                   ),
                   SyncActionButton(
-                    onPressed: enabled && shield && !_busy
+                    onPressed: shield && _busyAction == null
                         ? _syncDanmakuShield
                         : null,
-                    text: '立即同步弹幕屏蔽词',
+                    text: _busyAction == 'shield' || _busyAction == 'other'
+                        ? '请稍候…'
+                        : '立即同步弹幕屏蔽词',
                     icon: Icons.sync_rounded,
                   ),
                 ],
               ),
             ),
           ),
-          Padding(
-            // 「账号信息备份」区：与上方按钮区同款 16dp 内缩，顶部 10dp 拉开。
-            padding: const EdgeInsets.symmetric(horizontal: _buttonInset),
-            child: Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                spacing: 10,
-                children: [
-                  SyncActionButton(
-                    onPressed: configured && !_busy && _hasAnyCredential
-                        ? _uploadCredentials
-                        : null,
-                    text: _busy ? '请稍候…' : '备份账号信息到云端',
-                    icon: Icons.cloud_upload_rounded,
-                  ),
-                  SyncActionButton(
-                    onPressed: configured && !_busy
-                        ? _restoreCredentials
-                        : null,
-                    text: '从云端恢复账号信息',
-                    icon: Icons.cloud_download_rounded,
-                  ),
-                ],
+          if (enabled && credentials)
+            Padding(
+              // 「账号信息备份」区：与上方按钮区同款 16dp 内缩，顶部 10dp 拉开。
+              padding: const EdgeInsets.symmetric(horizontal: _buttonInset),
+              child: Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  spacing: 10,
+                  children: [
+                    SyncActionButton(
+                      onPressed: configured &&
+                              _busyAction == null &&
+                              _hasAnyCredential
+                          ? _uploadCredentials
+                          : null,
+                      text:
+                          _busyAction == 'uploadCredentials' ||
+                              _busyAction == 'other'
+                          ? '请稍候…'
+                          : '备份账号信息到云端',
+                      icon: Icons.cloud_upload_rounded,
+                    ),
+                    SyncActionButton(
+                      onPressed: configured && _busyAction == null
+                          ? _restoreCredentials
+                          : null,
+                      text:
+                          _busyAction == 'restoreCredentials' ||
+                              _busyAction == 'other'
+                          ? '请稍候…'
+                          : '从云端恢复账号信息',
+                      icon: Icons.cloud_download_rounded,
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
