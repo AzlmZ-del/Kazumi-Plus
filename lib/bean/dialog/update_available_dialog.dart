@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:kazumi/bean/dialog/dialog.dart';
 import 'package:kazumi/bean/settings/settings_dropdown_tile.dart';
 import 'package:kazumi/bean/settings/settings_list.dart';
+import 'package:kazumi/bean/widget/release_notes_view.dart';
 import 'package:kazumi/bean/widget/state_presentation.dart';
 import 'package:kazumi/bean/widget/tonal_card.dart';
 import 'package:kazumi/services/update/auto_updater.dart';
@@ -194,9 +195,8 @@ class _UpdateAvailableDialogState extends State<UpdateAvailableDialog> {
   }
 
   Widget _buildReleaseNotes(BuildContext context) {
-    final theme = Theme.of(context);
     final maxHeight =
-        (MediaQuery.sizeOf(context).height * 0.22).clamp(96.0, 180.0);
+        (MediaQuery.sizeOf(context).height * 0.32).clamp(120.0, 260.0);
 
     return TonalCard(
       padding: const EdgeInsets.fromLTRB(16, 12, 4, 12),
@@ -207,12 +207,7 @@ class _UpdateAvailableDialogState extends State<UpdateAvailableDialog> {
           child: SingleChildScrollView(
             controller: _notesController,
             padding: const EdgeInsets.only(right: 12),
-            child: Text(
-              widget.updateInfo.description.trim(),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
+            child: ReleaseNotesView(markdown: widget.updateInfo.description),
           ),
         ),
       ),
