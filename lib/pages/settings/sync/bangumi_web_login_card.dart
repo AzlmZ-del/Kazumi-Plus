@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
@@ -9,6 +11,7 @@ import 'package:kazumi/request/apis/bangumi_api.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/services/sync/bangumi_web_session.dart';
+import 'package:kazumi/services/sync/webdav.dart';
 
 /// 同步设置里的「网页登录」卡片。
 ///
@@ -53,6 +56,11 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
   /// 卡片展开态，仅用于驱动右侧箭头。null 时退回 `initiallyExpanded`。
   bool? _expanded;
 
+  /// 面板展开/收起的真控制器：登录并保存成功后的自动收起必须走
+  /// `collapse()`，只改 `_expanded` 布尔只会转箭头、面板纹丝不动
+  /// （`ExpansionTile` 的展开动画由控制器驱动）。
+  final ExpansibleController _tileController = ExpansibleController();
+
   @override
   void initState() {
     super.initState();
@@ -72,7 +80,13 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
       if (cached != null) {
         _loggedIn = cached;
         _expired = !cached;
-        if (cached) _loadNickname();
+        if (cached) {
+          _loadNickname();
+        } else {
+          // 缓存里记着已失效（可能是启动预热查出来的）：过期 cookie 一样要清掉，
+          // 免得升级前留下的旧 cookie 一直躺在设置箱里。
+          _clearExpiredCookie();
+        }
       } else {
         _validate();
       }
@@ -96,10 +110,22 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
 
   @override
   void dispose() {
+    _tileController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _captchaController.dispose();
     super.dispose();
+  }
+
+  /// 清掉已失效的本地 cookie，并在后台把云端备份里的过期数据一起抹掉。
+  ///
+  /// 与「退出登录」的区别：只清登录态，记住的账号密码与检测间隔都留着，
+  /// 用户重新登录时输入框还是回填好的（2026-10-28 用户要求）。
+  ///
+  /// 云端同步走 fire-and-forget，不等它——界面该立刻切回登录表单。
+  Future<void> _clearExpiredCookie() async {
+    await _session.clearInvalidCookie();
+    unawaited(WebDav().syncCredentialsAfterCookieExpired());
   }
 
   Future<void> _validate() async {
@@ -111,11 +137,18 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
     try {
       final ok = await _session.validate();
       KazumiLogger().i('BangumiWebUI: session validate -> $ok');
+      // cookie 还在但校验失败 = 过期；从没登录过的情况根本不会走到这里。
+      // 必须在清理前取，清完 hasStoredCookie 就是 false 了。
+      final expired = !ok && _session.hasStoredCookie;
+      if (expired) {
+        // 过期 cookie 留着没用，还会让下次进页面先闪一下「已登录」再退回表单。
+        // 清完顺手在后台同步云端备份，把过期数据一起抹掉。
+        await _clearExpiredCookie();
+      }
       if (mounted) {
         setState(() {
           _loggedIn = ok;
-          // cookie 还在但校验失败 = 过期；从没登录过的情况根本不会走到这里。
-          _expired = !ok && _session.hasStoredCookie;
+          _expired = expired;
         });
       }
       if (ok) await _loadNickname();
@@ -223,6 +256,18 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
         });
         KazumiDialog.showToast(message: '已登录，账号密码已保存');
       }
+      // 登录并保存成功 → 自动备份一次凭据（用户凭据开关开启时）。
+      // fire-and-forget：面板收起不等云端上传，失败由服务层弹提示。
+      unawaited(WebDav().autoBackupCredentialsAfterSave());
+      // 配好就收起来（与「同步服务器」卡同款）：挪到本帧结束后执行，
+      // 避免被 toast/状态刷新触发的 rebuild 盖回去。
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _tileController.collapse();
+          setState(() => _expanded = false);
+        });
+      }
       await _loadNickname();
     } catch (e, stackTrace) {
       KazumiLogger().w(
@@ -249,9 +294,15 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
       _nickname = '';
       _captcha = null;
       _captchaController.clear();
-      // 退出的是登录态，不是「已保存的账号密码」——两回事，输入框保持原样。
+      // 退出登录会把记住的账号密码一起清掉（`BangumiWebSession.logout`），
+      // 输入框同步清空，否则界面上还留着上一次的邮箱密码。
+      _emailController.clear();
+      _passwordController.clear();
     });
     KazumiDialog.showToast(message: '已退出网页登录');
+    // 云端那份凭据备份跟着更新（还有别的凭据就覆盖，一个不剩就删除）。
+    // fire-and-forget：退出动作不等云端往返。
+    unawaited(WebDav().syncCredentialsAfterLogout());
     // 退出后表单重新露出来，同样先把验证码摆好。
     _ensureCaptcha();
   }
@@ -325,6 +376,7 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
   Widget build(BuildContext context) => TonalCard(
     elevation: kSyncCardElevation,
     child: ExpansionTile(
+      controller: _tileController,
       // 一律默认收起，与是否登录无关：这张卡平时只是「看一眼登录状态」，
       // 表单摊开会把页面挤得很长。要看表单就点一下展开。
       initiallyExpanded: false,
