@@ -35,7 +35,6 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
   bool _passwordVisible = false;
   _BangumiAction? _action;
   String? _tokenError;
-  String? _tokenStatus;
   String? _message;
   bool _failed = false;
 
@@ -73,17 +72,17 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
     setState(() {
       _action = _BangumiAction.verify;
       _tokenError = null;
-      _tokenStatus = null;
       _message = null;
       _failed = false;
     });
     try {
       await _bangumi.saveToken(_tokenController.text);
       if (mounted) {
+        // 保存成功后的「已连接 用户名」不再在输入框下重复展示——
+        // 卡片头部的副标题（「已连接 · 用户名」）刷新后就有同样的信息。
         _tokenController.text = GStorage.getSetting(
           SettingsKeys.bangumiAccessToken,
         );
-        _tokenStatus = '已连接 ${_bangumi.username}';
       }
     } catch (e) {
       if (mounted) {
@@ -337,14 +336,21 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
       // 展开区四边统一 12dp（与其余五张卡一致）。
       childrenPadding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
       // 展开区默认 `CrossAxisAlignment.center`（`expansion_tile.dart:689`），
-      // 但 `SyncActionButton` 自带 `Align(centerLeft)`，宽度由 `SizedBox` 钉死，
+      // `SyncActionButton` 自带 `Align(centerLeft)`、宽度由 `SizedBox` 钉死，
       // 这里用 stretch 只为了让外层占满、按钮靠左对齐。
       expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SyncActionButton(
-          onPressed: enabled && configured && !_busy ? _sync : null,
-          text: _action == _BangumiAction.sync ? '正在同步追番…' : '立即同步追番',
-          icon: Icons.sync_rounded,
+        // 按钮左右边缘对齐卡内 `Divider(indent: 16)`：从 childrenPadding 的
+        // 12dp 再往里缩 16dp，高度由 `SyncActionButton` 钉在 40dp。
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: _buttonInset),
+          child: SyncActionButton(
+            onPressed: enabled && configured && !_busy ? _sync : null,
+            text: _action == _BangumiAction.sync
+                ? '正在同步追番…'
+                : '立即同步追番',
+            icon: Icons.sync_rounded,
+          ),
         ),
       ],
     ),
@@ -399,7 +405,6 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
             enableSuggestions: false,
             onChanged: (_) => setState(() {
               _tokenError = null;
-              _tokenStatus = null;
             }),
             onSubmitted: (_) => _saveToken(),
             decoration: InputDecoration(
@@ -425,13 +430,10 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
             ),
           ),
         ),
-        if (_tokenError != null ||
-            _tokenStatus != null ||
-            _action == _BangumiAction.verify) ...[
+        if (_tokenError != null || _action == _BangumiAction.verify) ...[
           const SizedBox(height: 6),
           Text(
-            _tokenError ??
-                (_action == _BangumiAction.verify ? '正在验证…' : _tokenStatus!),
+            _tokenError ?? '正在验证…',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: _tokenError != null
                   ? Theme.of(context).colorScheme.error
@@ -440,7 +442,7 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
             maxLines: 5,
           ),
         ],
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         // 按钮组的左右边缘与「网页登录」卡的分隔线对齐：那里是
         // `Divider(indent: 16, endIndent: 16)`，即从 `childrenPadding` 的 12dp
         // 再往里缩 16dp，所以这里补上同样的 `_buttonInset`。
