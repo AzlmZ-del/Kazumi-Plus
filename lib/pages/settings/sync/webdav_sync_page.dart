@@ -20,6 +20,10 @@ class WebDavSyncPage extends StatefulWidget {
 }
 
 class _WebDavSyncPageState extends State<WebDavSyncPage> {
+  /// 动作按钮的左右内缩，对齐卡内 `Divider(indent: 16)`，
+  /// 与「追番同步」页各卡的同名常量取同一个值。
+  static const double _buttonInset = 16;
+
   bool _busy = false;
   bool _failed = false;
   String? _message;
@@ -282,33 +286,36 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
                 : null,
           ),
           Padding(
-            // 横向交给 `childrenPadding` 的 12dp（与「自动同步追番」卡的按钮同宽），
-            // 顶部 10dp 与上面的开关列表拉开。
-            padding: const EdgeInsets.only(top: 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              spacing: 10,
-              children: [
-                SyncActionButton(
-                  onPressed: enabled && !_busy ? _syncHistory : null,
-                  text: _busy ? '请稍候…' : '立即同步观看记录',
-                  icon: Icons.sync_rounded,
-                ),
-                SyncActionButton(
-                  onPressed: enabled && collect && !_busy
-                      ? _syncCollectibles
-                      : null,
-                  text: '立即同步收藏列表',
-                  icon: Icons.sync_rounded,
-                ),
-                SyncActionButton(
-                  onPressed: enabled && shield && !_busy
-                      ? _syncDanmakuShield
-                      : null,
-                  text: '立即同步弹幕屏蔽词',
-                  icon: Icons.sync_rounded,
-                ),
-              ],
+            // 横向在 childrenPadding 的 12dp 之上再缩 16dp，对齐卡内
+            // `Divider(indent: 16, endIndent: 16)`；顶部 10dp 与上面的开关列表拉开。
+            padding: const EdgeInsets.symmetric(horizontal: _buttonInset),
+            child: Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                spacing: 10,
+                children: [
+                  SyncActionButton(
+                    onPressed: enabled && !_busy ? _syncHistory : null,
+                    text: _busy ? '请稍候…' : '立即同步观看记录',
+                    icon: Icons.sync_rounded,
+                  ),
+                  SyncActionButton(
+                    onPressed: enabled && collect && !_busy
+                        ? _syncCollectibles
+                        : null,
+                    text: '立即同步收藏列表',
+                    icon: Icons.sync_rounded,
+                  ),
+                  SyncActionButton(
+                    onPressed: enabled && shield && !_busy
+                        ? _syncDanmakuShield
+                        : null,
+                    text: '立即同步弹幕屏蔽词',
+                    icon: Icons.sync_rounded,
+                  ),
+                ],
+              ),
             ),
           ),
         ],

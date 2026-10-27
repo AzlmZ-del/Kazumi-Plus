@@ -28,6 +28,10 @@ class _WebDavServerCardState extends State<WebDavServerCard> {
   /// 输入框统一高度，与「追番同步」页保持一致。
   static const double _fieldHeight = 48;
 
+  /// 动作按钮的左右内缩，对齐卡内 `Divider(indent: 16)`，
+  /// 与「追番同步」页各卡的同名常量取同一个值。
+  static const double _buttonInset = 16;
+
   final _formKey = GlobalKey<FormState>();
   final _url = TextEditingController();
   final _username = TextEditingController();
@@ -246,10 +250,15 @@ class _WebDavServerCardState extends State<WebDavServerCard> {
                     ),
                   ),
                 ),
-                SyncActionButton(
-                  onPressed: _busy ? null : _save,
-                  text: _busy ? '正在测试连接…' : '保存并测试',
-                  icon: Icons.cloud_done_rounded,
+                // 左右边缘对齐卡内分隔线（`Divider(indent: 16)`），
+                // 高度由 `SyncActionButton` 钉在 40dp。
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: _buttonInset),
+                  child: SyncActionButton(
+                    onPressed: _busy ? null : _save,
+                    text: _busy ? '正在测试连接…' : '保存并测试',
+                    icon: Icons.cloud_done_rounded,
+                  ),
                 ),
               ],
             ),
