@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:kazumi/bean/dialog/dialog.dart';
 import 'package:kazumi/bean/settings/settings_detail_scaffold.dart';
 import 'package:kazumi/bean/widget/tonal_card.dart';
+import 'package:kazumi/pages/settings/sync/local_backup_cards.dart';
 import 'package:kazumi/pages/settings/sync/sync_settings_widgets.dart';
 import 'package:kazumi/pages/settings/sync/webdav_server_card.dart';
 import 'package:kazumi/services/logging/logger.dart';
@@ -131,6 +132,11 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
     },
   );
 
+  /// 备份目录改动后重建下面的卡片：按钮的可用态读的就是目录。
+  void _onLocalBackupDirectoryChanged() {
+    if (mounted) setState(() {});
+  }
+
   /// 服务器配置保存成功（或失败关掉了同步）后刷新本页：
   /// `configured` / 域名 / 「启用 WebDAV」卡的置灰状态都跟着变。
   void _onConfigurationChanged() {
@@ -236,6 +242,10 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
             ),
             if (_message != null)
               SyncFeedback(message: _message!, error: _failed, busy: _busy),
+            LocalBackupDirectoryCard(
+              onDirectoryChanged: _onLocalBackupDirectoryChanged,
+            ),
+            const LocalBackupSettingsCard(),
           ],
         ),
       ),

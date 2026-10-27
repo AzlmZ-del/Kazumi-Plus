@@ -14,6 +14,7 @@ import 'package:kazumi/utils/constants.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/services/player/pip_utils.dart';
 import 'package:kazumi/services/sync/webdav.dart';
+import 'package:kazumi/services/backup/local_backup_service.dart';
 import 'package:flutter/gestures.dart';
 import 'package:kazumi/pages/player/player_controller.dart';
 import 'package:flutter/material.dart';
@@ -79,6 +80,7 @@ class _PlayerItemState extends State<PlayerItem>
       widget.videoPageController;
   final HistoryController historyController = inject<HistoryController>();
   final MyController myController = inject<MyController>();
+  final LocalBackupService _localBackup = inject<LocalBackupService>();
   AudioController get _audioController => playerController.audioController;
   late final Map<String, PlayerShortcutAction> keyboardActions;
   late final Map<String, PlayerLongPressShortcutActions>
@@ -599,6 +601,12 @@ class _PlayerItemState extends State<PlayerItem>
         KazumiLogger().w('WebDav: auto history sync failed', error: e);
       }
     }
+  }
+
+  /// 退出播放页时把观看记录落到本地备份目录。
+  /// 不 await：播放页收尾不该等磁盘写。
+  void _backupHistoryLocally() {
+    unawaited(_localBackup.autoBackupHistory());
   }
 
   Future<void> _bindAudioService() async {
@@ -1355,6 +1363,8 @@ class _PlayerItemState extends State<PlayerItem>
   @override
   void dispose() {
     // The route-scoped PlayerController owns playback disposal.
+    // 离开播放页是观看记录最完整的时刻，顺手把本地备份刷一次。
+    _backupHistoryLocally();
     _fullscreenListener();
     _playerSizeListener();
     WidgetsBinding.instance.removeObserver(this);
