@@ -10,6 +10,7 @@ import 'package:kazumi/modules/collect/collect_module.dart';
 import 'package:kazumi/modules/collect/collect_change_module.dart';
 import 'package:kazumi/services/sync/history_sync_service.dart';
 import 'package:kazumi/services/sync/webdav_remote_file_commit.dart';
+import 'package:kazumi/services/security/credential_cipher.dart';
 import 'package:kazumi/utils/async_serial_queue.dart';
 import 'package:kazumi/utils/async_single_flight.dart';
 
@@ -222,8 +223,10 @@ class WebDav {
 
   /// 把本地凭据快照上传到云端（整文件原子覆盖）。
   ///
-  /// 上传的是**当前生效值**的 JSON 快照，不是 Hive 箱文件——
-  /// 设置箱里混着几十个无关键，整箱备份会让两台设备互相覆盖设置。
+  /// 上传的是**当前生效值**的 JSON 快照（AES 加密后落盘），不是 Hive
+  /// 箱文件——设置箱里混着几十个无关键，整箱备份会让两台设备互相覆盖
+  /// 设置。文件格式：`{version: 2, cipher: 'aes-256-gcm', data: base64}`，
+  /// `data` 解密后才是凭据 JSON（`uploadCredentialsPayload` 的形状）。
   Future<void> uploadCredentials() {
     return _runWebDavExclusive(() async {
       await _ensureRemoteDirectory(_syncRootPath);
@@ -236,11 +239,16 @@ class WebDav {
               key.name: GStorage.getSetting(key),
         },
       };
+      final credentialsMap = payload['credentials'] as Map<String, Object?>;
+      final envelope = <String, Object?>{
+        'version': 2,
+        'cipher': 'aes-256-gcm',
+        'data': CredentialCipher.encryptToBase64(jsonEncode(payload)),
+      };
       final runFile = File(
         '${webDavLocalTempDirectory.path}/credentials.json',
       );
-      final credentialsMap = payload['credentials'] as Map<String, Object?>;
-      await runFile.writeAsString(jsonEncode(payload), flush: true);
+      await runFile.writeAsString(jsonEncode(envelope), flush: true);
       await _publishRemoteFile(
         sourceFilePath: runFile.path,
         destinationPath: _credentialsPath,
@@ -255,11 +263,13 @@ class WebDav {
     });
   }
 
-  /// 从云端下载凭据快照并回填本地（只覆盖云端有的键）。
+  /// 从云端下载凭据快照（AES 密文）并解密回填本地（只覆盖云端有的键）。
   ///
-  /// 只写设置箱，不触发任何登录/校验请求——有效性由既有逻辑
-  /// （`BangumiWebSession.validate()`、下次同步）自行判定。
-  /// 云端没有备份文件时抛异常，由调用方转成用户提示。
+  /// 文件必须是 `uploadCredentials` 写出的 v2 加密封套
+  /// （`{cipher, data}`）——旧版明文备份不支持，格式不对一律报
+  /// 「备份文件格式不正确」。只写设置箱，不触发任何登录/校验请求——
+  /// 有效性由既有逻辑（`BangumiWebSession.validate()`、下次同步）
+  /// 自行判定。云端没有备份文件时抛异常，由调用方转成用户提示。
   Future<void> restoreCredentials() {
     return _runWebDavExclusive(() async {
       await _ensureRemoteDirectory(_syncRootPath);
@@ -275,7 +285,15 @@ class WebDav {
       await client.read2File(_credentialsPath, runFile.path);
       final decoded =
           jsonDecode(await runFile.readAsString()) as Map<String, dynamic>;
-      final credentials = decoded['credentials'];
+      final cipher = decoded['cipher'];
+      final data = decoded['data'];
+      if (cipher is! String || cipher.isEmpty || data is! String) {
+        throw Exception('备份文件格式不正确');
+      }
+      final inner = jsonDecode(
+        CredentialCipher.decryptFromBase64(data),
+      ) as Map<String, dynamic>;
+      final credentials = inner['credentials'];
       if (credentials is! Map<String, dynamic>) {
         throw Exception('备份文件格式不正确');
       }
