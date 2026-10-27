@@ -34,6 +34,13 @@ class GStorage {
   /// Queue to serialize write operations
   static Future<void> _collectChangesWriteQueue = Future.value();
 
+  /// 收藏数据发生变更后的通知钩子。
+  ///
+  /// 挂在 `appendCollectChange` 这个唯一的写入口上，本地备份之类的旁路
+  /// 订阅者不用去改每一个收藏操作，也不会漏掉 Bangumi 云端拉回来的变更。
+  /// 回调必须是 fire-and-forget 的轻量函数，真正的重活由订阅者自己排队。
+  static void Function()? onCollectChanged;
+
   /// Next ID
   static int _nextCollectChangeId = 0;
 
@@ -112,8 +119,18 @@ class GStorage {
       );
       await collectChanges.put(change.id, change);
       await collectChanges.flush();
+      _notifyCollectChanged();
       return change;
     });
+  }
+
+  /// 通知订阅者收藏已变更。回调抛错不能影响写入本身。
+  static void _notifyCollectChanged() {
+    try {
+      onCollectChanged?.call();
+    } catch (e) {
+      KazumiLogger().w('GStorage: collect change listener failed', error: e);
+    }
   }
 
   /// Update an existing collect change

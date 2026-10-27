@@ -219,8 +219,11 @@ class WebDav {
   ///
   /// 「立即备份」在没有任何凭据时给出明确报错，而不是往云端传一个空壳文件。
   bool get hasAnyCredential => _credentialKeys.any(
-    (key) => GStorage.getSetting(key).trim().isNotEmpty,
-  );
+        (key) => GStorage.getSetting(key).trim().isNotEmpty,
+      );
+
+  /// 参与账号信息备份的凭据键（本地备份复用同一份清单）。
+  static List<SettingKey<String>> get credentialKeys => _credentialKeys;
 
   /// 「凭据保存成功后自动备份」的统一入口。
   ///
