@@ -538,7 +538,7 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
           ),
         ),
       ],
-      const SizedBox(height: 16),
+      const SizedBox(height: 12),
       // 「获取验证码」按钮已去掉：点右侧验证码框即可获取/刷新，功能重复。
       //
       // 与已登录态的「重新检查 / 退出登录」保持同一规格：左右边缘对齐下方分隔线，

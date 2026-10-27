@@ -106,7 +106,11 @@ const double kSyncCardTileHeight = 72;
 const double kSyncCardElevation = 1.5;
 
 /// 同步设置页动作按钮的高度（dp）。宽度不锁死，由父级拉伸到整行。
-const double kSyncActionButtonHeight = 48;
+///
+/// 2026-10-27 用户拍板：从 48 收到 40（`kSyncBundledButtonHeight`），
+/// 与「重新检查 / 退出登录」等 bundled 按钮同高；宽度上各调用点
+/// 额外包 16dp 内缩，对齐卡内 `Divider(indent: 16)`。
+const double kSyncActionButtonHeight = 40;
 
 /// 同步设置页动作按钮的统一外观：与未改版前的 `FilledButton.tonalIcon` 同配色
 /// （`secondaryContainer` 底 + `onSecondaryContainer` 字），
@@ -326,12 +330,13 @@ class SyncExpandChevron extends StatelessWidget {
   );
 }
 
-/// 同步设置页的动作按钮：撑满整行 × `kSyncActionButtonHeight`、强调色底、白字、
-/// 与卡片主标题同字号。
+/// 同步设置页的动作按钮：撑满父级给定宽度 × `kSyncActionButtonHeight`（40dp）、
+/// 强调色底、白字、与卡片主标题同字号。
 ///
-/// 宽度用 `double.infinity` 交给父级决定，两个调用方都是
-/// `CrossAxisAlignment.stretch` 的列/展开区，所以拿到的就是「整行宽度」。
-/// 不写死数值的好处：换机型、改页面左右内边距、桌面端拉宽窗口都自动跟着变。
+/// 宽度用 `double.infinity` 交给父级决定，调用方都是
+/// `CrossAxisAlignment.stretch` 的列/展开区；要缩进时由调用点外面包
+/// `Padding(horizontal: 16)`（对齐卡内 `Divider(indent: 16)`），
+/// 组件本身不管横向内边距。
 class SyncActionButton extends StatelessWidget {
   const SyncActionButton({
     super.key,
