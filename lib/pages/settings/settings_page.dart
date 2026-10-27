@@ -115,7 +115,7 @@ const List<_SettingsGroup> _settingsGroups = [
         path: '/settings/storage',
       ),
       _SettingsCategory(
-        label: '关于',
+        label: '关于软件',
         description: '版本与开源信息',
         icon: Icons.info_outline_rounded,
         path: '/settings/about',

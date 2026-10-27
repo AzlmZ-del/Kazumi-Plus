@@ -10,7 +10,7 @@ class CreditsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SettingsDetailScaffold(
-        title: const Text('致谢'),
+        title: const Text('致谢名单'),
         body: AboutContent(
           children: [
             ContentSection.group(

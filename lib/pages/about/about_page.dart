@@ -60,7 +60,7 @@ class AboutPage extends StatelessWidget {
                     ),
                     const AboutLinkTile.route(
                       icon: Icons.favorite_outline_rounded,
-                      title: '致谢',
+                      title: '致谢名单',
                       route: '/settings/about/credits',
                     ),
                     const AboutLinkTile(
