@@ -139,6 +139,44 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
     action: () => widget.danmakuShieldSync.sync(),
   );
 
+  /// 「账号信息备份」卡的展开态（本页唯一需要记住展开态的独立卡）。
+  bool? _credentialsExpanded;
+
+  /// 本地是否存有任何凭据（Bangumi Token/账密/Cookie、WebDAV 配置）。
+  bool get _hasAnyCredential => WebDav().hasAnyCredential;
+
+  Future<void> _uploadCredentials() => _runSync(
+    startMessage: '正在备份账号信息…',
+    successMessage: '账号信息已备份到云端',
+    action: () async {
+      final webDav = WebDav();
+      if (!_hasAnyCredential) {
+        throw Exception('本地还没有可备份的账号信息');
+      }
+      if (!webDav.initialized) {
+        await webDav.init();
+      } else {
+        await webDav.ping();
+      }
+      await webDav.uploadCredentials();
+    },
+  );
+
+  Future<void> _restoreCredentials() => _runSync(
+    startMessage: '正在恢复账号信息…',
+    successMessage: '账号信息已恢复',
+    action: () async {
+      final webDav = WebDav();
+      if (!webDav.initialized) {
+        await webDav.init();
+      } else {
+        await webDav.ping();
+      }
+      await webDav.restoreCredentials();
+      if (mounted) setState(() {});
+    },
+  );
+
   @override
   Widget build(BuildContext context) {
     final enabled = GStorage.getSetting(SettingsKeys.webDavEnable);
@@ -161,6 +199,7 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
               description: '连接自己的云盘，同步观看记录、收藏列表与弹幕屏蔽词。',
             ),
             WebDavServerCard(onConfigurationChanged: _onConfigurationChanged),
+            _credentialsCard(configured: configured),
             _enableCard(
               configured: configured,
               enabled: enabled,
@@ -313,6 +352,72 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
                         : null,
                     text: '立即同步弹幕屏蔽词',
                     icon: Icons.sync_rounded,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 「账号信息备份」卡片：头部开关式外观不设开关，展开后是备份/恢复两颗按钮。
+  ///
+  /// 与其余六张卡同构：72dp 头部 + `Divider(indent: 16)` + 16dp 内缩的按钮区。
+  /// 未配置服务器时整卡置灰（备份恢复都要先连上云盘）。
+  Widget _credentialsCard({required bool configured}) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final dimmed = colors.onSurface.withValues(alpha: 0.38);
+    final foreground = configured ? colors.onSurface : dimmed;
+    final secondary = configured ? colors.onSurfaceVariant : dimmed;
+    final subtitle = configured
+        ? (_hasAnyCredential ? '备份或恢复 Bangumi 与服务器凭据' : '本地暂无账号信息')
+        : '请先配置服务器';
+
+    return TonalCard(
+      elevation: kSyncCardElevation,
+      child: ExpansionTile(
+        initiallyExpanded: _credentialsExpanded ?? false,
+        maintainState: true,
+        shape: const Border(),
+        collapsedShape: const Border(),
+        minTileHeight: kSyncCardTileHeight,
+        tilePadding: const EdgeInsets.symmetric(horizontal: 20),
+        childrenPadding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+        expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+        leading: Icon(Icons.key_rounded, color: secondary),
+        title: SyncCardTitle('账号信息备份', color: foreground),
+        subtitle: SyncCardSubtitle(subtitle, color: secondary),
+        trailing: SyncExpandChevron(
+          expanded: _credentialsExpanded ?? false,
+          color: secondary,
+        ),
+        onExpansionChanged: (value) => setState(() => _credentialsExpanded = value),
+        children: [
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: _buttonInset),
+            child: Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                spacing: 10,
+                children: [
+                  SyncActionButton(
+                    onPressed: configured && !_busy && _hasAnyCredential
+                        ? _uploadCredentials
+                        : null,
+                    text: _busy ? '请稍候…' : '备份到云端',
+                    icon: Icons.cloud_upload_rounded,
+                  ),
+                  SyncActionButton(
+                    onPressed: configured && !_busy
+                        ? _restoreCredentials
+                        : null,
+                    text: '从云端恢复',
+                    icon: Icons.cloud_download_rounded,
                   ),
                 ],
               ),
