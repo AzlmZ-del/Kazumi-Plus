@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:webdav_client/webdav_client.dart' as webdav;
 import 'package:path_provider/path_provider.dart';
@@ -18,6 +19,7 @@ class WebDav {
   static const String _historyChangesPath = '$_historyRootPath/changes';
   static const String _historySnapshotPath = '$_historyRootPath/snapshot.json';
   static const String _danmakuShieldPath = '$_syncRootPath/danmakuShield';
+  static const String _credentialsPath = '$_syncRootPath/credentials.json';
 
   late String webDavURL;
   late String webDavUsername;
@@ -194,6 +196,105 @@ class WebDav {
     try {
       await File(tempFilePath).delete();
     } catch (_) {}
+  }
+
+  /// 参与账号信息备份的凭据键。
+  ///
+  /// 全部明文存于本地 Hive 设置箱（与备份文件一致，不做额外加密，方案 1）。
+  /// WebDAV 三项「备份了也帮不了新设备首次连接」（新设备必须先手填才能读到
+  /// 云端文件），但留档无害——换服务器/迁移时可以照抄。
+  static const List<SettingKey<String>> _credentialKeys = [
+    SettingsKeys.bangumiAccessToken,
+    SettingsKeys.bangumiWebCookie,
+    SettingsKeys.bangumiWebEmail,
+    SettingsKeys.bangumiWebPassword,
+    SettingsKeys.webDavURL,
+    SettingsKeys.webDavUsername,
+    SettingsKeys.webDavPassword,
+  ];
+
+  /// 本地是否存有任何可备份的凭据。
+  ///
+  /// 「立即备份」在没有任何凭据时给出明确报错，而不是往云端传一个空壳文件。
+  bool get hasAnyCredential => _credentialKeys.any(
+    (key) => GStorage.getSetting(key).trim().isNotEmpty,
+  );
+
+  /// 把本地凭据快照上传到云端（整文件原子覆盖）。
+  ///
+  /// 上传的是**当前生效值**的 JSON 快照，不是 Hive 箱文件——
+  /// 设置箱里混着几十个无关键，整箱备份会让两台设备互相覆盖设置。
+  Future<void> uploadCredentials() {
+    return _runWebDavExclusive(() async {
+      await _ensureRemoteDirectory(_syncRootPath);
+      final payload = <String, Object?>{
+        'version': 1,
+        'backupAt': DateTime.now().toIso8601String(),
+        'credentials': {
+          for (final key in _credentialKeys)
+            if (GStorage.getSetting(key).trim().isNotEmpty)
+              key.name: GStorage.getSetting(key),
+        },
+      };
+      final runFile = File(
+        '${webDavLocalTempDirectory.path}/credentials.json',
+      );
+      final credentialsMap = payload['credentials'] as Map<String, Object?>;
+      await runFile.writeAsString(jsonEncode(payload), flush: true);
+      await _publishRemoteFile(
+        sourceFilePath: runFile.path,
+        destinationPath: _credentialsPath,
+        temporaryPath: '$_credentialsPath.cache',
+      );
+      try {
+        await runFile.delete();
+      } catch (_) {}
+      KazumiLogger().i(
+        'WebDav: credentials uploaded. keys=${credentialsMap.length}',
+      );
+    });
+  }
+
+  /// 从云端下载凭据快照并回填本地（只覆盖云端有的键）。
+  ///
+  /// 只写设置箱，不触发任何登录/校验请求——有效性由既有逻辑
+  /// （`BangumiWebSession.validate()`、下次同步）自行判定。
+  /// 云端没有备份文件时抛异常，由调用方转成用户提示。
+  Future<void> restoreCredentials() {
+    return _runWebDavExclusive(() async {
+      await _ensureRemoteDirectory(_syncRootPath);
+      if (!await _remoteEntryExists(_credentialsPath)) {
+        throw Exception('云端还没有账号信息备份');
+      }
+      final runFile = File(
+        '${webDavLocalTempDirectory.path}/credentials.json',
+      );
+      if (await runFile.exists()) {
+        await runFile.delete();
+      }
+      await client.read2File(_credentialsPath, runFile.path);
+      final decoded =
+          jsonDecode(await runFile.readAsString()) as Map<String, dynamic>;
+      final credentials = decoded['credentials'];
+      if (credentials is! Map<String, dynamic>) {
+        throw Exception('备份文件格式不正确');
+      }
+      final byName = {
+        for (final key in _credentialKeys) key.name: key,
+      };
+      var restored = 0;
+      for (final entry in credentials.entries) {
+        final key = byName[entry.key];
+        final value = entry.value;
+        if (key == null || value is! String) continue;
+        await GStorage.putSetting(key, value);
+        restored++;
+      }
+      try {
+        await runFile.delete();
+      } catch (_) {}
+      KazumiLogger().i('WebDav: credentials restored. keys=$restored');
+    });
   }
 
   Future<void> syncHistory() {
