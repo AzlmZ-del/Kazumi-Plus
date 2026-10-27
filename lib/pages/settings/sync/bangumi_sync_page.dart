@@ -430,14 +430,14 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
             ),
           ),
         ),
-        if (_tokenError != null || _action == _BangumiAction.verify) ...[
+        // 输入框下只兜错误红字；「正在验证…」进度由「验证并保存」按钮的
+        // 文案与置灰表达，不再重复展示。
+        if (_tokenError != null) ...[
           const SizedBox(height: 6),
           Text(
-            _tokenError ?? '正在验证…',
+            _tokenError!,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: _tokenError != null
-                  ? Theme.of(context).colorScheme.error
-                  : Theme.of(context).colorScheme.onSurfaceVariant,
+              color: Theme.of(context).colorScheme.error,
             ),
             maxLines: 5,
           ),
