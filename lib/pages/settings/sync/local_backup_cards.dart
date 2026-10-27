@@ -2,13 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 
 import 'package:kazumi/bean/dialog/dialog.dart';
+import 'package:kazumi/bean/widget/state_presentation.dart';
 import 'package:kazumi/bean/widget/tonal_card.dart';
 import 'package:kazumi/pages/settings/sync/sync_settings_widgets.dart';
 import 'package:kazumi/services/backup/local_backup_service.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/services/storage/storage.dart';
 
-/// 「多设备同步」页里的【本地备份路径】卡：只负责选目录、显示当前目录。
+/// 「多设备同步」页里的【本地备份路径】卡：负责填目录、显示当前目录。
+///
+/// 目录既能手打完整路径，也能点「选择目录」开系统选择器回填 —— 两者最终
+/// 都走 `LocalBackupService` 的同一套落地流程（建目录 + 试写 + 存设置），
+/// 所以填错了会立刻在「保存」时被挡下来，而不是等到备份时才发现。
 ///
 /// 与【同步服务器】卡的分工一致——这里只解决「备份到哪儿」，
 /// 「备份什么」和「什么时候备份」都在下面的【启用本地备份】卡里。
@@ -36,7 +41,7 @@ class _LocalBackupDirectoryCardState extends State<LocalBackupDirectoryCard> {
 
   final LocalBackupService _service = inject<LocalBackupService>();
 
-  /// 目录只读框的内容。单独持一个 controller，避免每次 build 新建。
+  /// 目录输入框的内容。既可手打，也可由系统选择器回填。
   final TextEditingController _pathController = TextEditingController();
 
   /// 展开态。null 时退回 `initiallyExpanded`（未选目录就展开）。
@@ -44,6 +49,11 @@ class _LocalBackupDirectoryCardState extends State<LocalBackupDirectoryCard> {
 
   /// 原生目录选择器正在前台。
   bool _selecting = false;
+
+  /// 正在把手填的路径落盘（建目录 + 试写）。
+  bool _saving = false;
+
+  bool get _busy => _selecting || _saving;
 
   final ExpansibleController _tileController = ExpansibleController();
 
@@ -60,8 +70,18 @@ class _LocalBackupDirectoryCardState extends State<LocalBackupDirectoryCard> {
     super.dispose();
   }
 
+  /// 选完目录就收起展开区：这块本来就是「换目录」用的，和【同步服务器】卡一个习惯。
+  void _collapseAfterSaved() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _tileController.collapse();
+      setState(() => _expanded = false);
+    });
+  }
+
   Future<void> _select() async {
-    if (_selecting) return;
+    if (_busy) return;
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _selecting = true);
     try {
       final selected = await _service.selectDirectory();
@@ -70,18 +90,34 @@ class _LocalBackupDirectoryCardState extends State<LocalBackupDirectoryCard> {
       _pathController.text = selected;
       KazumiDialog.showToast(message: '备份目录已更新');
       widget.onDirectoryChanged();
-      // 选完就收起来：展开区本来就是「换目录」用的，和【同步服务器】卡一个习惯。
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        _tileController.collapse();
-        setState(() => _expanded = false);
-      });
+      _collapseAfterSaved();
     } catch (e) {
       KazumiLogger().w('LocalBackup: select directory failed', error: e);
       if (!mounted) return;
       KazumiDialog.showToast(message: '$e');
     } finally {
       if (mounted) setState(() => _selecting = false);
+    }
+  }
+
+  /// 把手打的路径落盘。与 [_select] 的区别只在路径来源。
+  Future<void> _save() async {
+    if (_busy) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() => _saving = true);
+    try {
+      final saved = await _service.setDirectory(_pathController.text);
+      if (!mounted) return;
+      _pathController.text = saved;
+      KazumiDialog.showToast(message: '备份目录已更新');
+      widget.onDirectoryChanged();
+      _collapseAfterSaved();
+    } catch (e) {
+      KazumiLogger().w('LocalBackup: save directory failed', error: e);
+      if (!mounted) return;
+      KazumiDialog.showToast(message: '$e');
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -116,31 +152,60 @@ class _LocalBackupDirectoryCardState extends State<LocalBackupDirectoryCard> {
             spacing: 20,
             children: [
               // 与【同步服务器】卡一致：输入框整行、固定 48 高、M3 描边。
+              // 可直接手打路径，也可以点下面的按钮开系统选择器回填。
               SizedBox(
                 height: _fieldHeight,
                 child: TextField(
-                  readOnly: true,
-                  // 只读框不弹键盘，点一下就该直接开选择器，省一次多余点击。
-                  onTap: _selecting ? null : _select,
                   controller: _pathController,
+                  enabled: !_busy,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _save(),
                   style: Theme.of(context).textTheme.bodyMedium,
                   decoration: const InputDecoration(
                     labelText: '备份目录',
-                    hintText: '尚未选择',
+                    hintText: '点下方按钮选择，或直接填写完整路径',
                     isDense: true,
                     border: OutlineInputBorder(),
                   ),
                 ),
               ),
-              // 按钮同样照抄【同步服务器】的【保存并测试】：
-              // 整行撑满、40dp 高、左右内缩 16dp 对齐卡内分隔线。
+              // 与【网页登录】卡的按钮组同一套排法：两颗等宽平分整行、
+              // 等高 `kSyncBundledButtonHeight`、左右内缩 16dp 对齐卡内分隔线。
+              // 用 `Expanded` + `SizedBox(height:)` 而不是 stretch，理由同那张卡：
+              // `FilledButton` 内部的 `_InputPadding` 会把约束放松，必须靠 `Expanded`
+              // 给紧宽度。
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: _buttonInset),
-                child: SyncActionButton(
-                  onPressed: _selecting ? null : _select,
-                  text: _selecting ? '正在选择…' : '选择备份目录',
-                  icon: Icons.folder_open_rounded,
-                  reserveText: '正在选择…',
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: kSyncBundledButtonHeight,
+                        child: StateActionButton.tonal(
+                          onPressed: _busy ? null : _save,
+                          text: _saving ? '正在保存…' : '保存',
+                          icon: Icons.check_rounded,
+                          reserveText: '正在保存…',
+                          style: syncBundledButtonStyle(context),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SizedBox(
+                        height: kSyncBundledButtonHeight,
+                        child: StateActionButton.tonal(
+                          onPressed: _busy ? null : _select,
+                          text: _selecting ? '正在选择…' : '选择目录',
+                          icon: Icons.folder_open_rounded,
+                          reserveText: '正在选择…',
+                          style: syncBundledButtonStyle(context),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -255,6 +320,7 @@ class _LocalBackupSettingsCardState extends State<LocalBackupSettingsCard> {
     final secondary = colors.onSurfaceVariant;
     final configured = _service.directory.isNotEmpty;
     final enabled = _service.enabled;
+    final followWebDav = _service.followWebDav;
     final history = _service.historySelected;
     final collect = _service.collectSelected;
     final shield = _service.shieldSelected;
@@ -264,7 +330,9 @@ class _LocalBackupSettingsCardState extends State<LocalBackupSettingsCard> {
     final foreground = configured ? colors.onSurface : dimmed;
     final subtitleColor = configured ? secondary : dimmed;
     final subtitle = configured
-        ? (enabled ? '已开启，请选择要备份内容' : '开启后选择要备份的内容')
+        ? (enabled
+              ? (followWebDav ? '已开启，备份选项跟随 WebDAV' : '已开启，请选择要备份内容')
+              : '开启后选择要备份的内容')
         : '请先选择备份目录';
     // 总开关开着、选好目录、且没有动作在跑，才能动。
     final canAct = configured && enabled && !_busy;
@@ -301,63 +369,89 @@ class _LocalBackupSettingsCardState extends State<LocalBackupSettingsCard> {
         ),
         onExpansionChanged: (value) => setState(() => _expanded = value),
         children: [
-          const Divider(height: 1, indent: 16, endIndent: 16),
+          // 「同步云端开关」放在分割线上方：它是「怎么决定备份哪几项」的
+          // 选择器，逻辑上属于整张卡的前置，而不是下面四项中的一个。
           SwitchListTile(
-            secondary: Icon(Icons.history_rounded, size: 24, color: secondary),
-            title: const Text('观看记录'),
+            secondary: Icon(Icons.cloud_sync_rounded, size: 24, color: secondary),
+            title: const Text('同步云端开关'),
             subtitle: Text(
-              '备份播放进度与历史记录',
+              '让备份选项与云端同步',
               style: syncSwitchSubtitleStyle(context),
             ),
-            value: history,
+            value: followWebDav,
             onChanged: enabled && !_busy
-                ? (value) =>
-                    _toggle(SettingsKeys.localBackupEnableHistory, value)
+                ? (value) => _toggle(SettingsKeys.localBackupFollowWebDav, value)
                 : null,
           ),
-          SwitchListTile(
-            secondary: Icon(Icons.favorite_rounded, size: 24, color: secondary),
-            title: const Text('收藏列表'),
-            subtitle: Text(
-              '备份所有追番分类与收藏状态',
-              style: syncSwitchSubtitleStyle(context),
+          // 跟随云端时四项由【启用 WebDAV】那边决定，这里全部藏起来：
+          // 分割线也一起去掉，否则会剩一条悬空的线。
+          if (!followWebDav) ...[
+            const Divider(height: 1, indent: 16, endIndent: 16),
+            SwitchListTile(
+              secondary: Icon(Icons.history_rounded, size: 24, color: secondary),
+              title: const Text('观看记录'),
+              subtitle: Text(
+                '备份播放进度与历史记录',
+                style: syncSwitchSubtitleStyle(context),
+              ),
+              value: history,
+              onChanged: enabled && !_busy
+                  ? (value) =>
+                      _toggle(SettingsKeys.localBackupEnableHistory, value)
+                  : null,
             ),
-            value: collect,
-            onChanged: enabled && !_busy
-                ? (value) =>
-                    _toggle(SettingsKeys.localBackupEnableCollect, value)
-                : null,
-          ),
-          SwitchListTile(
-            secondary: Icon(
-              Icons.filter_alt_rounded,
-              size: 24,
-              color: secondary,
+            SwitchListTile(
+              secondary: Icon(
+                Icons.favorite_rounded,
+                size: 24,
+                color: secondary,
+              ),
+              title: const Text('收藏列表'),
+              subtitle: Text(
+                '备份所有追番分类与收藏状态',
+                style: syncSwitchSubtitleStyle(context),
+              ),
+              value: collect,
+              onChanged: enabled && !_busy
+                  ? (value) =>
+                      _toggle(SettingsKeys.localBackupEnableCollect, value)
+                  : null,
             ),
-            title: const Text('弹幕屏蔽词'),
-            subtitle: Text(
-              '备份关键词与正则表达式规则',
-              style: syncSwitchSubtitleStyle(context),
+            SwitchListTile(
+              secondary: Icon(
+                Icons.filter_alt_rounded,
+                size: 24,
+                color: secondary,
+              ),
+              title: const Text('弹幕屏蔽词'),
+              subtitle: Text(
+                '备份关键词与正则表达式规则',
+                style: syncSwitchSubtitleStyle(context),
+              ),
+              value: shield,
+              onChanged: enabled && !_busy
+                  ? (value) => _toggle(
+                      SettingsKeys.localBackupEnableDanmakuShield,
+                      value,
+                    )
+                  : null,
             ),
-            value: shield,
-            onChanged: enabled && !_busy
-                ? (value) =>
-                    _toggle(SettingsKeys.localBackupEnableDanmakuShield, value)
-                : null,
-          ),
-          SwitchListTile(
-            secondary: Icon(Icons.key_rounded, size: 24, color: secondary),
-            title: const Text('用户凭据'),
-            subtitle: Text(
-              '备份 Bangumi 与服务器账号信息（AES 加密存储）',
-              style: syncSwitchSubtitleStyle(context),
+            SwitchListTile(
+              secondary: Icon(Icons.key_rounded, size: 24, color: secondary),
+              title: const Text('用户凭据'),
+              subtitle: Text(
+                '备份 Bangumi 与服务器账号信息（AES 加密存储）',
+                style: syncSwitchSubtitleStyle(context),
+              ),
+              value: credentials,
+              onChanged: enabled && !_busy
+                  ? (value) => _toggle(
+                      SettingsKeys.localBackupEnableCredentials,
+                      value,
+                    )
+                  : null,
             ),
-            value: credentials,
-            onChanged: enabled && !_busy
-                ? (value) =>
-                    _toggle(SettingsKeys.localBackupEnableCredentials, value)
-                : null,
-          ),
+          ],
           // 总开关关闭时不显示按钮区：开关都禁用了，按钮留着也没法点。
           if (enabled)
             Padding(

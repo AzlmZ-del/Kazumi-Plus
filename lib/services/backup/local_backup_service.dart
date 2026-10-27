@@ -205,17 +205,25 @@ class LocalBackupService {
     await autoBackup(only: _credentialsOnly);
   }
 
-  bool get historySelected =>
-      GStorage.getSetting(SettingsKeys.localBackupEnableHistory);
+  /// 「同步云端开关」是否开启：开启时四项内容跟着【启用 WebDAV】走。
+  bool get followWebDav =>
+      GStorage.getSetting(SettingsKeys.localBackupFollowWebDav);
 
-  bool get collectSelected =>
-      GStorage.getSetting(SettingsKeys.localBackupEnableCollect);
+  bool get historySelected => followWebDav
+      ? GStorage.getSetting(SettingsKeys.webDavEnableHistory)
+      : GStorage.getSetting(SettingsKeys.localBackupEnableHistory);
 
-  bool get shieldSelected =>
-      GStorage.getSetting(SettingsKeys.localBackupEnableDanmakuShield);
+  bool get collectSelected => followWebDav
+      ? GStorage.getSetting(SettingsKeys.webDavEnableCollect)
+      : GStorage.getSetting(SettingsKeys.localBackupEnableCollect);
 
-  bool get credentialsSelected =>
-      GStorage.getSetting(SettingsKeys.localBackupEnableCredentials);
+  bool get shieldSelected => followWebDav
+      ? GStorage.getSetting(SettingsKeys.webDavEnableDanmakuShield)
+      : GStorage.getSetting(SettingsKeys.localBackupEnableDanmakuShield);
+
+  bool get credentialsSelected => followWebDav
+      ? GStorage.getSetting(SettingsKeys.webDavEnableCredentials)
+      : GStorage.getSetting(SettingsKeys.localBackupEnableCredentials);
 
   bool get hasSelection =>
       historySelected ||
@@ -231,11 +239,58 @@ class LocalBackupService {
     final current = directory;
     final selected = await _pickDirectory(current.isEmpty ? null : current);
     if (selected == null || selected.isEmpty) return null;
-    await ensureDirectoryWritable(selected);
-    await _persistAccess(selected);
-    await GStorage.putSetting(SettingsKeys.localBackupDirectory, selected);
-    _accessLost = false;
+    await _applyDirectory(selected);
     return selected;
+  }
+
+  /// 手动填写的目录路径。返回落盘后的路径。
+  ///
+  /// 与 [selectDirectory] 的差别只在「路径从哪来」：那边走系统选择器，这边
+  /// 收用户手打的字符串。拿到路径之后要做的事一模一样 —— 申请存储权限、
+  /// 建目录并试写、留持久授权、存设置 —— 所以两个入口最后都汇到
+  /// [_applyDirectory]，避免两套流程各自演化。
+  Future<String> setDirectory(String rawPath) async {
+    if (!supportsCustomDirectory) {
+      throw const LocalBackupException('当前平台不支持手动填写目录');
+    }
+    final target = _normalizePath(rawPath);
+    if (target.isEmpty) {
+      throw const LocalBackupException('请填写备份目录的完整路径');
+    }
+    if (!path.isAbsolute(target)) {
+      throw const LocalBackupException(
+        '请填写完整路径，例如 /storage/emulated/0/Kazumi',
+      );
+    }
+    await _applyDirectory(target);
+    return target;
+  }
+
+  /// 清洗手打的路径：去空白，去掉「复制为路径」带出来的成对引号。
+  String _normalizePath(String rawPath) {
+    var target = rawPath.trim();
+    if (target.length >= 2) {
+      final first = target[0];
+      final last = target[target.length - 1];
+      if ((first == '"' && last == '"') || (first == "'" && last == "'")) {
+        target = target.substring(1, target.length - 1).trim();
+      }
+    }
+    return target;
+  }
+
+  /// 选择器与手填共用的落地流程：授权 → 建目录试写 → 留持久授权 → 存设置。
+  Future<void> _applyDirectory(String target) async {
+    await _ensureStorageAccess();
+    try {
+      await ensureDirectoryWritable(target);
+    } catch (e) {
+      KazumiLogger().w('LocalBackup: directory not writable: $target', error: e);
+      throw const LocalBackupException('这个目录无法写入，请检查路径是否正确、是否有访问权限');
+    }
+    await _persistAccess(target);
+    await GStorage.putSetting(SettingsKeys.localBackupDirectory, target);
+    _accessLost = false;
   }
 
   Future<void> resetDirectory() async {
@@ -293,13 +348,7 @@ class LocalBackupService {
       );
     }
     try {
-      // 只有文档树授权拿不到直接文件路径，必须先要到全盘访问。
-      final granted =
-          await _androidChannel.invokeMethod<bool>('requestStorageAccess') ??
-          false;
-      if (!granted) {
-        throw const LocalBackupException('未授予存储访问权限，备份目录未修改');
-      }
+      await _ensureStorageAccess();
       return await _androidChannel.invokeMethod<String>('pickDirectory', {
         'initialDirectory': initialDirectory,
       });
@@ -309,6 +358,20 @@ class LocalBackupService {
             ? '请选择内部存储或 SD 卡中的本地文件夹'
             : '选择备份目录失败，请重试',
       );
+    }
+  }
+
+  /// Android 上要直接拿文件路径，必须先要到全盘访问权限；其它平台不用管。
+  ///
+  /// 选择器和手填都要过这一关，所以单独拆出来 —— 手填时用户可能还没授权，
+  /// 没有权限的话 `ensureDirectoryWritable` 会直接失败，报错信息又看不懂。
+  Future<void> _ensureStorageAccess() async {
+    if (!Platform.isAndroid) return;
+    final granted =
+        await _androidChannel.invokeMethod<bool>('requestStorageAccess') ??
+        false;
+    if (!granted) {
+      throw const LocalBackupException('未授予存储访问权限，备份目录未修改');
     }
   }
 
@@ -328,7 +391,12 @@ class LocalBackupService {
     await restoreAccess();
     _requireDirectory();
     if (!hasSelection) {
-      throw const LocalBackupException('请先选择要备份的内容');
+      // 跟随云端时四项都不在本地，用户看到「请先选择要备份的内容」会找不着地方改。
+      throw LocalBackupException(
+        followWebDav
+            ? 'WebDAV 尚未启用任何同步内容，请先在【启用 WebDAV】里选择'
+            : '请先选择要备份的内容',
+      );
     }
     final done = await _writeBackup();
     KazumiLogger().i('LocalBackup: backed up. items=$done');
