@@ -4,6 +4,7 @@ import 'package:kazumi/bean/settings/settings_list.dart';
 import 'package:kazumi/services/network/acceleration_mode.dart';
 import 'package:kazumi/services/network/bangumi_acceleration.dart';
 import 'package:kazumi/services/network/image_acceleration.dart';
+import 'package:kazumi/services/network/image_quality.dart';
 import 'package:kazumi/services/network/rules_mirror.dart';
 import 'package:kazumi/services/storage/storage.dart';
 
@@ -84,6 +85,7 @@ class _NetworkMirrorSettingsState extends State<NetworkMirrorSettings> {
     final bangumiAcceleration = BangumiAcceleration.current;
     final rulesMirror = RulesMirror.current;
     final imageAcceleration = ImageAcceleration.current;
+    final imageQuality = ImageQuality.current;
     return SettingsSection(
       title: const Text('访问加速'),
       margin: widget.margin,
@@ -146,6 +148,26 @@ class _NetworkMirrorSettingsState extends State<NetworkMirrorSettings> {
             current: imageAcceleration,
             modes: ImageAcceleration.values,
             setting: SettingsKeys.imageAcceleration,
+          ),
+        ),
+        SettingsTile(
+          leading: Icons.hd_rounded,
+          title: const Text('封面质量'),
+          description: const Text(
+            '番剧封面分辨率',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          value: SizedBox(
+            width: 60,
+            child: Text(imageQuality.label, textAlign: TextAlign.center),
+          ),
+          onPressed: (context) => _pick(
+            context,
+            title: '封面质量',
+            current: imageQuality,
+            modes: ImageQuality.values,
+            setting: SettingsKeys.imageQuality,
           ),
         ),
       ],
