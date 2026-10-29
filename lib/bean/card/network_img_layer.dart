@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:kazumi/services/logging/logger.dart';
+import 'package:kazumi/services/network/image_quality.dart';
 import 'package:kazumi/utils/constants.dart';
 import 'package:kazumi/utils/image_extension.dart';
 
@@ -60,7 +61,7 @@ class NetworkImgLayer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl = src ?? '';
+    final imageUrl = ImageQuality.current.applyUrl(src ?? '');
     if (imageUrl.isEmpty) {
       return _placeholder(context);
     }
