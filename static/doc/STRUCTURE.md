@@ -78,18 +78,22 @@ lib/
 │   ├── config/
 │   └── core/
 │
-├── services/                   # 服务
-│   ├── download/
-│   ├── logging/
-│   ├── network/
-│   ├── platform/
-│   ├── player/
-│   ├── plugin/
-│   ├── shaders/
-│   ├── storage/
-│   ├── sync/
-│   ├── update/
-│   └── video_source/
+├── services/                   # 业务服务与平台能力层
+│   ├── anime_schedule/         # 放送时间表（AniList 排期拉取与 Bgm→AniList 映射）
+│   ├── backup/                 # 本地备份与恢复
+│   ├── deep_links/             # kazumi:// 深度链接解析与路由分发
+│   ├── download/               # 离线下载管理、后台下载任务、目录授权与路径迁移
+│   ├── logging/                # 日志服务（KazumiLogger）
+│   ├── network/                # 代理管理、计费网络检测、镜像加速与代理感知图片缓存
+│   ├── platform/               # 桌面窗口配置、托盘与退出、刷新率、系统菜单、Windows 快捷方式与平台能力检测
+│   ├── player/                 # 音频控制、外部播放器、DLNA 投屏、画中画、SyncPlay、截图导出与播放策略
+│   ├── plugin/                 # XPath / API 规则引擎、站点 Cookie、人机验证、规则导入解析与有效性追踪
+│   ├── security/               # 凭证加密存储
+│   ├── shaders/                # Anime4K 着色器资源服务
+│   ├── storage/                # Hive 存储管理（GStorage）、设置键（SettingsKeys）与缓存清理
+│   ├── sync/                   # WebDAV、Bangumi 收藏、观看历史与弹幕屏蔽同步服务
+│   ├── update/                 # 自动更新检查、下载源选择与安装包下载
+│   └── video_source/           # 视频源地址解析服务（HTTP 解析、WebView 嗅探与解析池）
 │
 ├── utils/                      # 无状态工具
 │
