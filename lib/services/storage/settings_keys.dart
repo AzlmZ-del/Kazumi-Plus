@@ -284,6 +284,12 @@ class SettingsKeys {
     'ech',
     group: SettingGroup.proxy,
   );
+  // 番剧封面的分辨率档位，默认保持原图不做处理。
+  static const imageQuality = SettingKey<String>(
+    'imageQuality',
+    'original',
+    group: SettingGroup.proxy,
+  );
   // Defaults to ECH: it reaches the official API without relying on a mirror.
   static const bangumiAcceleration = SettingKey<String>(
     'bangumiAcceleration',
@@ -796,6 +802,7 @@ class SettingsKeys {
     ruleRepositories,
     enableBangumiProxy,
     imageAcceleration,
+    imageQuality,
     bangumiAcceleration,
     rulesMirror,
     enableSystemProxy,
