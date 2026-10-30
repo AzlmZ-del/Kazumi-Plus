@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -5,8 +7,13 @@ import 'package:flutter_modular/flutter_modular.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
 
+import 'package:kazumi/bean/dialog/adaptive_bottom_sheet.dart';
+import 'package:kazumi/bean/dialog/dialog.dart';
+import 'package:kazumi/bean/dialog/material_bottom_sheet.dart';
 import 'package:kazumi/bean/widget/loading_indicator.dart';
 import 'package:kazumi/bean/widget/media_error_widget.dart';
+import 'package:kazumi/bean/widget/split_list_row.dart';
+import 'package:kazumi/services/network/image_saver.dart';
 import 'package:kazumi/utils/device.dart';
 
 class ImageViewerRouteArgs {
@@ -14,11 +21,13 @@ class ImageViewerRouteArgs {
     required List<String> imageUrls,
     this.initialIndex = 0,
     this.heroTag,
+    this.fileBaseName,
   }) : imageUrls = List.unmodifiable(imageUrls);
 
   final List<String> imageUrls;
   final int initialIndex;
   final Object? heroTag;
+  final String? fileBaseName;
 }
 
 class ImageViewer extends StatefulWidget {
@@ -28,11 +37,15 @@ class ImageViewer extends StatefulWidget {
   final int initialIndex;
   final Object? heroTag;
 
+  /// 长按保存时的文件名（不含扩展名）。为空时从图片 URL 推导。
+  final String? fileBaseName;
+
   ImageViewer({
     super.key,
     required List<String> imageUrls,
     this.initialIndex = 0,
     this.heroTag,
+    this.fileBaseName,
   }) : imageUrls = List.unmodifiable(imageUrls);
 
   static Object heroTagFor(String imageUrl, int index) => '$imageUrl-$index';
@@ -42,6 +55,7 @@ class ImageViewer extends StatefulWidget {
     required List<String> imageUrls,
     int initialIndex = 0,
     Object? heroTag,
+    String? fileBaseName,
   }) async {
     if (imageUrls.isEmpty) return;
 
@@ -56,6 +70,7 @@ class ImageViewer extends StatefulWidget {
         imageUrls: imageUrls,
         initialIndex: index,
         heroTag: effectiveHeroTag,
+        fileBaseName: fileBaseName,
       ),
     );
   }
@@ -80,7 +95,52 @@ class _ImageViewerState extends State<ImageViewer> {
 
   static const double _maxScaleFactor = 6.0;
 
+  /// 判定「轻点」的最大位移（逻辑像素），超过就当成拖拽或翻页滑动。
+  static const double _tapSlop = 12.0;
+
+  /// 判定「轻点」的最大按住时长，超过就当成即将长按。
+  static const int _tapMaxMillis = 400;
+
+  /// 未放大时算作「就是初始大小」的容差，避免浮点误差把整图判成已放大。
+  static const double _zoomTolerance = 1.05;
+
+  Offset? _pointerDownPosition;
+  int _pointerDownMillis = 0;
+
+  /// 这一次按压过程中同时按下过的最大手指数。
+  /// 多指（捏合缩放）抬起时不能当成轻点，否则刚缩回整图就被关掉。
+  int _pointerPeak = 0;
+  int _pointerActive = 0;
+
+  /// 防止一次点击同时触发「立即关闭」与手势回退，重复 pop 会把下层页面也带走。
+  bool _closing = false;
+
+  /// 各控制器上「整图状态」的基准缩放值记录订阅，销毁时要一并取消。
+  final Map<int, StreamSubscription<PhotoViewControllerValue>>
+      _baselineSubscriptions = {};
+
   bool get _isMultiImage => widget.imageUrls.length > 1;
+
+  /// 记录某张图「整图状态」的缩放基准。
+  ///
+  /// photo_view 没有单独的 initialScale 概念可读，只能取它排完版后
+  /// 第一次上报的 scale —— 那一帧正是 contained 值。
+  void _watchBaseline(int key, PhotoViewController controller) {
+    if (_baselineSubscriptions.containsKey(key)) return;
+    _baselineSubscriptions[key] = controller.outputStateStream.listen((value) {
+      if (_initialScales[key] == null && value.scale != null) {
+        _initialScales[key] = value.scale;
+      }
+    });
+  }
+
+  /// 当前图片是否被放大过（相比打开时的整图大小）。
+  bool get _isZoomedIn {
+    final baseline = _initialScales[_activeScaleKey];
+    final current = _activePhotoViewController?.scale;
+    if (baseline == null || current == null) return false;
+    return current > baseline * _zoomTolerance;
+  }
 
   @override
   void initState() {
@@ -89,10 +149,17 @@ class _ImageViewerState extends State<ImageViewer> {
     _photoViewController = PhotoViewController();
     _scaleStateController = PhotoViewScaleStateController();
     _pageController = PageController(initialPage: widget.initialIndex);
+    if (!_isMultiImage) {
+      _watchBaseline(-1, _photoViewController);
+    }
   }
 
   @override
   void dispose() {
+    for (final subscription in _baselineSubscriptions.values) {
+      subscription.cancel();
+    }
+    _baselineSubscriptions.clear();
     _photoViewController.dispose();
     _scaleStateController.dispose();
     for (final controller in _galleryControllers.values) {
@@ -121,6 +188,76 @@ class _ImageViewerState extends State<ImageViewer> {
 
   int get _activeScaleKey => _isMultiImage ? _currentIndex : -1;
 
+  /// 长按任意位置弹出保存菜单。
+  ///
+  /// 菜单用底部弹层而不是右键菜单位置，手机与桌面同一套；
+  /// 长按整屏都算数，不要求按在图片像素上。
+  Future<void> _handleLongPress() async {
+    final index = _currentIndex;
+    final imageUrl = widget.imageUrls[index];
+    final action = await showAdaptiveBottomSheet<_ImageAction>(
+      context: context,
+      builder: (sheetContext) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          MaterialBottomSheetHeader(
+            title: '图片',
+            onClose: () => Navigator.of(sheetContext).pop(),
+          ),
+          Padding(
+            padding: materialBottomSheetContentPadding,
+            child: SplitListGroup(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.download_rounded),
+                  title: const Text('保存图片'),
+                  subtitle: Text(
+                    isDesktop() ? '选择位置另存为图片' : '保存到系统相册',
+                  ),
+                  onTap: () =>
+                      Navigator.of(sheetContext).pop(_ImageAction.save),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || action != _ImageAction.save) return;
+    await _saveImage(imageUrl, index);
+  }
+
+  Future<void> _saveImage(String imageUrl, int index) async {
+    final base = widget.fileBaseName?.trim();
+    final fileName = (base == null || base.isEmpty)
+        ? ImageSaver.safeName(_fileNameFromUrl(imageUrl), fallback: '图片')
+        : (widget.imageUrls.length > 1 ? '$base-${index + 1}' : base);
+    final result = await ImageSaver.save(
+      imageUrl: imageUrl,
+      fileName: fileName,
+    );
+    if (!mounted) return;
+    switch (result.status) {
+      case ImageSaveStatus.saved:
+        KazumiDialog.showToast(
+          message: isDesktop() ? '图片已保存' : '已保存到相册',
+        );
+      case ImageSaveStatus.cancelled:
+        break;
+      case ImageSaveStatus.failed:
+        KazumiDialog.showToast(message: result.message);
+    }
+  }
+
+  /// 从图片 URL 里抠出文件名（去掉扩展名），推导不出就用空串交给兜底。
+  static String _fileNameFromUrl(String imageUrl) {
+    final segments = Uri.tryParse(imageUrl)?.pathSegments;
+    if (segments == null || segments.isEmpty) return '';
+    final last = segments.last;
+    final dot = last.lastIndexOf('.');
+    return dot > 0 ? last.substring(0, dot) : last;
+  }
+
   void _handlePointerSignal(PointerSignalEvent event) {
     if (event is! PointerScrollEvent) return;
 
@@ -146,7 +283,49 @@ class _ImageViewerState extends State<ImageViewer> {
   }
 
   void _closePreview() {
+    if (_closing) return;
+    _closing = true;
     context.pop();
+  }
+
+  /// 记录按下的位置与时刻，给「轻点立即关闭」用。
+  void _handlePointerDown(PointerDownEvent event) {
+    _pointerActive++;
+    if (_pointerActive > _pointerPeak) _pointerPeak = _pointerActive;
+    if (_pointerDownPosition == null) {
+      _pointerDownPosition = event.position;
+      _pointerDownMillis = DateTime.now().millisecondsSinceEpoch;
+    }
+  }
+
+  /// 抬起时判断是不是一次「轻点」。
+  ///
+  /// 未放大时直接关闭，不等双击判定窗口的 300 ms —— 这是收回迟滞的主要来源。
+  /// 已放大时不动，交给外层手势：双击复位、单击退出照旧。
+  void _handlePointerUp(PointerUpEvent event) {
+    if (_pointerActive > 0) _pointerActive--;
+    final down = _pointerDownPosition;
+    final peak = _pointerPeak;
+    if (_pointerActive == 0) {
+      // 所有手指都离开了，这一轮判定结束。
+      _pointerDownPosition = null;
+      _pointerPeak = 0;
+    }
+    if (down == null || _closing) return;
+    if (peak > 1) return;
+    if ((event.position - down).distance > _tapSlop) return;
+    final held = DateTime.now().millisecondsSinceEpoch - _pointerDownMillis;
+    if (held > _tapMaxMillis) return;
+    if (_isZoomedIn) return;
+    _closePreview();
+  }
+
+  void _handlePointerCancel(PointerCancelEvent event) {
+    if (_pointerActive > 0) _pointerActive--;
+    if (_pointerActive == 0) {
+      _pointerDownPosition = null;
+      _pointerPeak = 0;
+    }
   }
 
   Object _heroTagForIndex(int index) {
@@ -273,12 +452,20 @@ class _ImageViewerState extends State<ImageViewer> {
   Widget _buildSingleImage() {
     return Listener(
       onPointerSignal: _handlePointerSignal,
+      onPointerDown: _handlePointerDown,
+      onPointerUp: _handlePointerUp,
+      onPointerCancel: _handlePointerCancel,
       child: GestureDetector(
+        // 放大状态下才靠这里关闭（指针通道此时已主动让路）。
         onTap: _closePreview,
+        onLongPress: _handleLongPress,
         child: PhotoView(
           imageProvider: CachedNetworkImageProvider(widget.imageUrls.first),
           controller: _photoViewController,
           scaleStateController: _scaleStateController,
+          // 打开即整图可见（长边贴合、不裁切），想放大再自己捏。
+          // 不要用 covered：封面是竖图，铺满会把上下裁掉一大截。
+          initialScale: PhotoViewComputedScale.contained,
           minScale: PhotoViewComputedScale.contained,
           maxScale: PhotoViewComputedScale.covered * 3,
           backgroundDecoration: const BoxDecoration(color: Colors.black),
@@ -297,8 +484,12 @@ class _ImageViewerState extends State<ImageViewer> {
   Widget _buildGallery() {
     return Listener(
       onPointerSignal: _handlePointerSignal,
+      onPointerDown: _handlePointerDown,
+      onPointerUp: _handlePointerUp,
+      onPointerCancel: _handlePointerCancel,
       child: GestureDetector(
         onTap: _closePreview,
+        onLongPress: _handleLongPress,
         child: PhotoViewGallery.builder(
           pageController: _pageController,
           itemCount: widget.imageUrls.length,
@@ -318,10 +509,13 @@ class _ImageViewerState extends State<ImageViewer> {
               index,
               PhotoViewScaleStateController.new,
             );
+            // 每页都记一次自己的整图基准，翻页后判定「是否放大」才不会串。
+            _watchBaseline(index, controller);
             return PhotoViewGalleryPageOptions(
               imageProvider: CachedNetworkImageProvider(imageUrl),
               controller: controller,
               scaleStateController: scaleStateController,
+              initialScale: PhotoViewComputedScale.contained,
               minScale: PhotoViewComputedScale.contained,
               maxScale: PhotoViewComputedScale.covered * 3,
               heroAttributes: index == _currentIndex
@@ -335,3 +529,6 @@ class _ImageViewerState extends State<ImageViewer> {
     );
   }
 }
+
+/// 图片预览长按菜单里选中的动作。
+enum _ImageAction { save }
