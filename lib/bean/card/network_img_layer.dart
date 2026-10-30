@@ -50,11 +50,32 @@ class NetworkImgLayer extends StatelessWidget {
     final hero =
         flightDirection == HeroFlightDirection.push ? fromHero : toHero;
 
+    // 飞行途中把高清重采样降成 low：
+    // 缩回卡片时是拿全屏大图往下缩，high 滤镜每帧都要重采一遍大图，
+    // 手机上肉眼可见地卡；飞行只有两百毫秒，low 根本看不出画质差别。
+    final child = hero.child;
+    final flightChild = child is NetworkImgLayer
+        ? NetworkImgLayer(
+            src: child.src,
+            width: child.width,
+            height: child.height,
+            fit: child.fit,
+            type: child.type,
+            fadeOutDuration: child.fadeOutDuration,
+            fadeInDuration: child.fadeInDuration,
+            origAspectRatio: child.origAspectRatio,
+            filterQuality: FilterQuality.low,
+            color: child.color,
+            colorBlendMode: child.colorBlendMode,
+            borderRadius: child.borderRadius,
+          )
+        : child;
+
     return InheritedTheme.captureAll(
       heroContext,
       Material(
         type: MaterialType.transparency,
-        child: hero.child,
+        child: flightChild,
       ),
     );
   }
