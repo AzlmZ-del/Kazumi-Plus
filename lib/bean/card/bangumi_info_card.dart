@@ -6,6 +6,7 @@ import 'package:kazumi/bean/widget/collect_button.dart';
 import 'package:kazumi/utils/constants.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/bean/card/network_img_layer.dart';
+import 'package:kazumi/bean/widget/image_preview.dart';
 import 'package:kazumi/pages/info/info_quick_actions.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:skeletonizer/skeletonizer.dart';
@@ -50,6 +51,21 @@ class _BangumiInfoCardVState extends State<BangumiInfoCardV> {
     } finally {
       if (mounted) setState(() => _savingCover = false);
     }
+  }
+
+  /// 点封面进全屏预览。
+  ///
+  /// 传原图链接（不是列表的显示档位），预览要的是最清晰的那张；
+  /// hero 复用卡片上的 tag，飞行衔接才连得上。
+  void _openCoverPreview() {
+    final imageUrl = InfoQuickActions.coverImageUrl(widget.bangumiItem);
+    if (imageUrl.isEmpty) return;
+    ImageViewer.show(
+      context,
+      imageUrls: [imageUrl],
+      heroTag: widget.bangumiItem.id,
+      fileBaseName: InfoQuickActions.coverFileName(widget.bangumiItem),
+    );
   }
 
   Widget _quickActionButton({
@@ -352,17 +368,22 @@ class _BangumiInfoCardVState extends State<BangumiInfoCardV> {
                     builder: (context, boxConstraints) {
                       final double maxWidth = boxConstraints.maxWidth;
                       final double maxHeight = boxConstraints.maxHeight;
-                      return Hero(
-                        transitionOnUserGestures: true,
-                        flightShuttleBuilder:
-                            NetworkImgLayer.heroFlightShuttleBuilder,
-                        tag: widget.bangumiItem.id,
-                        child: NetworkImgLayer(
-                          src: widget.bangumiItem.images['large'] ?? '',
-                          width: maxWidth,
-                          height: maxHeight,
-                          fadeInDuration: const Duration(milliseconds: 0),
-                          fadeOutDuration: const Duration(milliseconds: 0),
+                      return GestureDetector(
+                        // 点封面进全屏预览，长按仍交给外层（这里不拦长按，
+                        // 避免与标题/评分区的手势抢）。
+                        onTap: _openCoverPreview,
+                        child: Hero(
+                          transitionOnUserGestures: true,
+                          flightShuttleBuilder:
+                              NetworkImgLayer.heroFlightShuttleBuilder,
+                          tag: widget.bangumiItem.id,
+                          child: NetworkImgLayer(
+                            src: widget.bangumiItem.images['large'] ?? '',
+                            width: maxWidth,
+                            height: maxHeight,
+                            fadeInDuration: const Duration(milliseconds: 0),
+                            fadeOutDuration: const Duration(milliseconds: 0),
+                          ),
                         ),
                       );
                     },

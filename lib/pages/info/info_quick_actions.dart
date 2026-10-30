@@ -1,7 +1,3 @@
-import 'dart:ui' as ui;
-
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_modular/flutter_modular.dart';
@@ -9,8 +5,8 @@ import 'package:kazumi/bean/dialog/dialog.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/pages/webview/internal_browser_page.dart';
 import 'package:kazumi/services/logging/logger.dart';
+import 'package:kazumi/services/network/image_saver.dart';
 import 'package:kazumi/utils/device.dart';
-import 'package:saver_gallery/saver_gallery.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -46,51 +42,46 @@ class InfoQuickActions {
   }
 
   /// 把封面原图转成 PNG 存到相册（桌面端弹出另存为对话框）。
+  ///
+  /// 档位按原图优先挑：保存要的是最清晰的那张，
+  /// 与列表封面的显示档位（[ImageQuality]）无关。
   static Future<void> saveCover(
     BuildContext context,
     BangumiItem item,
   ) async {
-    final imageUrl = ['large', 'common', 'medium', 'small', 'grid']
-        .map((size) => item.images[size]?.trim() ?? '')
-        .firstWhere((url) => url.isNotEmpty, orElse: () => '');
+    final imageUrl = coverImageUrl(item);
     if (imageUrl.isEmpty) {
       _toast(context, '暂无封面');
       return;
     }
-    final fileName = _coverFileName(displayTitle(item), item.id);
-    try {
-      final bytes = await _loadCoverPng(imageUrl);
-      if (!context.mounted) return;
-
-      if (isDesktop()) {
-        final path = await FilePicker.platform.saveFile(
-          dialogTitle: '保存封面',
-          fileName: fileName,
-          type: FileType.custom,
-          allowedExtensions: const ['png'],
-          bytes: bytes,
-          lockParentWindow: true,
-        );
-        if (!context.mounted) return;
-        if (path != null) _toast(context, '封面已保存');
-        return;
-      }
-
-      final result = await SaverGallery.saveImage(
-        bytes,
-        fileName: fileName,
-        skipIfExists: false,
-      );
-      if (!context.mounted) return;
-      if (!result.isSuccess) {
-        throw StateError(result.errorMessage ?? 'Gallery save failed');
-      }
-      _toast(context, '已保存到相册');
-    } catch (error) {
-      KazumiLogger().w('InfoQuickActions: failed to save cover', error: error);
-      _toast(context, '封面保存失败，请重试');
+    final result = await ImageSaver.save(
+      imageUrl: imageUrl,
+      fileName: coverFileName(item),
+    );
+    if (!context.mounted) return;
+    switch (result.status) {
+      case ImageSaveStatus.saved:
+        _toast(context, isDesktop() ? '封面已保存' : '已保存到相册');
+      case ImageSaveStatus.cancelled:
+        break;
+      case ImageSaveStatus.failed:
+        _toast(context, result.message);
     }
   }
+
+  /// 条目封面的原图链接，按清晰度从高到低取第一个非空的。
+  ///
+  /// 各接口给的 images 键不一致（有的缺 `large`、有的 `common` 与 `large` 重复），
+  /// 因此不认某个具体键，只认「第一个有值的」。
+  static String coverImageUrl(BangumiItem item) {
+    return ['large', 'common', 'medium', 'small', 'grid']
+        .map((size) => item.images[size]?.trim() ?? '')
+        .firstWhere((url) => url.isNotEmpty, orElse: () => '');
+  }
+
+  /// 封面保存时用的文件名（不含扩展名）。
+  static String coverFileName(BangumiItem item) =>
+      '${ImageSaver.safeName(displayTitle(item), fallback: '封面')}-${item.id}';
 
   /// 在内置浏览器里打开该条目的 Bangumi 页面。
   static Future<void> openInternally(
@@ -212,37 +203,5 @@ class InfoQuickActions {
   static void _toast(BuildContext context, String message) {
     if (!context.mounted) return;
     KazumiDialog.showToast(context: context, message: message);
-  }
-
-  static String _coverFileName(String title, int subjectId) {
-    final safeTitle = String.fromCharCodes(
-      title
-          .replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1f]'), '_')
-          .trim()
-          .runes
-          .take(60),
-    );
-    return '${safeTitle.isEmpty ? '封面' : safeTitle}-$subjectId.png';
-  }
-
-  static Future<Uint8List> _loadCoverPng(String imageUrl) async {
-    final file = await CachedNetworkImageProvider.defaultCacheManager
-        .getSingleFile(imageUrl)
-        .timeout(const Duration(seconds: 30));
-    final codec = await ui.instantiateImageCodec(await file.readAsBytes());
-    try {
-      final frame = await codec.getNextFrame();
-      try {
-        // Normalize cached formats to PNG without downscaling.
-        final data =
-            await frame.image.toByteData(format: ui.ImageByteFormat.png);
-        if (data == null) throw StateError('Could not encode cover');
-        return data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-      } finally {
-        frame.image.dispose();
-      }
-    } finally {
-      codec.dispose();
-    }
   }
 }

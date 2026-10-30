@@ -31,7 +31,8 @@ final _tabTransition = CustomTransition(
 );
 
 final _imagePreviewTransition = CustomTransition(
-  duration: const Duration(milliseconds: 220),
+  // 淡出要快：220ms 时点一下要等小半秒才见画面退场，像卡住了。
+  duration: const Duration(milliseconds: 120),
   transitionsBuilder: (context, animation, secondaryAnimation, child) {
     return FadeTransition(opacity: animation, child: child);
   },
@@ -109,6 +110,7 @@ final indexModule = createModule(
             imageUrls: args.imageUrls,
             initialIndex: args.initialIndex,
             heroTag: args.heroTag,
+            fileBaseName: args.fileBaseName,
           );
         },
         transition: _imagePreviewTransition,
