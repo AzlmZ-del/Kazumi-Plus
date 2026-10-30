@@ -46,8 +46,6 @@
 | `episodePage` / `play` | 播放直链接口 |
 | `antiCrawlerConfig` | 验证码流程 |
 
-设计取舍见 [docs/custom-rule-repository-design.md](docs/custom-rule-repository-design.md)。
-
 ## 安装
 
 只发 Android，只出 **arm64-v8a**。装最新版到 [Releases](../../releases) 下载，
