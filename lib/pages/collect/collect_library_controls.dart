@@ -34,7 +34,8 @@ class _CollectCategories extends StatelessWidget {
       unselectedLabelStyle:
           theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500),
       labelPadding: const EdgeInsets.symmetric(horizontal: 2),
-      splashBorderRadius: BorderRadius.circular(24),
+      splashFactory: NoSplash.splashFactory,
+      overlayColor: const WidgetStatePropertyAll(Colors.transparent),
       tabs: [
         for (final type in _collectCategories)
           Tab(
