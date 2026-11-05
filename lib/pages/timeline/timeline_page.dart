@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:flutter_modular/flutter_modular.dart';
@@ -11,8 +13,10 @@ import 'package:kazumi/bean/widget/content_section.dart';
 import 'package:kazumi/bean/widget/empty_state_widget.dart';
 import 'package:kazumi/bean/widget/loading_indicator.dart';
 import 'package:kazumi/bean/widget/state_presentation.dart';
+import 'package:kazumi/modules/bangumi/airing_slot.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/pages/timeline/timeline_controller.dart';
+import 'package:kazumi/services/anime_schedule/airing_schedule_service.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/utils/anime_season.dart';
 
@@ -35,13 +39,67 @@ class _TimelinePageState extends State<TimelinePage> {
   TimelineController get _controller => widget.controller;
   late final bool _showRating;
 
+  /// 当前季的放送时刻表：bgmId -> 该番最近一集的放送信息。
+  ///
+  /// 只对「当前季」拉取：历史季的番不会再有新集，拉排期没有意义，
+  /// 而且能省掉切季度时的网络请求。
+  Map<int, AiringSlot> _airingSlots = const {};
+
+  /// 正在拉排期的季度，避免重复触发。
+  bool _airingLoading = false;
+
   @override
   void initState() {
     super.initState();
     _showRating = GStorage.getSetting(SettingsKeys.showRating);
+    AiringScheduleService.instance.revision.addListener(_onScheduleRevision);
+    // 先同步读一次缓存，预热已完成的场景首帧就能带 chip。
+    _airingSlots = AiringScheduleService.instance
+        .resolveCachedLatest(_calendarIds());
     if (_controller.bangumiCalendar.isEmpty) {
-      _controller.loadSeason(_controller.selectedDate);
+      _controller.loadSeason(_controller.selectedDate).then((_) {
+        _refreshAiringSlots();
+      });
+    } else {
+      _refreshAiringSlots();
     }
+  }
+
+  List<int> _calendarIds() => [
+        for (final day in _controller.bangumiCalendar)
+          for (final item in day) item.id,
+      ];
+
+  @override
+  void dispose() {
+    AiringScheduleService.instance.revision
+        .removeListener(_onScheduleRevision);
+    super.dispose();
+  }
+
+  /// 拉取当前季番单的放送排期。
+  ///
+  /// 失败时保持空表，卡片不显示时间 chip，不影响列表本身。
+  Future<void> _refreshAiringSlots() async {
+    if (_airingLoading) return;
+    if (!isSameSeason(_controller.selectedDate, DateTime.now())) return;
+    _airingLoading = true;
+    try {
+      final bgmIds = _calendarIds();
+      if (bgmIds.isEmpty) return;
+      final slots = await AiringScheduleService.instance.resolveLatest(bgmIds);
+      if (!mounted) return;
+      setState(() => _airingSlots = slots);
+    } finally {
+      _airingLoading = false;
+    }
+  }
+
+  /// 缓存补齐后自动重算，避免页面停在空状态。
+  void _onScheduleRevision() {
+    if (!mounted || _airingLoading) return;
+    if (_calendarIds().isEmpty) return;
+    unawaited(_refreshAiringSlots());
   }
 
   String _seasonLabel(DateTime date) {
@@ -113,7 +171,11 @@ class _TimelinePageState extends State<TimelinePage> {
       onPressed: !date.isAfter(now)
           ? () {
               Navigator.of(context).pop();
-              _controller.loadSeason(date);
+              // 切季度后重新拉排期：只有切回当前季才会真的发请求。
+              setState(() => _airingSlots = const {});
+              _controller.loadSeason(date).then((_) {
+                _refreshAiringSlots();
+              });
             }
           : null,
       child: Text('${getSeasonStringByMonth(date.month)}季'),
@@ -158,6 +220,8 @@ class _TimelinePageState extends State<TimelinePage> {
         final loading = _controller.isLoading;
         final failed = _controller.isTimeOut;
         final watchingIds = _controller.loadWatchingBangumiIds();
+        // 已收藏（任意类型）用于卡片边框高亮，与「只看追番」筛选无关。
+        final collectedIds = _controller.loadCollectedBangumiIds();
         final calendar = _controller.filterCalendar(watchingIds);
         final today = DateTime.now();
         final currentSeason = isSameSeason(_controller.selectedDate, today);
@@ -165,9 +229,11 @@ class _TimelinePageState extends State<TimelinePage> {
             ? null
             : _buildSeasonHeader(context,
                 loading: loading, compact: constraints.maxHeight < 500);
+        // toolbar 压到 50 后，按钮下方只剩 8；这里补 4 的 top padding，
+        // 让「按钮底边 → 星期栏」仍然保持 12，与卡片间距一致。
         final weekHeight = _TimelineWeekSelector.heightFor(scaler) + 16;
         final weekSelector = Padding(
-          padding: EdgeInsets.fromLTRB(inset, 0, inset, 16),
+          padding: EdgeInsets.fromLTRB(inset, 4, inset, 12),
           child: _TimelineWeekSelector(
             counts: calendar.map((day) => day.length).toList(),
             todayIndex: currentSeason ? today.weekday - 1 : null,
@@ -177,7 +243,9 @@ class _TimelinePageState extends State<TimelinePage> {
         return Scaffold(
           appBar: SysAppBar(
             needTopOffset: false,
-            toolbarHeight: 72,
+            // 按钮高 34，toolbar 高 50 → 上下各留 8。
+            // 留白同时决定「按钮上方」和「按钮到星期栏」的距离。
+            toolbarHeight: 50,
             title: narrowPortrait
                 ? _buildSeasonPicker(context, loading: loading, inAppBar: true)
                 : Text(
@@ -238,8 +306,12 @@ class _TimelinePageState extends State<TimelinePage> {
                                       padding: const EdgeInsets.all(24),
                                       sliver: SliverToBoxAdapter(
                                         child: BangumiMirrorErrorWidget(
-                                          onRetry: () => _controller.loadSeason(
-                                              _controller.selectedDate),
+                                          onRetry: () {
+                                            _controller.loadSeason(
+                                                _controller.selectedDate).then((_) {
+                                              _refreshAiringSlots();
+                                            });
+                                          },
                                           onSettingsReturned: () {
                                             if (mounted) setState(() {});
                                           },
@@ -256,6 +328,7 @@ class _TimelinePageState extends State<TimelinePage> {
                                         day: day,
                                         items: calendar[day],
                                         watchingIds: watchingIds,
+                                        collectedIds: collectedIds,
                                         columns: columns,
                                         inset: inset,
                                         compact: narrowPortrait,
@@ -313,7 +386,9 @@ class _TimelinePageState extends State<TimelinePage> {
           onTap: loading ? null : () => _showSeasonBottomSheet(context),
           borderRadius: BorderRadius.circular(20),
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            // 竖直内边距归零，整体高度由文字行高决定（约 34），
+            // 与右侧「热度优先」按钮齐平。
+            padding: EdgeInsets.zero,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -325,15 +400,15 @@ class _TimelinePageState extends State<TimelinePage> {
                           color: colors.onSurface,
                           fontWeight: FontWeight.w700)),
                 ),
-                SizedBox(width: inAppBar ? 4 : 12),
+                SizedBox(width: inAppBar ? 2 : 6),
                 if (inAppBar)
-                  const Icon(Icons.expand_more_rounded, size: 20)
+                  const Icon(Icons.expand_more_rounded, size: 18)
                 else
                   CircleAvatar(
-                    radius: 18,
+                    radius: 13,
                     backgroundColor: colors.secondaryContainer,
                     foregroundColor: colors.onSecondaryContainer,
-                    child: const Icon(Icons.expand_more_rounded, size: 24),
+                    child: const Icon(Icons.expand_more_rounded, size: 18),
                   ),
               ],
             ),
@@ -368,13 +443,18 @@ class _TimelinePageState extends State<TimelinePage> {
     required int day,
     required List<BangumiItem> items,
     required Set<int> watchingIds,
+    required Set<int> collectedIds,
     required int columns,
     required double inset,
     required bool compact,
   }) {
+    // SliverGrid 用统一 aspectRatio，所以整列必须按「有 chip」预留高度，
+    // 否则同一天里有的卡片带 chip、有的不带，高度会参差。
+    final hasAiring = _airingSlots.isNotEmpty;
     final cardHeight = BangumiTimelineCard.heightFor(
         MediaQuery.textScalerOf(context),
-        compact: compact);
+        compact: compact,
+        hasAiring: hasAiring);
     final rawCalendar = _controller.bangumiCalendar;
     final filteredOut = day < rawCalendar.length && rawCalendar[day].isNotEmpty;
     return _TimelineScrollView(
@@ -402,7 +482,8 @@ class _TimelinePageState extends State<TimelinePage> {
           )
         else
           SliverPadding(
-            padding: EdgeInsets.fromLTRB(inset, 0, inset, 24),
+            // 底部与卡片间距、星期栏间距统一为 12。
+            padding: EdgeInsets.fromLTRB(inset, 0, inset, 12),
             sliver: SliverGrid(
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: columns,
@@ -419,6 +500,9 @@ class _TimelinePageState extends State<TimelinePage> {
                     compact: compact,
                     showRating: _showRating,
                     isWatching: watchingIds.contains(item.id),
+                    isCollected: collectedIds.contains(item.id),
+                    airingSlot: _airingSlots[item.id],
+                    reserveAiring: hasAiring,
                     onTap: () => context.pushNamed('/info/', arguments: item),
                   );
                 },

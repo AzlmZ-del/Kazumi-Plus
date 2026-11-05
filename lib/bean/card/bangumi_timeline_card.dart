@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:kazumi/bean/card/network_img_layer.dart';
+import 'package:kazumi/modules/bangumi/airing_slot.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 
 class BangumiTimelineCard extends StatelessWidget {
@@ -11,13 +12,35 @@ class BangumiTimelineCard extends StatelessWidget {
     required this.showRating,
     required this.onTap,
     this.isWatching = false,
+    this.isCollected = false,
     this.compact = false,
+    this.airingSlot,
+    this.reserveAiring = false,
   });
 
   final BangumiItem bangumiItem;
   final bool showRating;
+
+  /// 是否「在看」。边框高亮由 [isCollected] 统一控制，这个字段只用于无障碍描述。
   final bool isWatching;
+
+  /// 是否已收藏（任意收藏类型，含在看/想看/看过/搁置/抛弃）。
+  ///
+  /// 为 true 时卡片边框改用次级色，替代原来左下角的书签图标。
+  final bool isCollected;
+
   final bool compact;
+
+  /// 该番的放送信息；拿不到时为 null，卡片不显示时间 chip。
+  final AiringSlot? airingSlot;
+
+  /// 是否给放送信息预留底部一行。
+  ///
+  /// 由时间线页面统一传入（整列同真同假），而不是卡片自己按 [airingSlot]
+  /// 判断：SliverGrid 用统一 mainAxisExtent，同列卡片必须等高，否则
+  /// 有 chip 的卡片比没 chip 的高出一截，列表会参差。
+  final bool reserveAiring;
+
   final VoidCallback onTap;
 
   static final _episodePattern =
@@ -30,23 +53,46 @@ class BangumiTimelineCard extends StatelessWidget {
   static const _labelFontSize = 12.0;
   static const _labelLineHeight = 4 / 3;
   static const _metadataGap = 8.0;
-  static const _footerGap = 12.0;
   static const _ratingIconSize = 16.0;
+
+  /// 评分 chip 的内边距。竖直方向为 0，只留文字本身的高度；
+  /// 左右也收到 8，让 chip 更紧凑。
   static const _ratingPadding =
-      EdgeInsets.symmetric(horizontal: 10, vertical: 6);
+      EdgeInsets.symmetric(horizontal: 8, vertical: 0);
+
+  /// 放送信息 chip 的内边距，比评分 chip 略瘦，避免整行过长。
+  static const _chipPadding =
+      EdgeInsets.symmetric(horizontal: 8, vertical: 4);
 
   // Shared by the grid and card to keep their text-scaled heights in sync.
-  static double heightFor(TextScaler scaler, {bool compact = false}) {
+  //
+  // 布局对齐参考图：标题（最多两行）→ 评分 + 元信息 → 弹性空间 → 放送 chip。
+  //
+  // 高度取「文字所需」与「封面 2:3 所需」的较大值：封面是卡片里最高的固定
+  // 元素，卡片矮于封面就只能裁封面（cover 模式会裁掉左右两侧，看起来像被
+  // 拉长），所以内容区至少要容得下封面。
+  static double heightFor(
+    TextScaler scaler, {
+    bool compact = false,
+    bool hasAiring = false,
+  }) {
     final titleHeight = scaler.scale(_titleFontSize) * _titleLineHeight * 2;
     final labelHeight = scaler.scale(_labelFontSize) * _labelLineHeight;
-    final footerHeight =
-        math.max(_ratingIconSize, labelHeight) + _ratingPadding.vertical;
-    final contentHeight = math.max(
-      compact ? 120.0 : 136.0,
-      titleHeight + _metadataGap + labelHeight + _footerGap + footerHeight,
-    );
+    final metaRowHeight =
+        math.max(_ratingIconSize + _ratingPadding.vertical, labelHeight);
+    final chipRowHeight = hasAiring
+        ? math.max(_ratingIconSize + _chipPadding.vertical, labelHeight)
+        : 0.0;
+    final textHeight =
+        titleHeight + _metadataGap + metaRowHeight + chipRowHeight;
+    final contentHeight = math.max(textHeight, coverHeightFor(compact));
     return _contentPadding * 2 + contentHeight;
   }
+
+  /// 封面按 Bangumi 原图 2:3 比例算出高度。
+  static double coverWidthFor(bool compact) => compact ? 80.0 : 88.0;
+
+  static double coverHeightFor(bool compact) => coverWidthFor(compact) * 3 / 2;
 
   String _supportingText(String title) {
     // Calendar entries expose episode counts through info.
@@ -68,21 +114,31 @@ class BangumiTimelineCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Semantics(
       button: true,
+      // 已收藏的卡片边框用主强调色 primary：secondaryContainer 太淡，
+      // 在 surfaceContainerLow 底上几乎看不出边界。
       child: Card(
         elevation: 0,
         margin: EdgeInsets.zero,
-        color: Theme.of(context).colorScheme.surfaceContainerLow,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(_cornerRadius)),
+        color: colors.surfaceContainerLow,
+        shape: RoundedRectangleBorder(
+          borderRadius:
+              const BorderRadius.all(Radius.circular(_cornerRadius)),
+          side: isCollected
+              ? BorderSide(color: colors.primary, width: 2)
+              : BorderSide.none,
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
           child: SizedBox(
-            height:
-                heightFor(MediaQuery.textScalerOf(context), compact: compact),
+            height: heightFor(
+              MediaQuery.textScalerOf(context),
+              compact: compact,
+              hasAiring: reserveAiring,
+            ),
             child: Padding(
               padding: const EdgeInsets.all(_contentPadding),
               child: Row(
@@ -111,6 +167,7 @@ class BangumiTimelineCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // 标题在上，最多两行。
         Text(
           title,
           maxLines: 2,
@@ -122,56 +179,138 @@ class BangumiTimelineCard extends StatelessWidget {
             height: _titleLineHeight,
           ),
         ),
-        if (supportingText.isNotEmpty) ...[
+        // 评分行紧跟标题，与参考图一致（不是贴底）。
+        if (showRating || supportingText.isNotEmpty) ...[
           const SizedBox(height: _metadataGap),
-          Text(
-            supportingText,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colors.onSurfaceVariant,
-              fontSize: _labelFontSize,
-              height: _labelLineHeight,
-            ),
-          ),
-        ],
-        if (showRating || isWatching) ...[
-          const Spacer(),
-          const SizedBox(height: _footerGap),
           Row(
             children: [
-              if (showRating)
+              if (showRating) _buildRating(context),
+              if (showRating && supportingText.isNotEmpty)
+                const SizedBox(width: 10),
+              if (supportingText.isNotEmpty)
                 Expanded(
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: _buildRating(context),
+                  child: Text(
+                    supportingText,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                      fontSize: _labelFontSize,
+                      height: _labelLineHeight,
+                    ),
                   ),
-                )
-              else
-                const Spacer(),
-              if (isWatching) ...[
-                if (showRating) const SizedBox(width: 8),
-                Tooltip(
-                  message: '正在追',
-                  child: Icon(Icons.bookmark_rounded,
-                      size: 20, color: colors.primary),
                 ),
-              ],
             ],
           ),
         ],
+        // 弹性空间：把放送信息压到卡片底部。
+        const Spacer(),
+        // 底部：放送时刻 + 集数，左对齐。
+        // 收藏状态改由卡片边框表达，这里不再放书签角标。
+        // chip 是异步数据，晚于卡片首次渲染才就位，用渐入代替「突然长出来」。
+        if (airingSlot != null)
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: 1.0),
+            duration: const Duration(milliseconds: 240),
+            curve: Curves.easeOut,
+            builder: (context, opacity, child) =>
+                Opacity(opacity: opacity, child: child),
+            child: Row(
+              children: [
+                _buildAiringChip(context, airingSlot!),
+                const SizedBox(width: 8),
+                _buildEpisodeChip(context, airingSlot!),
+              ],
+            ),
+          ),
       ],
     );
+  }
+
+  /// 「18:19 更新」胶囊。
+  ///
+  /// 参照参考图：浅色胶囊底 + 时钟图标 + 时分 + 「更新」二字。
+  Widget _buildAiringChip(BuildContext context, AiringSlot slot) {
+    final colors = Theme.of(context).colorScheme;
+    return _buildInfoChip(
+      context,
+      icon: Icons.schedule_rounded,
+      label: '${_formatHm(slot.airTime)} 更新',
+      background: colors.surfaceContainerHighest,
+      foreground: colors.onSurfaceVariant,
+      semanticLabel: '放送时间 ${_formatHm(slot.airTime)}',
+    );
+  }
+
+  /// 「第 5 集」胶囊。
+  Widget _buildEpisodeChip(BuildContext context, AiringSlot slot) {
+    final colors = Theme.of(context).colorScheme;
+    return _buildInfoChip(
+      context,
+      icon: Icons.format_list_bulleted_rounded,
+      label: '第 ${slot.episode} 集',
+      background: colors.surfaceContainerHighest,
+      foreground: colors.onSurfaceVariant,
+      semanticLabel: '第 ${slot.episode} 集',
+    );
+  }
+
+  Widget _buildInfoChip(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required Color background,
+    required Color foreground,
+    required String semanticLabel,
+  }) {
+    final theme = Theme.of(context);
+    final labelStyle = theme.textTheme.labelMedium?.copyWith(
+      fontSize: _labelFontSize,
+      height: _labelLineHeight,
+      color: foreground,
+    );
+    return Semantics(
+      label: semanticLabel,
+      excludeSemantics: true,
+      child: Container(
+        padding: _chipPadding,
+        decoration: ShapeDecoration(
+          color: background,
+          shape: const StadiumBorder(),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: _ratingIconSize, color: foreground),
+            const SizedBox(width: 4),
+            Text(label, maxLines: 1, softWrap: false, style: labelStyle),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _formatHm(DateTime time) {
+    final h = time.hour.toString().padLeft(2, '0');
+    final m = time.minute.toString().padLeft(2, '0');
+    return '$h:$m';
   }
 
   Widget _buildCover(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final imageUrl = bangumiItem.images['large'] ?? '';
+    // Bangumi 封面原始比例是 2:3，高度按宽度算出来固定住。
+    // 外层 Row 用了 stretch，子项会被拉满卡片高度，所以这里必须自己锁死，
+    // 否则卡片一变高封面就被拉长。
+    final width = coverWidthFor(compact);
+    final height = coverHeightFor(compact);
     return ExcludeSemantics(
-      child: SizedBox(
-        width: compact ? 80 : 88,
-        child: LayoutBuilder(
-          builder: (context, constraints) => Hero(
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: SizedBox(
+          width: width,
+          height: height,
+          child: Hero(
             tag: bangumiItem.id,
             transitionOnUserGestures: true,
             child: ClipRRect(
@@ -187,8 +326,8 @@ class BangumiTimelineCard extends StatelessWidget {
                     )
                   : NetworkImgLayer(
                       src: imageUrl,
-                      width: constraints.maxWidth,
-                      height: constraints.maxHeight,
+                      width: width,
+                      height: height,
                     ),
             ),
           ),
@@ -227,12 +366,14 @@ class BangumiTimelineCard extends StatelessWidget {
                 size: _ratingIconSize, color: colors.onSecondaryContainer),
             const SizedBox(width: 4),
             Flexible(
-              child: Text(score,
-                  maxLines: 1,
-                  style: labelStyle?.copyWith(
-                    color: colors.onSecondaryContainer,
-                    fontWeight: FontWeight.w700,
-                  )),
+              child: Text(
+                score,
+                maxLines: 1,
+                style: labelStyle?.copyWith(
+                  color: colors.onSecondaryContainer,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
           ],
         ),
