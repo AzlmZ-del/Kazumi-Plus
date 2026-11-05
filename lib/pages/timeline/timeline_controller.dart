@@ -136,6 +136,15 @@ abstract class _TimelineController with Store {
     return _collectRepository.getBangumiIdsByType(CollectType.watching);
   }
 
+  /// 已收藏的番剧 ID（任意收藏类型，含在看/想看/看过/搁置/抛弃）。
+  ///
+  /// 时间线用它在卡片上做边框高亮，与「只看追番」筛选是两回事。
+  Set<int> loadCollectedBangumiIds() {
+    return _collectRepository.getBangumiIdsByTypes(
+      CollectType.values.where((type) => type.isCollected).toList(),
+    );
+  }
+
   int get activeFilterCount => [
         onlyShowWatchingBangumis,
         notShowWatchedBangumis,

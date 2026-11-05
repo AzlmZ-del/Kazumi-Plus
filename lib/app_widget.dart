@@ -9,6 +9,7 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:kazumi/services/logging/logger.dart';
+import 'package:kazumi/services/anime_schedule/airing_schedule_service.dart';
 import 'package:kazumi/services/network/metered_network_service.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
@@ -45,6 +46,10 @@ class _AppWidgetState extends State<AppWidget>
     // 启动就预热一次网页登录状态，免得进设置页才现查。
     // 缓存窗口内（窗口 = 检测间隔滑块）不重复请求，不阻塞 UI。
     unawaited(BangumiWebSession().warmUpOnStartup());
+    // 启动就预热当前季的放送排期：进时间表时「几点更新」chip 直接就位，
+    // 不会再有卡片先渲染、chip 一两秒后突然长出来的突兀过程。
+    // 失败静默，进页面仍会按需拉取；与页面侧共用内存缓存，不会重复请求。
+    unawaited(AiringScheduleService.instance.warmUpOnStartup());
   }
 
   Future<void> _initializePlatformIntegrations() async {
