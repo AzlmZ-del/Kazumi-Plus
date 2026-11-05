@@ -398,6 +398,9 @@ class DefaultRuleRequestExecutor implements RuleRequestExecutor {
       data: request.method == 'POST' ? request.body : null,
       cancelToken: cancelToken,
       directConnection: config.directConnection,
+      // 原生直连通道不走 Dio，body 序列化得自己按 bodyType 来
+      // （Dio 会按 content-type 自动把 Map 编成 JSON/form）。
+      bodyType: request.bodyType,
     );
   }
 

@@ -112,6 +112,10 @@ class MainActivity: AudioServiceActivity() {
             flutterEngine.dartExecutor.binaryMessenger, DownloadDirectoryHandler.CHANNEL
         )
         downloadDirectoryChannel?.setMethodCallHandler(downloadDirectoryHandler)
+        // 绕过 VPN 的直连通道：规则级「直连」开关的 Android 实现（见 DirectHttpHandler）。
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger, DirectHttpHandler.CHANNEL
+        ).setMethodCallHandler(DirectHttpHandler(this))
         intentChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         intentChannel?.setMethodCallHandler { call, result ->
             if (call.method == "openWithMime") {
