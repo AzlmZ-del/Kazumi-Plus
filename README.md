@@ -66,7 +66,7 @@ GitHub / SourceForge 镜像。
 `DANDAN_APPID`/`DANDAN_KEY` → `DANDANAPI_APPID`/`DANDANAPI_KEY`，
 `MIRROR_APPID`/`MIRROR_KEY` → `KAZUMI_APPID`/`KAZUMI_KEY`。
 源码里只有 `String.fromEnvironment` 占位，没有任何真实值。
-常驻脚本会从本机 `AGENTS.md` 的「凭据值」表读取并注入（该文件已 gitignore）。
+常驻脚本会从仓库根目录的 `.env` 文件读取并注入（该文件已 gitignore，按上面的变量名自行创建即可）：
 
 ```powershell
 .\build_apk.ps1            # Android，编完自动 adb install
