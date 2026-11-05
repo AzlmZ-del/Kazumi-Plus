@@ -29,9 +29,11 @@ class _TimelineOptionsButton extends StatelessWidget {
     final compact =
         availableWidth < scaler.scale(16) * 22 || scaler.scale(14) > 28;
     final style = StateActionButton.styleOf(context).copyWith(
-      minimumSize: const WidgetStatePropertyAll(Size(48, 48)),
+      // 高度收到 34，比左边「xxxx年x季」略矮一点点，整体更扁。
+      minimumSize: const WidgetStatePropertyAll(Size(44, 34)),
+      maximumSize: const WidgetStatePropertyAll(Size(double.infinity, 34)),
       padding: const WidgetStatePropertyAll(
-        EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       ),
     );
     final summary = '${sort.label}，'

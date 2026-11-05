@@ -140,6 +140,9 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
     return Scaffold(
       body: _outlet(context),
       bottomNavigationBar: NavigationBar(
+        // 高度 64（Material 3 默认 80）：图标 24 + 标签 ~16 + 上下留白，
+        // 比 60 略松，图标与文字不挤。
+        height: 64,
         destinations: const <Widget>[
           NavigationDestination(
             selectedIcon: Icon(Icons.home),
