@@ -340,6 +340,7 @@ class _SearchPageState extends State<SearchPage> {
           items: items,
           width: width,
           showRating: GStorage.getSetting(SettingsKeys.showRating),
+          collectedIds: _controller.loadCollectedBangumiIds(),
         ),
       if (allItems.isNotEmpty || !failed)
         SliverToBoxAdapter(

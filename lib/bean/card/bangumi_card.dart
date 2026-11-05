@@ -11,18 +11,29 @@ class BangumiCardV extends StatelessWidget {
     required this.bangumiItem,
     this.canTap = true,
     this.enableHero = true,
+    this.isCollected = false,
   });
 
   final BangumiItem bangumiItem;
   final bool canTap;
   final bool enableHero;
 
+  /// 是否已收藏。为 true 时卡片边框用 primary 主强调色。
+  final bool isCollected;
+
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Card(
       elevation: 0,
       clipBehavior: Clip.antiAlias,
       margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: const BorderRadius.all(Radius.circular(12)),
+        side: isCollected
+            ? BorderSide(color: colors.primary, width: 2)
+            : BorderSide.none,
+      ),
       child: GestureDetector(
         child: InkWell(
           onTap: () {

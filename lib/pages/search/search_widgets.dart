@@ -73,11 +73,15 @@ class _SearchResultGrid extends StatelessWidget {
     required this.items,
     required this.width,
     required this.showRating,
+    this.collectedIds = const <int>{},
   });
 
   final List<BangumiItem> items;
   final double width;
   final bool showRating;
+
+  /// 已收藏的番剧 ID，用于卡片描边。
+  final Set<int> collectedIds;
 
   @override
   Widget build(BuildContext context) {
@@ -120,7 +124,8 @@ class _SearchResultGrid extends StatelessWidget {
           item: items[index],
           showRating: showRating,
           titleHeight: titleHeight,
-          titleStyle: titleStyle),
+          titleStyle: titleStyle,
+          isCollected: collectedIds.contains(items[index].id)),
     );
   }
 }
@@ -131,6 +136,7 @@ class _SearchResultCard extends StatelessWidget {
     required this.showRating,
     required this.titleHeight,
     required this.titleStyle,
+    this.isCollected = false,
   });
 
   static const coverAspectRatio = 0.7;
@@ -143,16 +149,29 @@ class _SearchResultCard extends StatelessWidget {
   final double titleHeight;
   final TextStyle titleStyle;
 
+  /// 是否已收藏。为 true 时外框用 primary 主强调色描边。
+  final bool isCollected;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final title = item.nameCn.isNotEmpty ? item.nameCn : item.name;
     final year = item.airDate.length >= 4 ? item.airDate.substring(0, 4) : '';
-    return Material(
-      type: MaterialType.transparency,
+    return Container(
+      // Material 用 MaterialType.transparency 时不会绘制 shape 的描边，
+      // 所以边框改由外层 Container 的 BoxDecoration 画。
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: isCollected
+            ? Border.all(color: theme.colorScheme.primary, width: 2)
+            : null,
+      ),
       clipBehavior: Clip.antiAlias,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
+      child: Material(
+        type: MaterialType.transparency,
+        clipBehavior: Clip.antiAlias,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
           onTap: () => context.pushNamed('/info/', arguments: item),
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -196,6 +215,7 @@ class _SearchResultCard extends StatelessWidget {
                           color: theme.colorScheme.onSurfaceVariant))),
             ]),
           ])),
+      ),
     );
   }
 }
