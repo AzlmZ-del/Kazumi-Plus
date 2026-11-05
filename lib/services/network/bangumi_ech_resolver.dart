@@ -22,20 +22,22 @@ class BangumiEchResolver {
   }
 }
 
-/// Retries ECH discovery once before giving up.
+/// ECH 发现阶段的重试包装。
 ///
-/// The DoH query is the first hop of the ECH path, so a failure there is the
-/// cheapest possible thing to repeat: a rejected query returns in ~0.1 s, well
-/// before any TCP or TLS work is spent. Measured on a mobile network, alidns
-/// drops roughly a quarter of these queries up front (`Connection closed
-/// abruptly` right after the request is sent) and a single retry recovers
-/// every one of them, so the whole path stays under a second.
+/// DoH 查询是 ECH 链路的第一跳，失败后重试成本最低（被拒的查询约 0.1s 返回，
+/// 还没花任何 TCP/TLS 时间）。实测 alidns 会直接丢掉约四分之一的查询，
+/// 这里最多重试 [maxAttempts] 次，带指数退避。
 ///
-/// Only [EchException] is retried. `DohEchResolver` clears its in-flight entry
-/// on failure and caches routes only on success, so the second attempt really
-/// re-queries instead of replaying the rejected result.
+/// 只重试 [EchException]。`DohEchResolver` 失败时会清掉 in-flight 记录、
+/// 只缓存成功结果，所以每次重试都是真正重新查询。
 class RetryingEchResolver implements EchResolver {
   RetryingEchResolver(this._inner, this.client);
+
+  /// 总尝试次数（含首次）。
+  static const int maxAttempts = 3;
+
+  /// 首次重试前的等待，之后每次翻倍。
+  static const Duration baseDelay = Duration(milliseconds: 100);
 
   final EchResolver _inner;
 
@@ -44,10 +46,15 @@ class RetryingEchResolver implements EchResolver {
 
   @override
   Future<EchRoute?> resolve(Uri uri) async {
-    try {
-      return await _inner.resolve(uri);
-    } on EchException {
-      return _inner.resolve(uri);
+    var delay = baseDelay;
+    for (var attempt = 1; ; attempt++) {
+      try {
+        return await _inner.resolve(uri);
+      } on EchException {
+        if (attempt >= maxAttempts) rethrow;
+        await Future.delayed(delay);
+        delay *= 2;
+      }
     }
   }
 }
