@@ -49,7 +49,7 @@
 ## 安装
 
 只发 Android，只出 **arm64-v8a**。装最新版到 [Releases](../../releases) 下载，
-之后 **设置 → 更新 → 检查更新** 会读本仓库的 Release 并支持应用内覆盖升级。
+之后 **设置 → 关于软件 → 检查更新** 会读本仓库的 Release 并支持应用内覆盖升级。
 
 > 从早期 **debug 签名**的构建升级会失败（`INSTALL_FAILED_UPDATE_INCOMPATIBLE`），
 > 需要先卸载旧版。之后同签名的版本都能直接覆盖升级。
@@ -62,19 +62,11 @@
 [Flutter 官方文档](https://docs.flutter.dev/get-started/install)。中国大陆可能需要配 MavenCentral /
 GitHub / SourceForge 镜像。
 
-弹弹play 与 Bangumi 镜像接口需要签名，本地构建在仓库根目录放一个 `build_local.env`
-（**已在 `.gitignore` 里，切勿提交**）：
-
-```dotenv
-DANDAN_APPID=xxx
-DANDAN_KEY=xxx
-MIRROR_APPID=xxx
-MIRROR_KEY=xxx
-```
-
-这四个值会被注入成 `--dart-define`：`DANDAN_APPID`/`DANDAN_KEY` →
-`DANDANAPI_APPID`/`DANDANAPI_KEY`，`MIRROR_APPID`/`MIRROR_KEY` → `KAZUMI_APPID`/`KAZUMI_KEY`。
+弹弹play 与 Bangumi 镜像接口需要签名，凭据通过 `--dart-define` 在构建时注入：
+`DANDAN_APPID`/`DANDAN_KEY` → `DANDANAPI_APPID`/`DANDANAPI_KEY`，
+`MIRROR_APPID`/`MIRROR_KEY` → `KAZUMI_APPID`/`KAZUMI_KEY`。
 源码里只有 `String.fromEnvironment` 占位，没有任何真实值。
+常驻脚本会从本机 `AGENTS.md` 的「凭据值」表读取并注入（该文件已 gitignore）。
 
 ```powershell
 .\build_apk.ps1            # Android，编完自动 adb install
