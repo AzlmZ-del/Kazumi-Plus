@@ -53,6 +53,13 @@ android/build/reports/problems/
 /tools/local-credentials.json
 /build_local.env
 /build_apk_log.txt
+# 本机化构建/部署脚本（硬编码本机路径与设备 ID，凭据从 AGENTS.md 抽取），
+# 2026-11-05 起移出版本库，只留本机
+/build_apk.ps1
+/build_local.ps1
+/run_mobile.ps1
+# 本机工作约定（内含凭据表），不同步到 GitHub
+/AGENTS.md
 
 # Android release signing (mirrors the SIGNING_KEY_BASE64 / KEY_* secrets)
 /android/key.properties
