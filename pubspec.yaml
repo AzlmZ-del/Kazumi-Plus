@@ -180,7 +180,6 @@ flutter:
     - assets/shaders/
     - assets/images/logo/
     - assets/statements/
-    - assets/anime_schedule/
     - licenses/ech_http/
   fonts:
     - family: MI_Sans_Regular
