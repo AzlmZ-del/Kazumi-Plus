@@ -4,7 +4,9 @@ import 'package:flutter_modular/flutter_modular.dart';
 import 'package:kazumi/bean/widget/bangumi_mirror_error_widget.dart';
 import 'package:kazumi/bean/widget/kazumi_menu.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
+import 'package:kazumi/modules/collect/collect_type.dart';
 import 'package:kazumi/pages/popular/popular_controller.dart';
+import 'package:kazumi/repositories/collect_repository.dart';
 import 'package:kazumi/bean/card/bangumi_card.dart';
 import 'package:kazumi/utils/constants.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
@@ -131,6 +133,10 @@ class _PopularPageState extends State<PopularPage> {
     if (MediaQuery.sizeOf(context).width > LayoutBreakpoint.medium['width']!) {
       crossCount = 6;
     }
+    // 已收藏的番剧加边框高亮，与时间线卡片同一套配色。
+    final collectedIds = CollectRepository().getBangumiIdsByTypes(
+      CollectType.values.where((type) => type.isCollected).toList(),
+    );
     return SliverPadding(
       padding: const EdgeInsets.all(8),
       sliver: SliverGrid(
@@ -148,7 +154,10 @@ class _PopularPageState extends State<PopularPage> {
         delegate: SliverChildBuilderDelegate(
           (BuildContext context, int index) {
             return bangumiList.isNotEmpty
-                ? BangumiCardV(bangumiItem: bangumiList[index])
+                ? BangumiCardV(
+                    bangumiItem: bangumiList[index],
+                    isCollected: collectedIds.contains(bangumiList[index].id),
+                  )
                 : null;
           },
           childCount: bangumiList.isNotEmpty ? bangumiList.length : 10,

@@ -207,4 +207,11 @@ abstract class _SearchPageController with Store {
   Set<int> loadAbandonedBangumiIds() {
     return _collectRepository.getBangumiIdsByType(CollectType.abandoned);
   }
+
+  /// 已收藏的番剧 ID（任意收藏类型），用于搜索结果卡片描边。
+  Set<int> loadCollectedBangumiIds() {
+    return _collectRepository.getBangumiIdsByTypes(
+      CollectType.values.where((type) => type.isCollected).toList(),
+    );
+  }
 }
