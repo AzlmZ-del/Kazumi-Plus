@@ -15,9 +15,13 @@ class PluginSiteClient {
     Map<String, dynamic> queryParameters = const {},
     Object? data,
     CancelToken? cancelToken,
+    bool directConnection = false,
   }) async {
     try {
-      final response = await DioFactory.pluginDio.request<String>(
+      final dio = directConnection
+          ? DioFactory.pluginDirectDio
+          : DioFactory.pluginDio;
+      final response = await dio.request<String>(
         url,
         queryParameters: queryParameters,
         data: data,

@@ -34,8 +34,9 @@ class _ScriptedSender {
   Future<String> call(
     PreparedRuleRequest request,
     Map<String, dynamic> headers,
-    dynamic cancelToken,
-  ) async {
+    dynamic cancelToken, [
+    dynamic config,
+  ]) async {
     sent.add((request: request, headers: headers));
     final response = responses.removeAt(0);
     if (response is Exception) throw response;

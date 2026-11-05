@@ -13,6 +13,7 @@ class DioFactory {
   static Dio? _bangumiDio;
   static Dio? _rulesRepoDio;
   static Dio? _pluginDio;
+  static Dio? _pluginDirectDio;
   static Dio? _downloadDio;
 
   static Dio get apiDio => _apiDio ??= _create(
@@ -46,6 +47,17 @@ class DioFactory {
     defaultHeaders: {
       // 站点抓取一律用非浏览器 UA：浏览器 UA + BoringSSL 指纹会被 WAF 判为
       // 伪装爬虫并直接 403。规则显式配了 userAgent 时以规则为准。
+      'user-agent': getRandomHttpUA(),
+      'accept-language': getRandomAcceptedLanguage(),
+    },
+  );
+
+  /// 规则级直连专用：不挂任何代理回调，HttpClient 默认 DIRECT。
+  /// 与 [pluginDio] 的唯一差异是代理行为，UA/超时保持一致。
+  static Dio get pluginDirectDio => _pluginDirectDio ??= _create(
+    // 直连版：forceDirect 令系统代理回调（Windows findProxy）也不挂。
+    const NetworkConfig(forceDirect: true),
+    defaultHeaders: {
       'user-agent': getRandomHttpUA(),
       'accept-language': getRandomAcceptedLanguage(),
     },
