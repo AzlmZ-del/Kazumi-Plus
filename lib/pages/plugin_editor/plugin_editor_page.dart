@@ -154,6 +154,8 @@ abstract final class _RuleEditorText {
   static const playPageQueryHelper = '与地址模板可用变量相同，合并进最终 URL 的查询参数。';
 
   static const userAgent = '用户代理（User-Agent）';
+  static const directConnection = '直连（不走代理）';
+  static const directConnectionDesc = '该规则的搜索、详情、选集与播放请求全部绕过代理直连目标站点';
   static const userAgentHelper =
       '用于搜索、章节、播放、下载与验证 WebView。留空则由内置 UA 池随机选取。';
   static const referer = '播放请求来源（Referer）';
@@ -297,6 +299,7 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
   bool usePost = false;
   bool useLegacyParser = false;
   bool adBlocker = false;
+  bool directConnection = false;
 
   final TextEditingController captchaImageController = TextEditingController();
   final TextEditingController captchaInputController = TextEditingController();
@@ -411,6 +414,7 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
     usePost = plugin.usePost;
     useLegacyParser = plugin.useLegacyParser;
     adBlocker = plugin.adBlocker;
+    directConnection = plugin.directConnection;
     final auth = plugin.auth;
     authEnabled = auth?.enabled ?? false;
     authLoginMethod = auth?.login.method ?? 'POST';
@@ -1006,6 +1010,15 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
             onChanged: (value) => setState(() => adBlocker = value),
           ),
           const EditorSubheader(label: _RuleEditorText.groupNetwork),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text(_RuleEditorText.directConnection),
+            subtitle: const Text(_RuleEditorText.directConnectionDesc),
+            value: directConnection,
+            onChanged: (value) =>
+                setState(() => directConnection = value),
+          ),
+          const SizedBox(height: 8),
           EditorTextField(
             controller: userAgentController,
             label: _RuleEditorText.userAgent,
@@ -1389,6 +1402,7 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
       usePost: usePost,
       useLegacyParser: useLegacyParser,
       adBlocker: adBlocker,
+      directConnection: directConnection,
       userAgent: userAgentController.text,
       baseUrl: baseURLController.text,
       searchURL: searchURLController.text,

@@ -369,6 +369,7 @@ typedef RuleTextSender = Future<String> Function(
   PreparedRuleRequest request,
   Map<String, dynamic> headers,
   CancelToken? cancelToken,
+  RuleExecutionConfig config,
 );
 
 /// Executes rule requests, adding the login/token handling declared by the
@@ -387,6 +388,7 @@ class DefaultRuleRequestExecutor implements RuleRequestExecutor {
     PreparedRuleRequest request,
     Map<String, dynamic> headers,
     CancelToken? cancelToken,
+    RuleExecutionConfig config,
   ) {
     return PluginSiteClient.instance.requestText(
       request.url,
@@ -395,6 +397,7 @@ class DefaultRuleRequestExecutor implements RuleRequestExecutor {
       queryParameters: request.query,
       data: request.method == 'POST' ? request.body : null,
       cancelToken: cancelToken,
+      directConnection: config.directConnection,
     );
   }
 
@@ -560,7 +563,7 @@ class DefaultRuleRequestExecutor implements RuleRequestExecutor {
           break;
       }
     }
-    return _textSender(request, headers, cancelToken);
+    return _textSender(request, headers, cancelToken, config);
   }
 
   Future<String> _cookieHeaderFor(String pluginName, String url) async {

@@ -13,6 +13,7 @@ class NetworkConfig {
     this.sendTimeout,
     this.proxyHost,
     this.proxyPort,
+    this.forceDirect = false,
     this.allowBadCertificates = false,
     this.enableLog = true,
   });
@@ -26,6 +27,11 @@ class NetworkConfig {
   final bool enableLog;
 
   bool get hasProxy => proxyHost != null && proxyPort != null;
+
+  /// true = 完全不使用代理（连 Windows 系统代理回调也不挂）。
+  /// 用于规则级直连：规则声明绕过代理时，系统代理与手动代理一并失效。
+  final bool forceDirect;
+
 
   Uri? proxyForUri(Uri uri) {
     if (hasProxy) return Uri(scheme: 'http', host: proxyHost, port: proxyPort);
@@ -42,7 +48,13 @@ class NetworkConfig {
     return IOHttpClientAdapter(
       createHttpClient: () {
         final client = HttpClient();
-        if (hasProxy) {
+        if (forceDirect) {
+          // 显式 DIRECT：仅仅「不挂代理回调」是不够的 —— dart:io 的 HttpClient
+          // 在 findProxy 为 null 时会回落到 HTTP_PROXY / HTTPS_PROXY 环境变量，
+          // 规则级直连因此会照样走系统代理（实测 2026-11-06：环境里带
+          // HTTPS_PROXY=127.0.0.1:7897 时，直连请求稳定 7.2s 后 TLS 握手被掐断）。
+          client.findProxy = (_) => 'DIRECT';
+        } else if (hasProxy) {
           client.findProxy = (_) => 'PROXY $proxyHost:$proxyPort';
         } else if (Platform.isWindows) {
           client.findProxy = SystemProxyService.findProxy;

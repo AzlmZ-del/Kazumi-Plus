@@ -38,6 +38,9 @@ class Plugin {
   bool usePost;
   bool useLegacyParser;
   bool adBlocker;
+
+  /// 开启后该规则的所有请求（搜索/详情/选集/播放 API）不走代理直连。
+  bool directConnection;
   String userAgent;
   String baseUrl;
   String searchURL;
@@ -85,6 +88,7 @@ class Plugin {
     required this.usePost,
     required this.useLegacyParser,
     required this.adBlocker,
+    required this.directConnection,
     required this.userAgent,
     required this.baseUrl,
     required this.searchURL,
@@ -116,6 +120,7 @@ class Plugin {
       useNativePlayer: json['useNativePlayer'] as bool? ?? true,
       usePost: json['usePost'] ?? false,
       useLegacyParser: json['useLegacyParser'] ?? false,
+      directConnection: json['directConnection'] ?? false,
       adBlocker: json['adBlocker'] ?? false,
       userAgent: json['userAgent'] as String? ?? '',
       baseUrl: json['baseURL'] as String? ?? '',
@@ -163,6 +168,7 @@ class Plugin {
       useNativePlayer: true,
       usePost: false,
       useLegacyParser: false,
+      directConnection: false,
       adBlocker: false,
       userAgent: '',
       baseUrl: '',
@@ -193,6 +199,7 @@ class Plugin {
       'useNativePlayer': useNativePlayer,
       'usePost': usePost,
       'useLegacyParser': useLegacyParser,
+      'directConnection': directConnection,
       'adBlocker': adBlocker,
       'userAgent': userAgent,
       'baseURL': baseUrl,
@@ -240,6 +247,7 @@ class Plugin {
         antiCrawlerConfig: antiCrawlerConfig,
         // 规则自带的 UA 对搜索/章节/播放一律生效，空则由请求层用非浏览器 UA 兜底。
         userAgent: userAgent,
+        directConnection: directConnection,
         // 停用的登录流程对运行时完全不可见，但配置本身留在规则里。
         auth: authEnabled ? auth : null,
         play: chapterApiConfig.play,

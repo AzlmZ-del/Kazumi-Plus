@@ -105,9 +105,13 @@ class RuleExecutionConfig {
     required this.chapterApiConfig,
     required this.antiCrawlerConfig,
     this.userAgent = '',
+    this.directConnection = false,
     this.auth,
     this.play,
   });
+
+  /// 规则级直连开关：开启后该规则请求绕过代理直连目标站点。
+  final bool directConnection;
 
   final String pluginName;
   final String baseUrl;
