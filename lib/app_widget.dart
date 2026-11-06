@@ -19,6 +19,7 @@ import 'package:kazumi/bean/dialog/exit_confirmation_dialog.dart';
 import 'package:kazumi/bean/dialog/kazumi_toast_host.dart';
 import 'package:kazumi/bean/settings/theme_provider.dart';
 import 'package:kazumi/navigation.dart';
+import 'package:kazumi/services/anime_schedule/bgm_anilist_map.dart';
 import 'package:kazumi/services/sync/bangumi_web_session.dart';
 import 'package:kazumi/utils/constants.dart';
 import 'package:kazumi/utils/device.dart';
@@ -52,6 +53,10 @@ class _AppWidgetState extends State<AppWidget>
     // 不会再有卡片先渲染、chip 一两秒后突然长出来的突兀过程。
     // 失败静默，进页面仍会按需拉取；与页面侧共用内存缓存，不会重复请求。
     unawaited(AiringScheduleService.instance.warmUpOnStartup());
+    // 后台静默刷新 Bangumi→AniList 映射表：0 点后首次启动或切换了「规则仓库
+    // 加速」档位时才会真正发请求，成功覆盖缓存、失败忽略，全程不打扰用户。
+    // 必须 unawaited：映射表用不到就绪状态，等它会拖慢启动。
+    unawaited(BgmAniListMap.refreshInBackground());
   }
 
   Future<void> _initializePlatformIntegrations() async {
