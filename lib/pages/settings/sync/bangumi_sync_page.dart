@@ -256,6 +256,8 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
                   // 属 `ListTile` 固有行为，不再逐项抠。
                   childrenPadding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
                   children: [
+                    // 与【启用 WebDAV】卡同节奏：头部下先来一条线。
+                    const Divider(height: 1, indent: 16, endIndent: 16),
                     RadioGroup<BangumiSyncPriority>(
                       groupValue: priority,
                       onChanged: (value) async {
@@ -270,6 +272,13 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
                         children: [
                           for (final option in BangumiSyncPriority.values)
                             RadioListTile<BangumiSyncPriority>(
+                              // dense + 收紧内边距：行高与开关行对齐，
+                              // 否则 RadioListTile 固有的宽松内距会让内容区偏高。
+                              // dense 会把 title 压成 bodyMedium(14sp)，
+                              // 这里显式钉回 bodyLarge(16sp) 保住标题字号。
+                              dense: true,
+                              contentPadding:
+                                  const EdgeInsets.symmetric(horizontal: 16),
                               value: option,
                               enabled: !_busy,
                               title: Text(switch (option) {
@@ -277,7 +286,7 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
                                 BangumiSyncPriority.bangumiFirst =>
                                   '以 Bangumi 为准',
                                 BangumiSyncPriority.timeFirst => '保留最近更新',
-                              }),
+                              }, style: Theme.of(context).textTheme.bodyLarge),
                               subtitle: Text(
                                 switch (option) {
                                   BangumiSyncPriority.localFirst =>
