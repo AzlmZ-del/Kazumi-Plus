@@ -207,21 +207,16 @@ class BangumiTimelineCard extends StatelessWidget {
         const Spacer(),
         // 底部：放送时刻 + 集数，左对齐。
         // 收藏状态改由卡片边框表达，这里不再放书签角标。
-        // chip 是异步数据，晚于卡片首次渲染才就位，用渐入代替「突然长出来」。
+        // chips 直接渲染不做渐入：冷启动时排期磁盘缓存与日历请求并行读，
+        // 缓存命中就与列表同帧出现，渐入反而让卡片已实、芯片还淡，观感
+        // 不一致；首次无缓存的情况由页面加载动画兜住。
         if (airingSlot != null)
-          TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0.0, end: 1.0),
-            duration: const Duration(milliseconds: 240),
-            curve: Curves.easeOut,
-            builder: (context, opacity, child) =>
-                Opacity(opacity: opacity, child: child),
-            child: Row(
-              children: [
-                _buildAiringChip(context, airingSlot!),
-                const SizedBox(width: 8),
-                _buildEpisodeChip(context, airingSlot!),
-              ],
-            ),
+          Row(
+            children: [
+              _buildAiringChip(context, airingSlot!),
+              const SizedBox(width: 8),
+              _buildEpisodeChip(context, airingSlot!),
+            ],
           ),
       ],
     );
@@ -381,3 +376,4 @@ class BangumiTimelineCard extends StatelessWidget {
     );
   }
 }
+
