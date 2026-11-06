@@ -6,6 +6,7 @@ class RuleCard extends StatelessWidget {
     required this.title,
     this.titleTag,
     this.subtitleTag,
+    this.stackedTags = const [],
     this.tags = const [],
     this.caption,
     this.subtitle,
@@ -17,42 +18,33 @@ class RuleCard extends StatelessWidget {
     this.onLongPress,
     this.selected = false,
     this.installed = false,
+    this.updatable = false,
   });
 
   final String title;
 
-  /// Chip docked in the card's top-right corner, sharing the heading line with
-  /// [title] and right-aligned with [trailing].
-  ///
-  /// Identity-adjacent facts (such as the rule version) read better level with
-  /// the name than in the chip row under the URLs, so they get their own slot
-  /// and stay put while the [tags] row changes.
+  /// 右上角，与 [title] 同行右对齐。
   final Widget? titleTag;
 
-  /// Chip docked at the right edge of the [subtitle] line.
-  ///
-  /// The rule type (API / XPath / mixed) belongs to the author line: it is a
-  /// property of the rule's implementation, not of its identity, so it sits
-  /// beside the author instead of crowding the name.
+  /// 与 [titleTag] 同列，贴在 [subtitle] 行右侧。
   final Widget? subtitleTag;
+
+  /// 继续往下堆叠在右列的同规格 chip（如「直连」），与版本号右边缘对齐。
+  final List<Widget> stackedTags;
 
   final List<Widget> tags;
   final String? caption;
   final String? subtitle;
 
-  /// Where this rule came from, rendered right under [subtitle].
-  ///
-  /// A separate line rather than another chip: the source is identity, not a
-  /// property of the rule, so it stays put while chips come and go.
+  /// 有可用更新时把标题染色（替代「可更新」标签）。
+  final bool updatable;
+
+  /// 规则来源，单独一行（不占 chip 位）。
   final String? source;
 
-  /// Tapping the source line usually reveals the same-name rules it shadowed.
   final VoidCallback? onSourceTap;
 
-  /// The address the source resolves to, rendered under the source line.
-  ///
-  /// Wraps instead of ellipsizing on purpose: a truncated base URL is useless
-  /// for spotting which host a rule actually comes from.
+  /// 换行不省略：截断的 base URL 无法辨认主机。
   final String? webUrl;
 
   final Widget? trailing;
@@ -65,7 +57,6 @@ class RuleCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
-    // Keep menu focus from activating the enclosing InkWell's highlight.
     final actions = trailing == null
         ? null
         : Focus(
@@ -102,13 +93,10 @@ class RuleCard extends StatelessWidget {
               onTap: onTap,
               onLongPress: onLongPress,
               child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: LayoutBuilder(builder: (context, constraints) {
-                  final stacked = constraints.maxWidth < 300 ||
-                      MediaQuery.textScalerOf(context).scale(14) > 20;
-                  final identity = Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                       AnimatedContainer(
                         duration: duration,
                         width: 48,
@@ -134,48 +122,65 @@ class RuleCard extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: Text(title,
-                                      style: text.titleMedium?.copyWith(
-                                          fontWeight: FontWeight.w700),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis),
-                                ),
-                                if (titleTag != null) ...[
-                                  const SizedBox(width: 8),
-                                  // 16px keeps the chip's edge on the trailing
-                                  // action's label edge (both variants pad their
-                                  // labels by 16), instead of the card border.
-                                  Padding(
-                                    padding: const EdgeInsets.only(right: 16),
-                                    child: titleTag!,
-                                  ),
-                                ],
-                              ],
-                            ),
-                            if (subtitle != null && subtitle!.isNotEmpty) ...[
-                              const SizedBox(height: 3),
-                              Row(
+                            // 三枚 chip 统一行高，行距 2。
+                            SizedBox(
+                              height: 18,
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
                                   Expanded(
-                                    child: Text(subtitle!,
+                                    child: Text(title,
+                                        // 压行高收窄两个 chip 的间距；<1.1 中文贴边。
+                                        style: text.titleMedium?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                            height: 1.2,
+                                            // 有更新时标题染色，替代原来的「可更新」标签。
+                                            color: updatable
+                                                ? colors.primary
+                                                : null),
                                         maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: text.bodySmall?.copyWith(
-                                            color: colors.onSurfaceVariant)),
+                                        overflow: TextOverflow.ellipsis),
                                   ),
-                                  if (subtitleTag != null) ...[
+                                  if (titleTag != null) ...[
                                     const SizedBox(width: 8),
-                                    // 与标题行的版本号右边缘对齐。
-                                    Padding(
-                                      padding: const EdgeInsets.only(right: 16),
-                                      child: subtitleTag!,
-                                    ),
+                                    titleTag!,
                                   ],
                                 ],
+                              ),
+                            ),
+                            if (subtitle != null && subtitle!.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              SizedBox(
+                                height: 18,
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Expanded(
+                                      child: Text(subtitle!,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          // 收紧副标题行；<1.1 中文贴边。
+                                          style: text.bodySmall?.copyWith(
+                                              color: colors.onSurfaceVariant,
+                                              height: 1.15)),
+                                    ),
+                                    if (subtitleTag != null) ...[
+                                      const SizedBox(width: 8),
+                                      subtitleTag!,
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                            // 后续 chip 沿用同一行高与行距。
+                            for (final tag in stackedTags) ...[
+                              const SizedBox(height: 2),
+                              SizedBox(
+                                height: 18,
+                                child: Align(
+                                  alignment: Alignment.centerRight,
+                                  child: tag,
+                                ),
                               ),
                             ],
                             if (source != null && source!.isNotEmpty) ...[
@@ -205,43 +210,41 @@ class RuleCard extends StatelessWidget {
                                     color: colors.onSurfaceVariant),
                               ),
                             ],
-                            if (tags.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              Wrap(spacing: 6, runSpacing: 6, children: tags),
-                            ],
                             if (caption != null) ...[
                               const SizedBox(height: 6),
                               Text(caption!,
                                   style: text.bodySmall?.copyWith(
                                       color: colors.onSurfaceVariant)),
                             ],
+                            // 状态标签与操作按钮同一行，行高锁 32 免得被 48px 拖拽手柄撑高。
+                            if (tags.isNotEmpty || actions != null) ...[
+                              const SizedBox(height: 4),
+                              SizedBox(
+                                height: 32,
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    if (tags.isNotEmpty)
+                                      Expanded(
+                                        child: Wrap(
+                                          spacing: 6,
+                                          runSpacing: 6,
+                                          alignment: WrapAlignment.start,
+                                          children: tags,
+                                        ),
+                                      )
+                                    else
+                                      const Spacer(),
+                                    ?actions,
+                                  ],
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
                     ],
-                  );
-                  if (stacked) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        identity,
-                        if (actions != null) ...[
-                          const SizedBox(height: 8),
-                          Align(
-                              alignment: AlignmentDirectional.centerEnd,
-                              child: actions),
-                        ],
-                      ],
-                    );
-                  }
-                  return Row(children: [
-                    Expanded(child: identity),
-                    if (actions != null) ...[
-                      const SizedBox(width: 12),
-                      actions
-                    ],
-                  ]);
-                }),
+                ),
               ),
             ),
           ),
@@ -267,15 +270,12 @@ class RuleTag extends StatelessWidget {
   final Color background;
   final Color foreground;
 
-  /// 固定尺寸。传了就按这个宽高画，不再随文字长短伸缩；
-  /// 一组标签（例如 API / XPath / 混合）必须传同一组数值才对得齐。
+  /// 固定尺寸；同组标签必须用同一组数值才对得齐。
   final double? width;
   final double? height;
 
-  /// 圆角。标签压到 16 高时用 6，否则 8 的圆角会让它变成胶囊形。
   final double radius;
 
-  /// 字号。窄标签（44 宽）要配 10 才不贴边，不传就用 labelSmall 默认的 11。
   final double? fontSize;
 
   @override
