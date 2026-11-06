@@ -60,6 +60,9 @@ android/build/reports/problems/
 /build_apk.ps1
 /build_local.ps1
 /run_mobile.ps1
+# 手机通知脚本：硬编码局域网 IP（192.168.3.45）与本机 adb 路径，
+# 2026-11-06 起不进版本库
+/agent_notify.ps1
 # 本机工作约定（内含凭据表），不同步到 GitHub
 /AGENTS.md
 
