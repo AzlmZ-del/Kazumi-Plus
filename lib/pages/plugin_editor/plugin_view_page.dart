@@ -382,6 +382,7 @@ class _PluginViewPageState extends State<PluginViewPage> {
                       return RuleCard(
                         key: ValueKey(plugin.name),
                         title: plugin.name,
+                        updatable: updatable,
                         titleTag: RuleTag(
                             label: plugin.version,
                             width: 44,
@@ -401,6 +402,18 @@ class _PluginViewPageState extends State<PluginViewPage> {
                                 fontSize: 10,
                                 background: const Color(0xFFCFE3FA),
                                 foreground: const Color(0xFF14406B)),
+                        // 与版本号同列、同规格，堆在类型 chip 下方。
+                        stackedTags: [
+                          if (plugin.directConnection)
+                            RuleTag(
+                                label: '直连',
+                                width: 44,
+                                height: 16,
+                                radius: 6,
+                                fontSize: 10,
+                                background: colors.tertiaryContainer,
+                                foreground: colors.onTertiaryContainer),
+                        ],
                         subtitle: Uri.tryParse(plugin.baseUrl)?.host ??
                             plugin.baseUrl,
                         selected: _selected.contains(plugin.name),
@@ -423,11 +436,6 @@ class _PluginViewPageState extends State<PluginViewPage> {
                                 label: '启用登录',
                                 background: colors.primaryContainer,
                                 foreground: colors.onPrimaryContainer),
-                          if (updatable)
-                            RuleTag(
-                                label: '可更新',
-                                background: colors.secondaryContainer,
-                                foreground: colors.onSecondaryContainer),
                           if (_controller.validityTracker
                               .isSearchValid(plugin.name))
                             RuleTag(
@@ -453,8 +461,9 @@ class _PluginViewPageState extends State<PluginViewPage> {
                               message: '拖动排序',
                               child: ReorderableDragStartListener(
                                 index: index,
+                                // 32 而非 48：图标 24 贴边，才不会比右侧 chip 偏左 12px。
                                 child: const SizedBox.square(
-                                    dimension: 48,
+                                    dimension: 32,
                                     child: Icon(Icons.drag_indicator_rounded)),
                               ),
                             ),
@@ -478,6 +487,10 @@ class _PluginViewPageState extends State<PluginViewPage> {
         builder: (context, toggle) => IconButton(
             tooltip: '${plugin.name} 的更多操作',
             onPressed: toggle,
+            // 与拖拽手柄一致收到 32，图标才不会比右侧 chip 偏左。
+            constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+            padding: EdgeInsets.zero,
+            iconSize: 24,
             icon: const Icon(Icons.more_horiz_rounded)),
         menuChildren: [
           KazumiMenuItem(
