@@ -53,7 +53,12 @@ class _TimelinePageState extends State<TimelinePage> {
     super.initState();
     _showRating = GStorage.getSetting(SettingsKeys.showRating);
     AiringScheduleService.instance.revision.addListener(_onScheduleRevision);
-    // 先同步读一次缓存，预热已完成的场景首帧就能带 chip。
+    // 与日历加载并行：磁盘读盘（毫秒级）和 Bangumi 日历请求同时开跑。
+    // 日历是网络请求，通常要几百毫秒；把读盘塞进它的等待窗口里，等日历
+    // 回来时排期缓存已经就位，chips 就能跟列表同帧出现，不会「先出列表、
+    // 再补 chips」。这一步不 await，失败也只是退回原来的行为。
+    unawaited(AiringScheduleService.instance.ensureCacheLoaded());
+    // 先同步读一次内存缓存，预热已完成的场景首帧就能带 chip。
     _airingSlots = AiringScheduleService.instance
         .resolveCachedLatest(_calendarIds());
     if (_controller.bangumiCalendar.isEmpty) {
@@ -79,17 +84,40 @@ class _TimelinePageState extends State<TimelinePage> {
 
   /// 拉取当前季番单的放送排期。
   ///
-  /// 失败时保持空表，卡片不显示时间 chip，不影响列表本身。
+  /// 分两段：
+  /// 1) 先用磁盘缓存立刻渲染 chip（本地读盘，毫秒级）；
+  /// 2) 再走网络拉最新排期，拿到后覆盖。
+  ///
+  /// 之前只在 initState 里读一次缓存，但那时 bangumiCalendar 还是空的，
+  /// `_calendarIds()` 返回空列表，缓存等于没读——chips 仍要等「日历加载 +
+  /// AniList 请求」两段网络，实测冷启动空白 1 秒以上。
+  ///
+  /// 失败时保持已有的（缓存）数据，卡片不显示空 chip，不影响列表本身。
   Future<void> _refreshAiringSlots() async {
     if (_airingLoading) return;
     if (!isSameSeason(_controller.selectedDate, DateTime.now())) return;
     _airingLoading = true;
     try {
       final bgmIds = _calendarIds();
+      // 日历还没就位：不把 _airingLoading 卡住，等日历回来后由调用方再触发。
       if (bgmIds.isEmpty) return;
+
+      // --- 第一段：磁盘缓存，立刻出 chip ---
+      // initState 里已经 unawaited 过 ensureCacheLoaded，这里只是保证完成；
+      // 若早已读完，这个 await 立即返回，不会多等。
+      await AiringScheduleService.instance.ensureCacheLoaded();
+      if (!mounted) return;
+      final cached =
+          AiringScheduleService.instance.resolveCachedLatest(bgmIds);
+      if (cached.isNotEmpty && mounted) {
+        setState(() => _airingSlots = cached);
+      }
+
+      // --- 第二段：网络补齐 ---
+      // resolveLatest 会跳过已缓存的 ID，命中的话这一步近乎无请求。
       final slots = await AiringScheduleService.instance.resolveLatest(bgmIds);
       if (!mounted) return;
-      setState(() => _airingSlots = slots);
+      if (slots.isNotEmpty) setState(() => _airingSlots = slots);
     } finally {
       _airingLoading = false;
     }
