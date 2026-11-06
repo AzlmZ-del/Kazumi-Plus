@@ -65,17 +65,17 @@ class Plugin {
   /// authentication; credentials themselves are stored locally.
   ApiAuthConfig? auth;
 
-  /// 规则源类型的中文标签，由 [api] 决定：1 = API，2 = XPath，3 = 混合。
+  /// 规则源类型标签：API / XPath / 混合，由搜索结果与章节的解析模式推导。
   ///
-  /// 与规则仓库 index.json 的 `type` 字段同义，那边由 gen_index.py 按同样的
-  /// 映射生成；这里是本地已安装规则自己算，不依赖索引。未知值返回空串，
-  /// 界面据此不画标签。
-  String get sourceTypeLabel => switch (api) {
-        '1' => 'API',
-        '2' => 'XPath',
-        '3' => '混合',
-        _ => '',
-      };
+  /// 不看 [api]：那是「所需最低客户端级别」，保存时会被写成 apiLevel（9），
+  /// 当类型用会落进默认分支变空串。
+  String get sourceTypeLabel {
+    final searchIsApi = searchMode == RuleMode.api;
+    final chapterIsApi = chapterMode == RuleMode.api;
+    if (searchIsApi && chapterIsApi) return 'API';
+    if (!searchIsApi && !chapterIsApi) return 'XPath';
+    return '混合';
+  }
 
   Plugin({
     required this.api,

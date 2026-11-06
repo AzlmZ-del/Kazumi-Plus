@@ -11,33 +11,20 @@ import 'package:path_provider/path_provider.dart';
 
 /// Bangumi 条目 ID → AniList 番剧 ID 的离线映射。
 ///
-/// 数据从 BangumiExtLinker 的 anime_map.csv 在线获取，精简成两列后
-/// 缓存到应用私有目录，每天 0 点后的首次启动刷新一次（app 不在后台
-/// 定时唤醒，当日内重启只加载缓存）；获取失败沿用本地缓存。
+/// 取自 BangumiExtLinker 的 anime_map.csv，精简成两列后缓存到应用私有目录。
 class BgmAniListMap {
   BgmAniListMap._();
 
-  /// GitHub Pages 地址（直连用）。
-  ///
-  /// 实测（2026-11-06，`curl --noproxy '*'`）无代理环境下 5/5 全通，
-  /// 而 raw.githubusercontent.com 有 1/5 直接连不上（000）——
-  /// 没有 VPN 的用户也能拉到，所以直连档用它。
+  /// 直连档用它：无代理环境实测比 raw.githubusercontent.com 更通。
   static const String _csvUrlPages =
       'https://rhilip.github.io/BangumiExtLinker/data/anime_map.csv';
 
-  /// raw.githubusercontent.com 地址（镜像用）。
-  ///
-  /// 与 Pages 版内容完全一致（同为 3,331,025 字节）。gh-proxy / ghfast 这类
-  /// 前缀式镜像只认 GitHub 域名，把 github.io 拼上去会 301 成 `https:/` 后 404，
-  /// 因此走镜像时必须换成这个原始地址。
+  /// 镜像档用它：前缀式镜像只认 GitHub 域名，拼 github.io 会 404。
   static const String _csvUrlRaw =
       'https://raw.githubusercontent.com/rhilip/BangumiExtLinker/'
       'master/data/anime_map.csv';
 
-  /// 按「设置 → 网络 → 规则仓库加速」选 CSV 源。
-  ///
-  /// gitcode 只镜像了 KazumiRules 这一个仓库（路径式），套不到 CSV 上，
-  /// 只能退回 Pages 直连。
+  /// gitcode 只镜像 KazumiRules，套不到 CSV，退回 Pages。
   static String get _csvUrl => switch (RulesMirror.current) {
         RulesMirror.ghProxy => '${ApiEndpoints.ghProxyMirror}$_csvUrlRaw',
         RulesMirror.ghfast => '${ApiEndpoints.ghfastMirror}$_csvUrlRaw',
@@ -49,24 +36,19 @@ class BgmAniListMap {
   static DateTime? _lastFetch;
   static String? _etag;
 
-  /// 上次拉取用的加速档位（RulesMirror.name）。切档后要重拉，见 refreshInBackground。
+  /// 上次拉取用的档位，切档后要重拉。
   static String? _lastFetchedSource;
 
-  /// 后台刷新进行中标记，防重入。
   static bool _refreshInFlight = false;
 
-  /// 加载映射表：只读本地缓存，不联网。
-  ///
-  /// 刷新统一由 [refreshInBackground] 在启动时后台触发，见那里的说明。
+  /// 只读本地缓存，不联网；刷新由 [refreshInBackground] 负责。
   static Future<Map<String, int>> ensureLoaded() {
     final cached = _cache;
     if (cached != null) return Future.value(cached);
     return _loading ??= _load();
   }
 
-  /// 上次拉取是否在 0 点之前（即今天还没刷新过）。
-  ///
-  /// 只在 [refreshInBackground] 里判定，页面侧不再触发刷新。
+  /// 上次拉取是否在 0 点之前（今天还没刷过）。
   static bool _stale() {
     final last = _lastFetch;
     if (last == null) return true;
@@ -75,9 +57,7 @@ class BgmAniListMap {
     return last.isBefore(todayStart);
   }
 
-  /// 上游 CSV 的 ETag（内容哈希的弱化形式），内容不变时可用 304 免下载。
-  ///
-  /// 随精简缓存一起持久化（首行 ETag\换行\JSON），读到即恢复。
+  /// 随精简缓存持久化（首行 ETag + 换行 + JSON）。
   static String? get etag => _etag;
 
   static Future<Map<String, int>> _load() async {
@@ -99,20 +79,13 @@ class BgmAniListMap {
       KazumiLogger().w('BgmAniListMap: read cache failed',
           error: error, stackTrace: stackTrace);
     }
-    // 注意：这里只读盘，不再联网。刷新统一走 refreshInBackground()，
-    // 由启动时在后台触发，避免调用方（时间表首屏）被网络卡住最长 60s。
     _loading = null;
     return _cache ?? const {};
   }
 
-  /// 后台静默刷新映射表（用户 2026-11-06 定）。
+  /// 后台静默刷新：0 点后首次启动或切换了加速档位时触发。
   ///
-  /// 语义：
-  /// - 缓存**永不过期**，读不到就直接读盘，失败也不会清空已有数据；
-  /// - **0 点后首次启动**刷新一次；切了「规则仓库加速」档位也刷新一次；
-  /// - 成功就覆盖缓存，**失败静默忽略**，不弹提示、不写错误 UI。
-  ///
-  /// 调用方用 `unawaited(...)` 在启动时触发即可，不要 await。
+  /// 成功覆盖缓存，失败静默忽略。调用方用 unawaited，不要 await。
   static Future<void> refreshInBackground() async {
     if (_refreshInFlight) return;
     final sourceChanged = _lastFetchedSource != null &&
@@ -121,8 +94,7 @@ class BgmAniListMap {
     _refreshInFlight = true;
     try {
       var response = await _fetchCsv();
-      // 304 与空缓存配对会永久锁死（每天 304、永远空映射）：
-      // ETag 存在但映射为空时丢弃 If-None-Match 强制全量重拉。
+      // 304 配空缓存会永久锁死，丢弃 ETag 强制重拉。
       if (response.statusCode == 304 &&
           (_cache == null || _cache!.isEmpty)) {
         KazumiLogger().w(
@@ -131,7 +103,6 @@ class BgmAniListMap {
         response = await _fetchCsv();
       }
       if (response.statusCode == 304) {
-        // 内容没变：只推进拉取时间，避免每次启动都重拉。
         _lastFetch = DateTime.now();
         _lastFetchedSource = RulesMirror.current.name;
         await _writeSourceMarker(await _cacheFile());
@@ -144,7 +115,7 @@ class BgmAniListMap {
       final slim = await compute(_slimCsv, raw);
       final newEtag = response.headers.value(HttpHeaders.etagHeader);
       final cacheFile = await _cacheFile();
-      // 原子写：先写临时文件再 rename，避免进程被杀时留下半截 JSON。
+      // 原子写，避免进程被杀时留下半截 JSON。
       final temp = File('${cacheFile.path}.tmp');
       await temp.writeAsString('${newEtag ?? ''}\n$slim', flush: true);
       await temp.rename(cacheFile.path);
@@ -156,7 +127,6 @@ class BgmAniListMap {
       KazumiLogger()
           .i('BgmAniListMap: background refresh ok, ${_cache!.length} entries');
     } catch (error, stackTrace) {
-      // 静默失败：用户无感，下次启动再试。
       KazumiLogger().w('BgmAniListMap: background refresh failed, ignored',
           error: error, stackTrace: stackTrace);
     } finally {
@@ -164,7 +134,6 @@ class BgmAniListMap {
     }
   }
 
-  /// 记下这次缓存是从哪个加速档拉来的，用于「切档后重拉」。
   static Future<String?> _readSourceMarker(File cacheFile) async {
     try {
       final marker = File('${cacheFile.path}.source');
@@ -180,14 +149,10 @@ class BgmAniListMap {
     try {
       await File('${cacheFile.path}.source')
           .writeAsString(RulesMirror.current.name, flush: true);
-    } catch (_) {
-      // 标记写失败只会导致下次多拉一次，不影响功能。
-    }
+    } catch (_) {}
   }
 
-  /// 带 If-None-Match 条件请求 CSV；服务器内容未变时返回 304 空体。
-  ///
-  /// 默认 validateStatus 视 304 为失败，这里放行让调用方按状态码分流。
+  /// 带 If-None-Match 条件请求；内容未变时返回 304 空体。
   static Future<Response<String>> _fetchCsv() async {
     return DioFactory.pluginDio.get<String>(
       _csvUrl,
@@ -205,8 +170,7 @@ class BgmAniListMap {
 
   static Future<File> _cacheFile() async {
     final dir = await getApplicationSupportDirectory();
-    // writeAsString 不会自动建父目录；首次落盘时 anime_schedule/ 还不存在，
-    // 桌面端实测会直接 PathNotFoundException（网络拉取成功却写盘炸）。
+    // writeAsString 不建父目录，首次落盘会 PathNotFoundException。
     final target = Directory('${dir.path}/anime_schedule');
     if (!target.existsSync()) {
       await target.create(recursive: true);
@@ -214,7 +178,6 @@ class BgmAniListMap {
     return File('${target.path}/bgm_anilist_map.json');
   }
 
-  /// 解析精简后的 JSON 缓存。
   static Map<String, int> _parse(String raw) {
     final decoded = jsonDecode(raw);
     final result = <String, int>{};
@@ -226,9 +189,7 @@ class BgmAniListMap {
     return result;
   }
 
-  /// 从 CSV 原文提取 bgm_id → anilist_id 两列。在 isolate 中执行。
-  ///
-  /// name/name_cn 列含逗号且带引号包裹，用状态机逐字符解析。
+  /// 在 isolate 中执行；引号内的逗号由状态机处理。
   static String _slimCsv(String csv) {
     final result = <String, int>{};
     final rows = _splitCsvRows(csv);
@@ -274,14 +235,11 @@ class BgmAniListMap {
         row.add(field.toString());
         field.clear();
       } else if (c == '\r') {
-        // 跳过，行结束由 \n 处理
       } else if (c == '\n') {
         row.add(field.toString());
         rows.add(row);
         field.clear();
-        // 注意不能用 row.clear()：rows 里持有的是同一个 List 引用，
-        // clear 会把已收集的历史行一起清空（表现为所有行都是空数组，
-        // 29205 行 CSV 解析出 0 条映射）。改为每行新建 List。
+        // 不能用 row.clear()：rows 里是同一个 List 引用，会清空历史行。
         row = <String>[];
       } else {
         field.write(c);
