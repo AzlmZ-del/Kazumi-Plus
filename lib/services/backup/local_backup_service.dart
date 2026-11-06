@@ -205,7 +205,7 @@ class LocalBackupService {
     await autoBackup(only: _credentialsOnly);
   }
 
-  /// 「同步选项」是否开启：开启时四项内容跟着【启用 WebDAV】走。
+  /// 「跟随同步」是否开启：开启时四项内容跟着【启用 WebDAV】走。
   bool get followWebDav =>
       GStorage.getSetting(SettingsKeys.localBackupFollowWebDav);
 

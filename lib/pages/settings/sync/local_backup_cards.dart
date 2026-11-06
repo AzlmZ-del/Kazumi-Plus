@@ -368,13 +368,14 @@ class _LocalBackupSettingsCardState extends State<LocalBackupSettingsCard> {
         ),
         onExpansionChanged: (value) => setState(() => _expanded = value),
         children: [
-          // 「同步选项」放在分割线上方：它是「怎么决定备份哪几项」的
-          // 选择器，逻辑上属于整张卡的前置，而不是下面四项中的一个。
+          // 与【启用 WebDAV】卡同节奏：头部开关下先来一条线。
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          // 放在分割线上方：它是选择器，不是四项内容之一。
           SwitchListTile(
             secondary: Icon(Icons.cloud_sync_rounded, size: 24, color: secondary),
-            title: const Text('同步选项'),
+            title: const Text('跟随同步'),
             subtitle: Text(
-              '让备份选项与云端同步',
+              '让备份选项跟随 WebDAV',
               style: syncSwitchSubtitleStyle(context),
             ),
             value: followWebDav,
