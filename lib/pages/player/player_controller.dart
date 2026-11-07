@@ -84,6 +84,9 @@ class PlayerController implements Disposable {
   late String referer;
   String? coverUrl;
   String videoUrl = '';
+
+  /// 本次播放所属规则是否声明了直连，详情面板据此标注「直连」。
+  bool directConnection = false;
   String _bangumiName = '';
   String _episodeTitle = '';
   bool isLocalPlayback = false;
@@ -179,6 +182,7 @@ class PlayerController implements Disposable {
     final initialization = _initializations.begin();
 
     videoUrl = params.videoUrl;
+    directConnection = params.directConnection;
     _bangumiName = params.bangumiName ?? '';
     _episodeTitle = params.episodeTitle.trim();
     isLocalPlayback = params.isLocalPlayback;
@@ -216,6 +220,7 @@ class PlayerController implements Disposable {
         canInstall: () => initialization.isActive,
         offset: params.offset,
         videoSourceFormat: params.videoSourceFormat,
+        directConnection: params.directConnection,
       );
     } catch (e) {
       if (initialization.isStale) {

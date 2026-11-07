@@ -35,8 +35,116 @@ class DirectHttpHandler(private val context: Context) : MethodChannel.MethodCall
         when (call.method) {
             "request" -> request(call, result)
             "isVpnActive" -> result.success(isVpnActive())
+            "startLocalProxy" -> startLocalProxy(result)
+            "stopLocalProxy" -> stopLocalProxy(result)
             else -> result.notImplemented()
         }
+    }
+
+    /**
+     * 本地 CONNECT 隧道（mpv 专用直连出口）。
+     *
+     * mpv 以 http://127.0.0.1:<port> 为 http-proxy，发来的 CONNECT host:443
+     * 在 NOT_VPN 网卡上建 TCP 隧道，字节原样双向转发；TLS 由 mpv 与源站端到端完成。
+     * 与 PoC 的差别：单例 ServerSocket、可显式关闭、监听线程可退出。
+     */
+    private var proxyServer: java.net.ServerSocket? = null
+    private val proxyLock = Any()
+
+    private fun startLocalProxy(result: MethodChannel.Result) {
+        synchronized(proxyLock) {
+            // 已有隧道在跑：直接复用，避免每次播放都新建。
+            proxyServer?.let {
+                result.success(it.localPort)
+                return
+            }
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                ?: run {
+                    result.error("NO_CM", "ConnectivityManager 不可用", null)
+                    return
+                }
+        val request = NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .build()
+        var registered = false
+        try {
+            cm.requestNetwork(request, object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) {
+                    if (registered) return
+                    registered = true
+                    try {
+                        val server = java.net.ServerSocket(0, 50, java.net.InetAddress.getByName("127.0.0.1"))
+                        synchronized(proxyLock) {
+                            proxyServer = server
+                        }
+                        // 每个连接独立线程：CONNECT 握手后纯字节转发。
+                        Thread {
+                            while (!server.isClosed) {
+                                val client = try { server.accept() } catch (e: Exception) { break }
+                                Thread {
+                                    try { handleConnect(client, network) }
+                                    catch (e: Exception) { try { client.close() } catch (_: Exception) {} }
+                                }.start()
+                            }
+                        }.start()
+                        result.success(server.localPort)
+                    } catch (e: Exception) {
+                        result.error("PROXY_START_FAILED", e.message ?: e.toString(), null)
+                    }
+                }
+
+                override fun onUnavailable() {
+                    if (registered) return
+                    registered = true
+                    result.error("NO_NETWORK", "没有可用的非 VPN 网络", null)
+                }
+            }, NETWORK_TIMEOUT_MS.toInt())
+        } catch (e: Exception) {
+            result.error("REQUEST_FAILED", e.message ?: e.toString(), null)
+        }
+        }
+    }
+
+    /** 关闭本地隧道：播放器销毁时由 Dart 侧调用。 */
+    private fun stopLocalProxy(result: MethodChannel.Result) {
+        synchronized(proxyLock) {
+            try {
+                // close 让 accept() 抛异常，监听线程随之退出。
+                proxyServer?.close()
+            } catch (_: Exception) {}
+            proxyServer = null
+        }
+        result.success(null)
+    }
+
+    /** 处理单条连接：读 CONNECT 行，经 NOT_VPN 网卡连目标，之后双向转发。 */
+    private fun handleConnect(client: java.net.Socket, network: Network) {
+        client.soTimeout = 0
+        val reader = client.getInputStream().bufferedReader()
+        val firstLine = reader.readLine() ?: return
+        // 形如 CONNECT host:port HTTP/1.1
+        val target = firstLine.split(" ").getOrNull(1) ?: return
+        // 把请求头读完丢弃（mpv 的 Proxy-Authorization 等，PoC 不校验）。
+        while (reader.readLine()?.isNotEmpty() == true) { }
+        val (host, port) = if (target.contains(":")) {
+            target.split(":").let { it[0] to (it.getOrNull(1)?.toIntOrNull() ?: 443) }
+        } else {
+            target to 443
+        }
+        // network.socketFactory 造出的 socket 绑定在非 VPN 网卡上。
+        val remote = network.socketFactory.createSocket(host, port)
+        client.getOutputStream().write("HTTP/1.1 200 Connection Established\r\n\r\n".toByteArray())
+        client.getOutputStream().flush()
+        // 双向转发：client <-> remote。
+        val t1 = Thread {
+            try { client.getInputStream().copyTo(remote.getOutputStream()) } catch (_: Exception) {} finally { try { remote.shutdownOutput() } catch (_: Exception) {} }
+        }
+        val t2 = Thread {
+            try { remote.getInputStream().copyTo(client.getOutputStream()) } catch (_: Exception) {} finally { try { client.close() } catch (_: Exception) {} }
+        }
+        t1.start(); t2.start(); t1.join(); t2.join()
+        try { remote.close() } catch (_: Exception) {}
     }
 
     /** 当前是否有 VPN 网络正在接管流量（决定要不要走原生直连）。 */

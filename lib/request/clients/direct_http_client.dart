@@ -28,6 +28,21 @@ class DirectHttpClient {
     }
   }
 
+  /// PoC：启动本地 CONNECT 隧道（绑定非 VPN 网卡），返回监听端口。
+  /// 已有隧道在跑时直接返回其端口。失败抛异常。
+  static Future<int> startLocalProxy() async {
+    final port = await _channel.invokeMethod<int>('startLocalProxy');
+    if (port == null) throw StateError('startLocalProxy 未返回端口');
+    return port;
+  }
+
+  /// 关闭本地 CONNECT 隧道（播放器销毁时调用）。
+  static Future<void> stopLocalProxy() async {
+    try {
+      await _channel.invokeMethod('stopLocalProxy');
+    } catch (_) {}
+  }
+
   /// 走非 VPN 网络发起请求，返回响应正文。
   ///
   /// [bodyType] 与 Dio 路径保持一致（'json' / 'form' / 'none'）：Dio 会自动
