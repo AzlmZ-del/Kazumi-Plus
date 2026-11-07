@@ -4,7 +4,6 @@ class PluginHTTPItem {
   bool useNativePlayer;
   String author;
   int lastUpdate;
-  bool antiCrawlerEnabled;
 
   /// 规则级「直连」声明，来自 index.json 条目（老索引无此键时为 false）。
   bool directConnection;
@@ -33,17 +32,12 @@ class PluginHTTPItem {
     required this.author,
     required this.lastUpdate,
     this.type = '',
-    this.antiCrawlerEnabled = false,
     this.directConnection = false,
     this.repositoryUrl = '',
     this.repositoryLabel = '',
   });
 
   factory PluginHTTPItem.fromJson(Map<String, dynamic> json) {
-    final dynamic rawConfig = json['antiCrawlerConfig'];
-    final bool antiCrawlerEnabled = rawConfig is Map<String, dynamic>
-        ? (rawConfig['enabled'] as bool? ?? false)
-        : (json['antiCrawlerEnabled'] as bool? ?? false);
     return PluginHTTPItem(
       name: json['name'],
       version: json['version'],
@@ -51,7 +45,6 @@ class PluginHTTPItem {
       author: json['author'],
       lastUpdate: json['lastUpdate'] ?? 0,
       type: json['type']?.toString() ?? '',
-      antiCrawlerEnabled: antiCrawlerEnabled,
       directConnection: json['directConnection'] ?? false,
     );
   }
@@ -71,7 +64,6 @@ class PluginHTTPItem {
       author: author,
       lastUpdate: lastUpdate,
       type: type,
-      antiCrawlerEnabled: antiCrawlerEnabled,
       directConnection: directConnection,
       repositoryUrl: url,
       repositoryLabel: label,

@@ -28,9 +28,6 @@ class BangumiCollection {
   /// 平均评分
   double score;
 
-  /// 总集数
-  int eps;
-
   /// 排名
   int rank;
 
@@ -49,7 +46,6 @@ class BangumiCollection {
       this.nameCn,
       this.shortSummary,
       this.score,
-      this.eps,
       this.rank,
       this.images,
       this.tags);
@@ -114,7 +110,6 @@ class BangumiCollection {
       subject['name_cn'] as String? ?? '',
       subject['short_summary'] as String? ?? '',
       (subject['score'] as num?)?.toDouble() ?? 0.0,
-      subject['eps'] as int? ?? 0,
       subject['rank'] as int? ?? 0,
       subjectImages,
       subjectTags,

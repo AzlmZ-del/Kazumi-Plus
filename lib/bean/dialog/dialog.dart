@@ -157,21 +157,6 @@ class KazumiDialog {
       navigator.removeRoute<T>(route, result);
     }
   }
-
-  // 保留给仍在使用 ScaffoldMessenger 的调用方（如需要清理页面残留
-  // SnackBar 的场景），当前 toast 已改走 FToast。
-  // ignore: unused_element
-  static ScaffoldMessengerState? _resolveScaffoldMessenger(
-    BuildContext? context,
-  ) {
-    if (context != null && context.mounted) {
-      final scopedMessenger = ScaffoldMessenger.maybeOf(context);
-      if (scopedMessenger != null) {
-        return scopedMessenger;
-      }
-    }
-    return rootScaffoldMessengerKey.currentState;
-  }
 }
 
 class _KazumiDialogRoute<T> extends DialogRoute<T> {

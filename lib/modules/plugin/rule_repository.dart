@@ -30,12 +30,6 @@ class RuleRepository {
   /// Built-in repositories are always present and can only be switched off.
   bool get isBuiltIn => isOfficial || isPersonal;
 
-  /// Display name of a built-in repository the user has not renamed.
-  ///
-  /// Kept out of [displayLabel] so that failure messages and other places that
-  /// only know the address keep using the plain host/repository name.
-  String? get builtInLabel => RuleRepositoryList.builtInLabelOf(url);
-
   /// Host portion of [url], used as the compact subtitle and as the last-resort
   /// display name.
   String get hostLabel {

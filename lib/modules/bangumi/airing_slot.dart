@@ -63,25 +63,6 @@ class SeasonSchedule {
     return result;
   }
 
-  /// 取某个星期列上应显示的那一集，优先待播，否则退回已播。
-  AiringSlot? slotForWeekday(int weekday, DateTime now) {
-    AiringSlot? future;
-    AiringSlot? past;
-    for (final slot in slots) {
-      if (slot.airTime.weekday != weekday) continue;
-      if (slot.airTime.isAfter(now)) {
-        if (future == null || slot.airTime.isBefore(future.airTime)) {
-          future = slot;
-        }
-      } else {
-        if (past == null || slot.airTime.isAfter(past.airTime)) {
-          past = slot;
-        }
-      }
-    }
-    return future ?? past;
-  }
-
   /// 整季的固定放送时刻：取各集时分的众数，避免个别集偏移导致跳动。
   ///
   /// 众数并列时退回最近一集的时刻。
