@@ -49,11 +49,118 @@ class DirectHttpHandler(private val context: Context) : MethodChannel.MethodCall
      * 与 PoC 的差别：单例 ServerSocket、可显式关闭、监听线程可退出。
      */
     private var proxyServer: java.net.ServerSocket? = null
+    private var proxyCallback: ConnectivityManager.NetworkCallback? = null
+    private var proxyCm: ConnectivityManager? = null
+
+    /** 尚未回复的 startLocalProxy 调用；stop 时替它回一个错误，免 Dart 侧 await 挂死。 */
+    private var pendingProxyStart: MethodChannel.Result? = null
+
+    /**
+     * 代际计数：每次 start 自增，每次 stop 也自增。
+     *
+     * requestNetwork 的回调可能在 unregister 之后才被投递，若不校验代际，
+     * 一次已作废的 onAvailable 仍会建出 ServerSocket —— 那个 socket 没人持有，
+     * 既关不掉也不会随 stop 释放，反而比原来的 callback 泄漏更难查。
+     */
+    private var proxyGeneration = 0
     private val proxyLock = Any()
+
+    /**
+     * 申请一次 NetworkCallback，获批后就地建隧道。
+     *
+     * 结果只回一次：超时后再到的网络回调不会二次 reply。
+     */
+    private fun requestProxyNetwork(
+        cm: ConnectivityManager,
+        request: NetworkRequest,
+        result: MethodChannel.Result,
+    ) {
+        var replied = false
+        val generation = synchronized(proxyLock) {
+            proxyGeneration += 1
+            pendingProxyStart = result
+            proxyGeneration
+        }
+
+        fun replyOnce(error: String?, payload: Any?, message: String?) {
+            synchronized(proxyLock) {
+                if (replied) return
+                replied = true
+                if (pendingProxyStart === result) pendingProxyStart = null
+            }
+            if (error == null) result.success(payload)
+            else result.error(error, message, null)
+        }
+
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                var server: java.net.ServerSocket? = null
+                var rejectReason: String? = null
+                synchronized(proxyLock) {
+                    // 代际不符 = 已被 stop 或已被新一轮 start 取代，本次回调作废。
+                    if (generation != proxyGeneration || proxyCallback !== this) {
+                        rejectReason = "隧道申请已作废"
+                    } else {
+                        try {
+                            server = java.net.ServerSocket(
+                                0, 50, java.net.InetAddress.getByName("127.0.0.1")
+                            )
+                            proxyServer = server
+                        } catch (e: Exception) {
+                            rejectReason = e.message ?: e.toString()
+                        }
+                    }
+                }
+
+                // 建 socket 之外的善后都放到锁外，避免持锁调用通道回复。
+                val started = server
+                if (started == null) {
+                    replyOnce("PROXY_START_FAILED", null, rejectReason)
+                    return
+                }
+                // 每个连接独立线程：CONNECT 握手后纯字节转发。
+                Thread {
+                    while (!started.isClosed) {
+                        val client = try { started.accept() } catch (e: Exception) { break }
+                        Thread {
+                            try { handleConnect(client, network) }
+                            catch (e: Exception) { try { client.close() } catch (_: Exception) {} }
+                        }.start()
+                    }
+                }.start()
+                replyOnce(null, started.localPort, null)
+            }
+
+            override fun onUnavailable() {
+                // 带超时的 requestNetwork 在 onUnavailable 后由系统自行注销，
+                // 这里只需摘掉引用，免得 stop 再对已注销的 callback 调 unregister。
+                synchronized(proxyLock) {
+                    if (proxyCallback === this) {
+                        proxyCallback = null
+                        proxyCm = null
+                    }
+                }
+                replyOnce("NO_NETWORK", null, "没有可用的非 VPN 网络")
+            }
+        }
+
+        synchronized(proxyLock) {
+            proxyCallback = callback
+            proxyCm = cm
+        }
+
+        try {
+            cm.requestNetwork(request, callback, NETWORK_TIMEOUT_MS.toInt())
+        } catch (e: Exception) {
+            replyOnce("REQUEST_FAILED", null, e.message ?: e.toString())
+        }
+    }
 
     private fun startLocalProxy(result: MethodChannel.Result) {
         synchronized(proxyLock) {
             // 已有隧道在跑：直接复用，避免每次播放都新建。
+            // 隧道常驻而非跟随播放器实例：切集/换源都会重建播放器，复用端口才不会每次都
+            // 重新 requestNetwork（最长等 NETWORK_TIMEOUT_MS）。
             proxyServer?.let {
                 result.success(it.localPort)
                 return
@@ -63,58 +170,46 @@ class DirectHttpHandler(private val context: Context) : MethodChannel.MethodCall
                     result.error("NO_CM", "ConnectivityManager 不可用", null)
                     return
                 }
-        val request = NetworkRequest.Builder()
-            .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
-            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-            .build()
-        var registered = false
-        try {
-            cm.requestNetwork(request, object : ConnectivityManager.NetworkCallback() {
-                override fun onAvailable(network: Network) {
-                    if (registered) return
-                    registered = true
-                    try {
-                        val server = java.net.ServerSocket(0, 50, java.net.InetAddress.getByName("127.0.0.1"))
-                        synchronized(proxyLock) {
-                            proxyServer = server
-                        }
-                        // 每个连接独立线程：CONNECT 握手后纯字节转发。
-                        Thread {
-                            while (!server.isClosed) {
-                                val client = try { server.accept() } catch (e: Exception) { break }
-                                Thread {
-                                    try { handleConnect(client, network) }
-                                    catch (e: Exception) { try { client.close() } catch (_: Exception) {} }
-                                }.start()
-                            }
-                        }.start()
-                        result.success(server.localPort)
-                    } catch (e: Exception) {
-                        result.error("PROXY_START_FAILED", e.message ?: e.toString(), null)
-                    }
-                }
-
-                override fun onUnavailable() {
-                    if (registered) return
-                    registered = true
-                    result.error("NO_NETWORK", "没有可用的非 VPN 网络", null)
-                }
-            }, NETWORK_TIMEOUT_MS.toInt())
-        } catch (e: Exception) {
-            result.error("REQUEST_FAILED", e.message ?: e.toString(), null)
-        }
+            val request = NetworkRequest.Builder()
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .build()
+            requestProxyNetwork(cm, request, result)
         }
     }
 
-    /** 关闭本地隧道：播放器销毁时由 Dart 侧调用。 */
+    /**
+     * 关闭本地隧道并注销网络回调。
+     *
+     * 只在 App 退出时调用一次：隧道本身是常驻单例（见 [startLocalProxy] 的复用分支）。
+     * 早期版本漏了 unregisterNetworkCallback，每次进程内重启隧道都会残留一个回调，
+     * 触碰系统对同进程回调数量的上限后 requestNetwork 会静默失败。
+     */
     private fun stopLocalProxy(result: MethodChannel.Result) {
+        val pending: MethodChannel.Result?
         synchronized(proxyLock) {
+            proxyGeneration += 1
+            proxyCallback?.let { callback ->
+                try {
+                    proxyCm?.unregisterNetworkCallback(callback)
+                } catch (_: Exception) {
+                    // 已被系统自行注销（如网络丢失）时会抛，忽略即可。
+                }
+            }
+            proxyCallback = null
+            proxyCm = null
             try {
                 // close 让 accept() 抛异常，监听线程随之退出。
                 proxyServer?.close()
             } catch (_: Exception) {}
             proxyServer = null
+            pending = pendingProxyStart
+            pendingProxyStart = null
         }
+        // 启动申请还悬着就替它回错误，否则那侧的 await 会一直等到 Activity 销毁。
+        try {
+            pending?.error("PROXY_STOPPED", "隧道已关闭", null)
+        } catch (_: Exception) {}
         result.success(null)
     }
 

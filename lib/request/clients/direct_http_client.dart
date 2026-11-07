@@ -30,14 +30,21 @@ class DirectHttpClient {
 
   /// PoC：启动本地 CONNECT 隧道（绑定非 VPN 网卡），返回监听端口。
   /// 已有隧道在跑时直接返回其端口。失败抛异常。
+  ///
+  /// 隧道是常驻单例，不跟随播放器实例：切集/换源都会重建播放器，
+  /// 复用端口才不会每次都重新 requestNetwork。
   static Future<int> startLocalProxy() async {
     final port = await _channel.invokeMethod<int>('startLocalProxy');
     if (port == null) throw StateError('startLocalProxy 未返回端口');
     return port;
   }
 
-  /// 关闭本地 CONNECT 隧道（播放器销毁时调用）。
+  /// 关闭本地 CONNECT 隧道并注销原生 NetworkCallback。
+  ///
+  /// 只在 App 退出时调用一次，不要挂到播放器 dispose —— 那会让每次切集
+  /// 都重建隧道，白等最长 8 秒的网络申请。
   static Future<void> stopLocalProxy() async {
+    if (!Platform.isAndroid) return;
     try {
       await _channel.invokeMethod('stopLocalProxy');
     } catch (_) {}
