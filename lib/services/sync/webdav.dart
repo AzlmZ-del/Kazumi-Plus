@@ -119,6 +119,9 @@ class WebDav {
     // 关闭主开关只停止同步，三个内容开关的选择原样保留：
     // 真正的同步入口都会同时判断 webDavEnable 与各自的内容开关，
     // 所以主开关关着时即使内容开关还亮着也不会发起任何请求。
+    // initialized 要一并复位，否则关闭后 initialized 仍为 true，
+    // collect_controller 的「未连接」提示会被绕过。
+    if (!enabled) initialized = false;
     await GStorage.putSetting(SettingsKeys.webDavEnable, enabled);
   }
 
