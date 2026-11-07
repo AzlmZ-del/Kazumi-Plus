@@ -150,7 +150,10 @@ class _VideoDetailsSheetState extends State<_VideoDetailsSheet>
           ),
           const SizedBox(height: 24),
           ContentSection.group(title: '媒体', children: [
-            _statusField(context, '媒体地址', playerController.videoUrl,
+            _statusField(
+                context,
+                playerController.directConnection ? '媒体地址（直连）' : '媒体地址',
+                playerController.videoUrl,
                 compact: true),
             _statusField(context, '播放列表', debug.playerPlaylist, compact: true),
             _statusField(

@@ -2,6 +2,7 @@
 
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:async';
 
 import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
@@ -11,6 +12,7 @@ import 'package:kazumi/services/shaders/shader_asset_service.dart';
 import 'package:kazumi/utils/constants.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/services/network/proxy_utils.dart';
+import 'package:kazumi/request/clients/direct_http_client.dart';
 import 'package:kazumi/services/network/system_proxy_service.dart';
 import 'package:kazumi/services/player/playback_cache_policy.dart';
 import 'package:kazumi/services/player/player_error_mapper.dart';
@@ -40,6 +42,8 @@ final class _OwnedPlayer {
   }
 
   Future<void> _dispose() async {
+    // 本地直连隧道不随单次 dispose 关闭：切集/换源都会重建播放器实例，
+    // 而隧道只是个轻量监听线程，跟随 App 生命周期即可，保证端口复用。
     try {
       await player.dispose();
     } catch (error, stackTrace) {
@@ -272,6 +276,7 @@ abstract class _PlayerPlaybackController with Store {
     required bool Function() canInstall,
     int offset = 0,
     VideoSourceFormat videoSourceFormat = VideoSourceFormat.auto,
+    bool directConnection = false,
   }) async {
     startOffset = offset;
     superResolutionMode = SuperResolutionMode.fromStorageValue(
@@ -348,7 +353,20 @@ abstract class _PlayerPlaybackController with Store {
       }
 
       final bool proxyEnable = GStorage.getSetting(SettingsKeys.proxyEnable);
-      if (proxyEnable) {
+      // 规则声明直连时不挂 http-proxy：mpv 默认走系统网络，不设即直连。
+      if (directConnection) {
+        KazumiLogger().i('Player: 规则直连，跳过代理设置');
+        // PoC：VPN 活跃时启动本地 CONNECT 隧道，让 mpv 经非 VPN 网卡取流。
+        if (Platform.isAndroid && await DirectHttpClient.isVpnActive()) {
+          try {
+            final port = await DirectHttpClient.startLocalProxy();
+            await pp.setProperty("http-proxy", 'http://127.0.0.1:$port');
+            KazumiLogger().i('Player: 本地直连隧道已就绪 127.0.0.1:$port');
+          } catch (e) {
+            KazumiLogger().w('Player: 本地直连隧道启动失败，回落普通直连 $e');
+          }
+        }
+      } else if (proxyEnable) {
         final String proxyUrl = GStorage.getSetting(SettingsKeys.proxyUrl);
         final formattedProxy = ProxyUtils.getFormattedProxyUrl(proxyUrl);
         if (formattedProxy != null) {

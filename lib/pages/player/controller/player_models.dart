@@ -15,6 +15,10 @@ class PlaybackInitParams {
   final int? sortNumber;
   final Map<String, String> httpHeaders;
   final bool adBlockerEnabled;
+
+  /// 规则级直连：为 true 时播放器不挂 http-proxy，视频流直接走物理网络。
+  final bool directConnection;
+
   final String episodeTitle;
   final String referer;
   final int currentRoad;
@@ -31,6 +35,7 @@ class PlaybackInitParams {
     required this.danmakuEpisodeNumber,
     required this.httpHeaders,
     required this.adBlockerEnabled,
+    this.directConnection = false,
     required this.episodeTitle,
     required this.referer,
     required this.currentRoad,
