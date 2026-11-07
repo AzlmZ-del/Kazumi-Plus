@@ -121,10 +121,10 @@ class VideoWebviewWindowsImpl
     disposeEventControllers();
   }
 
-  // The webview_windows package does not have a method to unload the current page.
-  // The loadUrl method opens a new tab, which can lead to memory leaks.
-  // Directly disposing of the webview controller would require reinitialization when switching episodes, which is costly.
-  // Therefore, this method is used to redirect to a blank page instead.
+  // webview_windows 没有卸载当前页面的方法。
+  // 用 loadUrl 会新开一个标签页，导致内存泄漏。
+  // 直接销毁 webview 控制器又要在切集时重新初始化，代价太大。
+  // 所以这里改成跳到一个空白页来替代卸载。
   Future<void> redirect2Blank() async {
     if (headlessWebview == null) return;
     try {

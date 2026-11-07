@@ -11,11 +11,9 @@ import 'package:kazumi/plugins/plugins.dart';
 import 'package:kazumi/plugins/plugins_controller.dart';
 import 'package:kazumi/services/plugin/plugin_credentials_store.dart';
 
-/// Lists the installed rules that declare a login flow and lets the user
-/// enter the account each of them needs.
+/// 列出已安装且声明了登录流程的规则，让用户为每条规则填一份账号。
 ///
-/// Credentials stay on this device: they are written to a dedicated Hive box
-/// and only ever sent to the rule's own login endpoint.
+/// 凭据只留在这台设备上：写进独立的 Hive box，且只会发给该规则自己的登录接口。
 class RuleAccountsPage extends StatefulWidget {
   const RuleAccountsPage({super.key, required this.controller});
 
@@ -108,8 +106,7 @@ class _AccountCard extends StatelessWidget {
     );
     if (result == null) return;
     if (result.password.isEmpty) {
-      // The dialog only allows an empty password when one is already stored,
-      // and then it means "keep the current one".
+      // 对话框只在已存过密码时才允许留空，此时表示「沿用当前密码」。
       final saved = await store.saveUsername(plugin.name, result.username);
       if (!saved) return;
     } else {
@@ -118,7 +115,7 @@ class _AccountCard extends StatelessWidget {
         username: result.username,
         password: result.password,
       );
-      // A new password invalidates the token obtained with the old one.
+      // 换了新密码，用旧密码拿到的令牌必须作废。
       await store.clearToken(plugin.name);
     }
     onChanged();
@@ -222,15 +219,13 @@ class _AccountDialog extends StatefulWidget {
   final String pluginName;
   final String initialUsername;
 
-  /// When true the password field may be left empty, meaning "keep the
-  /// password that is already stored".
+  /// 为 true 时密码框可以留空，表示「沿用已存的密码」。
   final bool passwordOptional;
 
-  /// Whether a password is already stored; when true the stored password is
-  /// pre-filled so the user can confirm what is saved.
+  /// 是否已存过密码；为 true 时会把已存密码预填进去，让用户确认存的是什么。
   final bool hasStoredPassword;
 
-  /// The stored password to pre-fill, empty when none is saved.
+  /// 用来预填的已存密码，没存过时为空串。
   final String initialPassword;
 
   @override
@@ -244,10 +239,8 @@ class _AccountDialogState extends State<_AccountDialog> {
       TextEditingController(text: widget.initialPassword);
   String? _error;
 
-  // The stored password is pre-filled but hidden by default; typing shows
-  // plain text only after the user toggles the eye (or it can be toggled to
-  // confirm before saving). Empty field with a stored password means "keep
-  // the stored one".
+  // 已存密码会预填但默认隐藏；只有用户点开眼睛图标才显示明文
+  // （也可以点开确认后再保存）。已存过密码而输入框为空，表示「沿用已存的」。
   bool _obscured = true;
 
   @override

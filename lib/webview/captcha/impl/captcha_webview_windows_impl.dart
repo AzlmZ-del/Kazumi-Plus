@@ -25,12 +25,12 @@ class CaptchaWebviewWindowsImpl
     await _headlessWebview!.setPopupWindowPolicy(WebviewPopupWindowPolicy.deny);
     await _applyUserAgent(userAgent);
 
-    // Listen for messages from JavaScript via window.chrome.webview.postMessage
+    // 通过 window.chrome.webview.postMessage 接收 JS 发来的消息。
     _subscriptions.add(
       _headlessWebview!.webMessage.listen(_onWebMessage),
     );
 
-    // Inject the active verification script when navigation completes.
+    // 导航完成时注入当前生效的验证脚本。
     _subscriptions.add(
       _headlessWebview!.loadingState.listen((state) async {
         if (state == LoadingState.navigationCompleted) {
@@ -47,8 +47,8 @@ class CaptchaWebviewWindowsImpl
       }),
     );
 
-    // After a navigation, detect verification completion for captcha-image
-    // and automated flows that marked a verification action as clicked.
+    // 导航之后判断验证是否完成：覆盖验证码图片与
+    // 已标记「验证动作点击过」的自动化流程两种情况。
     _subscriptions.add(
       _headlessWebview!.loadingState.listen((state) async {
         if (state == LoadingState.navigationCompleted) {
@@ -221,7 +221,7 @@ class CaptchaWebviewWindowsImpl
     return false;
   }
 
-  // If inputXpath is provided, trigger focus to load captcha (some sites require this)
+  // 若提供了 inputXpath，就先触发一次 focus 把验证码加载出来（有些站点要求这样）。
   _triggerInputFocus();
   
   if (!_checkForCaptcha()) {

@@ -3,7 +3,7 @@ import 'package:kazumi/request/core/dio_factory.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/services/network/proxy_aware_image_cache_manager.dart';
 
-// WebView proxies are configured separately by their platform controllers.
+// WebView 的代理由各自的平台控制器单独配置。
 class ProxyManager {
   ProxyManager._();
 

@@ -49,7 +49,7 @@ class ChapterErrorException implements Exception {
       '${cause != null ? ' ($cause)' : ''}';
 }
 
-/// The rule requires credentials that the user has not entered yet.
+/// 该规则需要的凭据用户还没填过。
 class RuleAuthRequiredException implements Exception {
   const RuleAuthRequiredException(this.pluginName);
 
@@ -60,7 +60,7 @@ class RuleAuthRequiredException implements Exception {
       'RuleAuthRequiredException: $pluginName requires an account';
 }
 
-/// Login ran but did not yield a token (bad credentials or changed API).
+/// 登录跑过了但没拿到令牌（凭据错了，或接口改了）。
 class RuleAuthFailedException implements Exception {
   const RuleAuthFailedException(
     this.pluginName, {
@@ -71,8 +71,8 @@ class RuleAuthFailedException implements Exception {
   final String pluginName;
   final Object? cause;
 
-  /// True when the login endpoint rejected the account itself (HTTP 401/403)
-  /// rather than failing for another reason such as a network error.
+  /// 为 true 表示登录接口拒绝的是账号本身（HTTP 401/403），
+  /// 而不是因为网络错误等其它原因失败。
   final bool badCredentials;
 
   @override
@@ -82,11 +82,10 @@ class RuleAuthFailedException implements Exception {
           '${cause != null ? ' ($cause)' : ''}';
 }
 
-/// Immutable runtime snapshot built from a plugin rule.
+/// 由插件规则构建出的不可变运行时快照。
 ///
-/// API requests can provide their own static headers. [userAgent] is the
-/// rule's own User-Agent; it applies to every outgoing request (search,
-/// chapter and playback), falling back to a non-browser default when empty.
+/// API 请求可以自带静态请求头。[userAgent] 是规则自己的 User-Agent，
+/// 对每一个出站请求（搜索、章节、播放）都生效；为空时退回一个非浏览器的默认值。
 class RuleExecutionConfig {
   const RuleExecutionConfig({
     required this.pluginName,
@@ -125,22 +124,21 @@ class RuleExecutionConfig {
   final String chapterRoads;
   final String chapterResult;
 
-  /// Optional XPath list naming each chapter road, index-aligned with
-  /// [chapterRoads]. Empty keeps the generated "播放线路N" labels.
+  /// 可选的 XPath 列表，用于给各章节线路命名，与 [chapterRoads] 按下标对齐。
+  /// 留空则沿用自动生成的「播放线路N」标签。
   final String chapterRoadName;
   final ApiSearchConfig searchApiConfig;
   final ApiChapterConfig chapterApiConfig;
   final AntiCrawlerConfig antiCrawlerConfig;
 
-  /// User-Agent declared by the rule. Applies to search, chapter and playback
-  /// requests alike. Empty means "use a non-browser default".
+  /// 规则声明的 User-Agent，对搜索、章节与播放请求都生效。
+  /// 为空表示「用一个非浏览器的默认值」。
   final String userAgent;
 
-  /// Login flow declared by the rule, or null when the rule needs no auth.
+  /// 规则声明的登录流程；规则不需要鉴权时为 null。
   final ApiAuthConfig? auth;
 
-  /// Playback endpoint that returns a media URL, or null when playback has to
-  /// go through the webview.
+  /// 返回媒体地址的播放接口；必须走 webview 播放时为 null。
   final ApiPlayConfig? play;
 }
 
@@ -162,8 +160,8 @@ class PreparedRuleRequest {
   final String bodyType;
   final Object? body;
 
-  /// Whether stored plugin cookies are attached to the request. Historically
-  /// only search and API requests send cookies; XPath chapter requests do not.
+  /// 是否把存储的插件 cookie 带在请求上。历史上只有搜索与 API 请求会带
+  /// cookie，XPath 章节请求不带。
   final bool includeCookies;
 }
 

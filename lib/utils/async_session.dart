@@ -1,8 +1,7 @@
-/// Owns the currently active asynchronous operation in a replaceable sequence.
+/// 持有一条可被替换的序列中「当前有效」的那个异步操作。
 ///
-/// Starting a new session invalidates the previous one. [cancel] invalidates
-/// the current session while keeping the owner reusable, and [close] makes the
-/// owner permanently reject new work.
+/// 开启新会话会让上一个失效。[cancel] 让当前会话失效但持有者仍可复用，
+/// [close] 则让持有者永久拒绝新任务。
 final class AsyncSessionOwner {
   int _version = 0;
   bool _closed = false;

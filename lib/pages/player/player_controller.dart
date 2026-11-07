@@ -168,7 +168,7 @@ class PlayerController implements Disposable {
     unawaited(GStorage.putSetting<double>(SettingsKeys.defaultVolume, clamped));
   }
 
-  /// Describes [videoUrl], not the episode the page may still be resolving.
+  /// 描述的是 [videoUrl]，而不是页面可能还在解析中的那一集。
   String get mediaTitle {
     final episode =
         _episodeTitle.isNotEmpty ? _episodeTitle : '第 $currentEpisode 集';
@@ -393,11 +393,10 @@ class PlayerController implements Disposable {
     beginShutdown();
   }
 
-  /// Starts the idempotent player shutdown without blocking route navigation.
+  /// 启动幂等的播放器关闭流程，不阻塞路由跳转。
   ///
-  /// Native media and audio-session cleanup may finish after the route is
-  /// removed. Immediate ownership detachment happens synchronously before this
-  /// method returns.
+  /// 原生媒体与音频会话的清理可能在路由移除之后才完成；
+  /// 但所有权的立即摘除会在本方法返回前同步完成。
   void beginShutdown() {
     _initializations.close();
     if (_shutdownFuture != null) {
@@ -457,11 +456,6 @@ class PlayerController implements Disposable {
   void setButtonForwardTime(int time) {
     playback.buttonSkipTime = time;
     GStorage.putSetting(SettingsKeys.buttonSkipTime, time);
-  }
-
-  void setArrowKeyForwardTime(int time) {
-    playback.arrowKeySkipTime = time;
-    GStorage.putSetting(SettingsKeys.arrowKeySkipTime, time);
   }
 
   Future<void> launchExternalPlayer() async {

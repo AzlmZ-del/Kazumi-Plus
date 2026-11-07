@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:kazumi/services/platform/desktop_window_config.dart';
 
-/// Reserves space above content for native macOS window controls.
+/// 为 macOS 原生窗口按钮在内容上方留出空间。
 class EmbeddedNativeControlArea extends StatelessWidget {
   const EmbeddedNativeControlArea({
     super.key,

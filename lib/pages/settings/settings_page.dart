@@ -183,7 +183,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   void _replaceCategory(String path) {
     final outlet = _outletKey.currentState!;
-    // Nested pushes leave _location unchanged, so check the stack as well.
+    // 嵌套 push 不会改动 _location，所以要一并检查导航栈。
     if (!outlet.canPop &&
         !_isSecondaryRoute &&
         _selectedCategoryPath == path) {
@@ -201,7 +201,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _categoryNavigation = navigation;
     setState(() => _location = path);
     await _outletKey.currentState!.push<void>(path);
-    // Ignore completions from history replaced by a rail selection.
+    // 被侧栏选择替换掉的那次导航，它的完成回调要丢掉。
     if (!mounted || _categoryNavigation != navigation) return;
     setState(() {
       _categoryNavigation = null;
@@ -236,7 +236,7 @@ class _SettingsPageState extends State<SettingsPage> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Keep the outlet at the same tree position on resize.
+                // 尺寸变化时，出口组件要留在树的同一个位置上。
                 SizedBox(
                   width: wide ? 280 : 0,
                   child: Offstage(

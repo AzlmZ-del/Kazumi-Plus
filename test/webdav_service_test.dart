@@ -49,7 +49,8 @@ void main() {
     await directory.delete(recursive: true);
   });
 
-  test('disabling WebDAV clears all dependent flags', () async {
+  test('disabling WebDAV keeps content flags so the user choice survives',
+      () async {
     await GStorage.putSetting(SettingsKeys.webDavEnable, true);
     await GStorage.putSetting(SettingsKeys.webDavEnableHistory, true);
     await GStorage.putSetting(SettingsKeys.webDavEnableCollect, true);
@@ -58,10 +59,12 @@ void main() {
     await webDav.setEnabled(false);
 
     expect(GStorage.getSetting(SettingsKeys.webDavEnable), isFalse);
-    expect(GStorage.getSetting(SettingsKeys.webDavEnableHistory), isFalse);
-    expect(GStorage.getSetting(SettingsKeys.webDavEnableCollect), isFalse);
+    expect(webDav.initialized, isFalse);
+    // 内容开关是用户的选择，关主开关时保留；同步入口会同时判断两者。
+    expect(GStorage.getSetting(SettingsKeys.webDavEnableHistory), isTrue);
+    expect(GStorage.getSetting(SettingsKeys.webDavEnableCollect), isTrue);
     expect(
-        GStorage.getSetting(SettingsKeys.webDavEnableDanmakuShield), isFalse);
+        GStorage.getSetting(SettingsKeys.webDavEnableDanmakuShield), isTrue);
   });
 
   test('failed WebDAV initialization clears the previous connection', () async {

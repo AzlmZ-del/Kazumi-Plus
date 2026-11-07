@@ -30,8 +30,8 @@ class TrayService {
     await trayManager.setContextMenu(trayMenu);
   }
 
-  /// Must run before exit(): the plugin only drops the Windows icon on
-  /// WM_DESTROY, and its destroy assumes an icon was set.
+  /// 必须在 exit() 之前执行：该插件只在 WM_DESTROY 时才清理 Windows 图标，
+  /// 而它的销毁逻辑假定此前设置过图标。
   static Future<void> dispose() async {
     if (!_iconSet) return;
     _iconSet = false;

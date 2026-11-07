@@ -37,12 +37,11 @@ class BangumiItem {
   List<int> votesCount;
   @HiveField(14, defaultValue: '')
   String info;
-  // Calendar metadata is separate from counted user tags and is not persisted.
+  // 放送日历自带的元信息，与用户标签分开统计，不落库。
   final List<String> metaTags;
   BangumiInterest? interest;
 
-  /// Whether the subject is adult-only. Only available from the API (the /p1
-  /// subject endpoint and search results carry it) and never persisted.
+  /// 是否为成人内容。只有 API 会返回（/p1 条目接口与搜索结果带这个字段），不落库。
   final bool nsfw;
 
   BangumiItem({
@@ -72,7 +71,7 @@ class BangumiItem {
         final List<dynamic> infobox = jsonData['infobox'];
         for (var item in infobox) {
           if (item is Map && item['key'] == '别名') {
-            // api.bgm.tv /v0 uses `value`; next.bgm.tv /p1 uses `values`
+            // api.bgm.tv /v0 用 `value`，next.bgm.tv /p1 用 `values`，两个接口不统一。
             final dynamic raw = item['values'] ?? item['value'];
             if (raw == null) {
               return [];

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:material_new_shapes/material_new_shapes.dart';
 
-/// Keeps the rule catalog lazy within the responsive onboarding scroll surface.
+/// 让规则目录在引导页的自适应滚动容器里保持懒加载。
 class OnboardingStepLayout extends StatelessWidget {
   const OnboardingStepLayout({
     super.key,

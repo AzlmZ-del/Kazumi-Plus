@@ -96,7 +96,7 @@ class _EpisodeCommentsSheetState extends State<EpisodeCommentsSheet>
   }
 
   void _rememberEpisodeInfo(int index, EpisodeInfo info) {
-    // Playback resets the controller's EpisodeInfo in place when switching.
+    // 切集时播放器会原地重置控制器的 EpisodeInfo，所以要按索引另存一份快照。
     _episodeInfoByIndex[index] = EpisodeInfo(
       id: info.id,
       episode: info.episode,

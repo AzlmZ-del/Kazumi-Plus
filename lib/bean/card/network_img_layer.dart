@@ -121,7 +121,7 @@ class NetworkImgLayer extends StatelessWidget {
     switch (fit) {
       case BoxFit.none:
       case BoxFit.scaleDown:
-        // These modes depend on the original image dimensions.
+        // 这两个模式的最终尺寸由原图决定，不能预先限制解码尺寸。
         return (null, null);
       case BoxFit.fill:
         return (cacheWidth, cacheHeight);
@@ -130,12 +130,12 @@ class NetworkImgLayer extends StatelessWidget {
       case BoxFit.fitHeight:
         return (null, cacheHeight);
       case BoxFit.contain:
-        // A single decode axis preserves unknown source proportions.
+        // 只限一个轴，另一轴交给等比缩放，未知原图比例也不会变形。
         return sourceAspectRatio != null && sourceAspectRatio > aspectRatio
             ? (cacheWidth, null)
             : (null, cacheHeight);
       case BoxFit.cover:
-        // Decode enough pixels along the axis that fills the box.
+        // cover 会裁切，只需沿「填满盒子的那个轴」解码足够像素。
         if (sourceAspectRatio != null) {
           if (sourceAspectRatio < aspectRatio) return (cacheWidth, null);
           if (sourceAspectRatio > aspectRatio) return (null, cacheHeight);

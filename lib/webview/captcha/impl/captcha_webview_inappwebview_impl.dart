@@ -124,7 +124,7 @@ class CaptchaWebviewInAppWebviewImpl
     final escapedInputXpath =
         _currentInputXpath.replaceAll('\\', '\\\\').replaceAll("'", "\\'");
 
-    // Remove any previously injected captcha script before adding a fresh one.
+    // 注入新验证脚本之前，先移除之前注入过的那个。
     await webviewController?.removeAllUserScripts();
 
     const String scriptTemplate = """
@@ -221,9 +221,9 @@ function _triggerInputFocus() {
   return false;
 }
 
-// Report captcha status to Dart at DOMContentLoaded so that after a full-page
-// navigation Dart can detect that verification succeeded (captcha is gone).
-// Also trigger input focus here since DOM is ready at this point.
+// 在 DOMContentLoaded 时把验证状态回报给 Dart，这样整页跳转之后
+// Dart 才能判断验证已经通过（验证码消失了）。
+// 此时 DOM 已就绪，顺便在这里触发输入框 focus。
 window.addEventListener('DOMContentLoaded', function() {
   _triggerInputFocus();
   var node = _evalXpath();

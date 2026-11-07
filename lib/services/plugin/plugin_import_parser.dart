@@ -43,7 +43,7 @@ class PluginImportParser {
       jsonValue = json.decode(value);
       decodedAsJson = true;
     } on FormatException {
-      // Share links and text files are parsed below.
+      // 下面解析分享链接与文本文件。
     }
 
     if (decodedAsJson) {
@@ -136,7 +136,7 @@ class PluginImportParser {
             const FormatException('规则链接内容必须是 JSON object');
       } on FormatException catch (error) {
         firstError ??= error;
-        // Try a shorter prefix in case prose follows the rule link.
+        // 试一个更短的前缀，以防规则链接后面跟着一段说明文字。
       }
     }
     throw firstError ?? const FormatException('Invalid Kazumi rule link');

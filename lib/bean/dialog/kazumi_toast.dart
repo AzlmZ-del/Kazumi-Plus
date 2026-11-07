@@ -132,7 +132,6 @@ class UpdatableKazumiToast {
     _message.value = text;
   }
 
-  /// 收起胶囊。
   void dismiss() {
     if (_dismissed) return;
     _dismissed = true;
@@ -184,7 +183,7 @@ void showKazumiToast({
   }
 }
 
-/// 立刻收起当前提示（换页时用）。
+/// 换页时调用，立刻收起当前提示。
 void dismissKazumiToast() {
   FToast().removeCustomToast();
 }

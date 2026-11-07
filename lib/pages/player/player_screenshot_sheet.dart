@@ -59,7 +59,7 @@ class _PlayerScreenshotSheetState extends State<_PlayerScreenshotSheet> {
   String? _activeId;
   final FocusNode _focus = FocusNode(debugLabel: 'Screenshot review');
   final TransformationController _transform = TransformationController();
-  // Preserve the preview when resizing switches layouts.
+  // 尺寸变化导致布局切换时，保住已有的预览状态。
   final GlobalKey _previewKey = GlobalKey();
   final Map<String, double?> _aspectRatios = {};
   int _index = 0;
@@ -101,7 +101,7 @@ class _PlayerScreenshotSheetState extends State<_PlayerScreenshotSheet> {
       _aspectRatios.removeWhere((id, _) => !ids.contains(id));
       _pages = PageController(initialPage: _index, keepPage: false);
     });
-    // Detach the old PageView before disposing its controller.
+    // 先摘掉旧的 PageView，再销毁它的 controller。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       oldPages.dispose();
       if (mounted) _warmNeighbors();
@@ -142,7 +142,7 @@ class _PlayerScreenshotSheetState extends State<_PlayerScreenshotSheet> {
       _aspectRatios[item.id] = ratio;
       if (resize) setState(() {});
     } catch (_) {
-      // The image widget handles invalid image data.
+      // 无效的图片数据由图片组件自己兜底。
     } finally {
       descriptor?.dispose();
       buffer?.dispose();
@@ -722,7 +722,7 @@ class _PlayerScreenshotSheetState extends State<_PlayerScreenshotSheet> {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          // Rough width the single-row layout needs before it must stack.
+          // 单行布局所需的大致宽度，低于它就得改成上下堆叠。
           final rowWidth =
               saveWidth + scaler.scale(96) + scaler.scale(128) + 56;
           final stacked = stackActions || constraints.maxWidth < rowWidth;
@@ -738,7 +738,7 @@ class _PlayerScreenshotSheetState extends State<_PlayerScreenshotSheet> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Select-all stays intrinsic so the pick label never truncates.
+                // 「全选」按内容撑开，这样「选择」文案不会被截断。
                 Row(
                   children: [
                     Expanded(child: pick),

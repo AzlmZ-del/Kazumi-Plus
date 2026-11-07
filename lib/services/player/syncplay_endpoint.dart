@@ -1,7 +1,7 @@
-/// Official endpoint selected for new and reset settings.
+/// 新建与重置设置时选用的官方地址。
 const String defaultSyncPlayEndPoint = 'syncplay.pl:8996';
 
-/// Official public endpoints that must use STARTTLS.
+/// 必须走 STARTTLS 的官方公共地址。
 const Set<String> officialSyncPlayEndPoints = {
   'syncplay.pl:8995',
   defaultSyncPlayEndPoint,

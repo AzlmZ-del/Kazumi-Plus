@@ -67,7 +67,7 @@ class _RatingReviewDialogState extends State<RatingReviewDialog> {
 
   bool get _editing => _savedScore > 0 || _initialComment.trim().isNotEmpty;
 
-  // The default score is submittable but does not count as an edit.
+  // 默认分数可以直接提交，但不算「改动过」——用于决定关闭时要不要确认。
   bool get _dirty => _score != _initialScore || _textOrTagsChanged;
 
   bool get _canSubmit =>
@@ -189,7 +189,7 @@ class _RatingReviewDialogState extends State<RatingReviewDialog> {
 
   Future<void> _submit() async {
     if (!_canSubmit || _confirmingClose) return;
-    // Include pending custom input in the submission.
+    // 输入框里还没点「添加」的自定义标签，提交时一并带上。
     if (_tagController.text.trim().isNotEmpty && !_addCustomTag()) return;
     if (_commentController.text.characters.length > _maxCommentLength ||
         _selectedTags.length > _maxTags) {

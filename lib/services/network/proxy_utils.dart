@@ -6,7 +6,7 @@ class ProxyUtils {
   /// 解析代理 URL，返回 (主机, 端口)
   ///
   /// 支持的格式:
-  /// - http://127.0.0.1:7890
+  /// - http://127.0.0.1:7890（示例）
   /// - 127.0.0.1:7890
   static (String, int)? parseProxyUrl(String url) {
     url = url.trim();

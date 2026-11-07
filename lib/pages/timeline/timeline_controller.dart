@@ -74,7 +74,7 @@ abstract class _TimelineController with Store {
     }
   }
 
-  // MobX batches clear/addAll between awaits so observers never see a partial update.
+  // MobX 会把 await 之间的 clear/addAll 合成一批，观察者看不到中间的空列表状态。
   @action
   Future<void> _getSchedulesBySeason(DateTime date) async {
     final dateRange = AnimeSeason(date).toSeasonStartAndEnd();

@@ -311,7 +311,7 @@ class SettingsTile<T> extends StatelessWidget {
         initialValue = null,
         radioValue = null;
 
-  /// Row taps pass null to [onToggle]; switch gestures pass the new value.
+  /// 点整行时 [onToggle] 收到 null，拨开关时收到新值。
   const SettingsTile.switchTile({
     super.key,
     required this.title,

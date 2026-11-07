@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -37,7 +36,7 @@ class BangumiWebSession {
   /// 登录态判据：条目页里 `CHOBITS_UID` 是当前登录用户 id，0 表示未登录。
   ///
   /// 站点把它写在一条合并声明里，形如
-  /// `var SHOW_ROBOT = '0', CHOBITS_UID = 808296, CHOBITS_USERNAME = '808296', ...`
+  /// 形如 `var SHOW_ROBOT = '0', CHOBITS_UID = 808296, CHOBITS_USERNAME = '808296', ...`
   /// —— `var` 只修饰第一个变量，所以匹配时**不能带 `var` 前缀**，否则永远匹配不到。
   static final RegExp _chobitsUidPattern = RegExp(r'CHOBITS_UID\s*=\s*(\d+)');
 
@@ -549,8 +548,6 @@ class BangumiWebCaptcha {
 
   final Uint8List image;
   final String formhash;
-
-  String get base64Image => base64Encode(image);
 }
 
 enum BangumiWebDeleteResult {

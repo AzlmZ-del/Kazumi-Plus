@@ -9,8 +9,8 @@ class ThemeProvider extends ChangeNotifier {
   late ThemeData dark;
   String? currentFontFamily = customAppFontFamily;
 
-  /// Returns true if the effective theme is dark mode.
-  /// Automatically gets platform brightness when themeMode is ThemeMode.system.
+  /// 判断当前生效的主题是否为深色。
+  /// themeMode 为 system 时自动取平台亮度。
   bool isEffectiveDark() {
     if (themeMode == ThemeMode.dark) return true;
     if (themeMode == ThemeMode.light) return false;

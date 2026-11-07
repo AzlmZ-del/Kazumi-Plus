@@ -17,7 +17,7 @@ abstract interface class RuleRequestExecutor {
     CancelToken? cancelToken,
   });
 
-  /// Runs the rule's login flow proactively and caches the fresh token.
+  /// 主动跑一遍规则的登录流程，并把新令牌缓存起来。
   Future<String> login(
     RuleExecutionConfig config, {
     CancelToken? cancelToken,
@@ -39,9 +39,6 @@ class RuleEngine {
   final ApiRuleStrategy _apiStrategy;
   final XPathRuleStrategy _xpathStrategy;
   final bool _logFailures;
-
-  /// Visible for tests: drives the production executor directly.
-  RuleRequestExecutor get testRequestExecutor => _requestExecutor;
 
   Future<RuleSearchTrace> search(
     RuleExecutionConfig config,
@@ -105,18 +102,17 @@ class RuleEngine {
     }
   }
 
-  /// Parses HTML harvested from the captcha webview as a search result,
-  /// skipping one network round trip after verification. Returns null when
-  /// not applicable (API/POST rules) or when the page does not parse into
-  /// results (still a challenge page, redirect page, or empty list) — the
-  /// caller then falls back to a regular re-search.
+  /// 把验证 webview 里抓到的 HTML 直接当作搜索结果解析，
+  /// 省掉验证之后的一次网络往返。不适用时（API/POST 规则）返回 null，
+  /// 页面解析不出结果时（仍是验证页、跳转页或空列表）也返回 null，
+  /// 调用方随后退回常规的重新搜索。
   PluginSearchResponse? tryParseHarvestedSearch(
     RuleExecutionConfig config,
     String raw,
   ) {
     if (raw.trim().isEmpty) return null;
-    // The webview loads the search URL with GET; API-mode and POST-mode
-    // rules may render a different page than the real search response.
+    // webview 是用 GET 加载搜索地址的；API 模式与 POST 模式的规则
+    // 渲染出来的页面可能和真正的搜索响应不是一回事。
     if (config.searchMode == RuleMode.api || config.usePost) return null;
     try {
       final parsed = _xpathStrategy.parseSearch(raw, config);
@@ -190,9 +186,9 @@ class RuleEngine {
     }
   }
 
-  /// Runs the login flow on demand (the「点击登录」button) and caches the
-  /// token. Reuses [_login], so a failure surfaces as [RuleAuthFailedException]
-  /// and a missing account as [RuleAuthRequiredException].
+  /// 按需执行登录流程（对应「点击登录」按钮），并把拿到的令牌缓存下来。
+  /// 复用 [_login]，所以失败会抛 [RuleAuthFailedException]，
+  /// 缺账号则抛 [RuleAuthRequiredException]。
   Future<String> login(
     RuleExecutionConfig config, {
     CancelToken? cancelToken,
@@ -208,16 +204,15 @@ class RuleEngine {
     } on RuleAuthFailedException {
       rethrow;
     } finally {
-      // Touch the store so linters see the dependency; the executor owns the
-      // actual credential checks.
+      // 碰一下 store 让 lint 看到这个依赖；真正的凭据校验由执行器负责。
       store.hasCredentials(config.pluginName);
     }
   }
 
-  /// Resolves the media URL for [episodeUrl] through the rule's play API.
+  /// 通过规则的播放接口为 [episodeUrl] 解析出媒体地址。
   ///
-  /// Throws [ChapterErrorException] when the rule declares no play endpoint;
-  /// callers use that to fall back to the webview.
+  /// 规则没有声明播放接口时抛 [ChapterErrorException]，
+  /// 调用方据此退回 webview。
   Future<String> resolvePlayUrl(
     RuleExecutionConfig config,
     String episodeUrl, {
@@ -276,14 +271,12 @@ class RuleEngine {
         error.type == NetworkExceptionType.cancel;
   }
 
-  /// Checks whether a failed XPath search request actually returned an
-  /// anti-crawler challenge page.
+  /// 判断一次失败的 XPath 搜索请求，实际返回的是不是反爬验证页。
   ///
-  /// Dio rejects non-2xx responses before [XPathRuleStrategy.parseSearch]
-  /// gets a chance to inspect the response body. Protected sites commonly
-  /// return challenge HTML with HTTP 403/429/503, so reuse the configured
-  /// captcha detector against the preserved Dio response body and hand the
-  /// request over to the existing captcha flow when it matches.
+  /// Dio 在 [XPathRuleStrategy.parseSearch] 有机会看响应体之前，
+  /// 就已经把非 2xx 响应拒掉了。被防护的站点常用 HTTP 403/429/503
+  /// 返回验证页，所以拿配置好的识别器去查 Dio 保留的响应体，
+  /// 命中就交给现有的验证流程处理。
   bool _isCaptchaChallengeResponse(
     SearchErrorException error,
     RuleExecutionConfig config,
@@ -304,9 +297,9 @@ class RuleEngine {
 
     final response = rawError.response;
 
-    // Cloudflare marks managed challenge responses with this header.
-    // This is useful when the body is empty, compressed unexpectedly, or
-    // otherwise unavailable to Dio on a specific platform.
+    // Cloudflare 用这个响应头标记「托管验证」响应。
+    // 当响应体为空、被意外压缩，或某个平台上 Dio 就是拿不到内容时，
+    // 这个头就派上用场了。
     final cfMitigated = response?.headers.value('cf-mitigated');
     if (cfMitigated?.toLowerCase() == 'challenge') {
       return true;
@@ -332,8 +325,8 @@ class RuleEngine {
     }
   }
 
-  /// Surfaces partially-skipped nodes so incomplete results are traceable
-  /// from logs even when the rule succeeds overall.
+  /// 把被部分跳过的节点暴露出来，这样即使规则整体成功，
+  /// 也能从日志里追到不完整的结果。
   void _logDiagnostics(
     RuleExecutionConfig config,
     String phase,
@@ -362,9 +355,9 @@ class RuleEngine {
   }
 }
 
-/// Sends a fully prepared request and returns the raw response body.
+/// 发送一个完全备好的请求并返回原始响应体。
 ///
-/// Injected so tests can drive the production executor without the network.
+/// 做成可注入，测试就能不联网地驱动生产执行器。
 typedef RuleTextSender = Future<String> Function(
   PreparedRuleRequest request,
   Map<String, dynamic> headers,
@@ -372,16 +365,15 @@ typedef RuleTextSender = Future<String> Function(
   RuleExecutionConfig config,
 );
 
-/// Executes rule requests, adding the login/token handling declared by the
-/// rule's `auth` block.
+/// 执行规则请求，并按规则 `auth` 块声明的协议补上登录与令牌处理。
 class DefaultRuleRequestExecutor implements RuleRequestExecutor {
   DefaultRuleRequestExecutor({RuleTextSender? textSender})
       : _textSender = textSender ?? _sendViaClient;
 
   final RuleTextSender _textSender;
 
-  /// Tokens currently being refreshed, so a 401 during the retry itself does
-  /// not loop back into another re-login.
+  /// 正在刷新中的令牌，避免重试本身又收到 401 时
+  /// 回头再触发一次重新登录，形成死循环。
   final Set<String> _refreshing = {};
 
   static Future<String> _sendViaClient(
@@ -428,14 +420,14 @@ class DefaultRuleRequestExecutor implements RuleRequestExecutor {
     if (!store.hasCredentials(config.pluginName)) {
       throw RuleAuthRequiredException(config.pluginName);
     }
-    // Always log in fresh: the button is an explicit credential check, so a
-    // cached token must not mask a password that no longer works.
+    // 每次都重新登录：这个按钮本身就是一次凭据校验，
+    // 缓存的令牌不能掩盖一个已经失效的密码。
     await store.clearToken(config.pluginName);
     return _login(config, cancelToken: cancelToken);
   }
 
-  /// Whether [request] was rendered from the rule's own login endpoint —
-  /// sending the token to the token issuer makes no sense.
+  /// 判断 [request] 是不是由规则自己的登录接口构造出来的，
+  /// 把令牌发回给签发它的地方没有任何意义。
   bool _isLoginRequest(PreparedRuleRequest request, RuleExecutionConfig config) {
     final loginUrl = config.auth!.login.url.trim();
     return loginUrl.isNotEmpty && request.url.startsWith(loginUrl);
@@ -466,7 +458,7 @@ class DefaultRuleRequestExecutor implements RuleRequestExecutor {
       if (_refreshing.contains(config.pluginName)) rethrow;
       _refreshing.add(config.pluginName);
       try {
-        // The cached token was rejected: drop it and log in once more.
+        // 缓存的令牌被拒了：丢掉它，再登录一次。
         await store.clearToken(config.pluginName);
         final fresh = await _login(config, cancelToken: cancelToken);
         return await _send(request, config,
@@ -477,7 +469,7 @@ class DefaultRuleRequestExecutor implements RuleRequestExecutor {
     }
   }
 
-  /// Runs the rule's login request, extracts the token and caches it.
+  /// 跑规则的登录请求，取出令牌并缓存。
   Future<String> _login(
     RuleExecutionConfig config, {
     CancelToken? cancelToken,
@@ -506,8 +498,8 @@ class DefaultRuleRequestExecutor implements RuleRequestExecutor {
     } on ApiRuleFormatException catch (error) {
       throw RuleAuthFailedException(config.pluginName, cause: error);
     } on NetworkException catch (error) {
-      // 401/403 from the login endpoint means the account itself was
-      // rejected; anything else (timeout, DNS, 5xx) is a different problem.
+      // 登录接口返回 401/403 说明账号本身被拒；
+      // 其它情况（超时、DNS、5xx）是另一类问题。
       final status = error.statusCode;
       throw RuleAuthFailedException(
         config.pluginName,
@@ -531,14 +523,14 @@ class DefaultRuleRequestExecutor implements RuleRequestExecutor {
         : null;
     final auth = config.auth;
     // UA 优先级：clearance cookie 绑定的 UA > 规则自带 UA > 请求层默认值。
-    // Clearance cookies are bound to the User-Agent they were issued to, so the
-    // verified UA must win whenever it exists; sending a different one would
-    // make the site serve the challenge page again.
+    // clearance cookie 与签发它时的 User-Agent 绑定，
+    // 所以只要有验证过的 UA 就必须优先用它；
+    // 换成别的 UA 会让站点重新返回验证页。
     final ruleUserAgent = config.userAgent.trim();
     final userAgent = verifiedUserAgent ??
         (ruleUserAgent.isEmpty ? null : ruleUserAgent);
-    // Header names are lowercased so a rule-supplied 'User-Agent' collides
-    // with ours instead of being sent as a second, conflicting header.
+    // 头名统一转小写，这样规则里写的 'User-Agent' 会与我们这条撞上，
+    // 而不是变成第二个互相冲突的头。
     final headers = <String, dynamic>{
       'referer': '${config.baseUrl}/',
       if (cookieHeader.isNotEmpty) 'cookie': cookieHeader,
@@ -546,8 +538,8 @@ class DefaultRuleRequestExecutor implements RuleRequestExecutor {
         entry.key.toLowerCase(): entry.value,
       'user-agent': ?userAgent,
     };
-    // Auth token goes last so it wins over a rule-supplied static header of
-    // the same name (lowercased keys collide by design, see above).
+    // 认证令牌放在最后，这样它能盖过规则里写死的同名静态头
+    // （键统一小写就是为了让它们撞上，见上）。
     final headerName = auth?.headerName.trim() ?? '';
     if (token != null && headerName.isNotEmpty) {
       headers[headerName.toLowerCase()] =

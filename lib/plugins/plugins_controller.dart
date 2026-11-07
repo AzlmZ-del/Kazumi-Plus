@@ -41,20 +41,19 @@ class PluginBatchUpdateResult {
   bool get hasNoCandidates => candidates == 0;
 }
 
-/// Loads the whole catalog from a single injected source.
+/// 从单个注入源加载整份目录。
 ///
-/// This replaces catalog aggregation entirely: when it is supplied the
-/// controller never reads repository settings. Tests and embedded callers use
-/// it to describe "one catalog, period", which the per-repository loaders
-/// below cannot express.
+/// 这会完全取代目录聚合：只要提供了它，控制器就不再读仓库设置。
+/// 测试与嵌入式调用方用它表达「就这一份目录」，而下面那套按仓库加载的
+/// 实现无法表达这个语义。
 typedef PluginCatalogLoader = Future<List<PluginHTTPItem>> Function();
 typedef PluginLoader = Future<Plugin> Function(String name);
 
-/// Loads the catalog of one repository.
+/// 加载单个仓库的目录。
 typedef PluginRepositoryCatalogLoader =
     Future<List<PluginHTTPItem>> Function(String repositoryUrl);
 
-/// Loads a single rule from the repository that advertised it.
+/// 从声明了该规则的仓库加载单条规则。
 typedef PluginRepositoryLoader =
     Future<Plugin> Function(String repositoryUrl, String name);
 
@@ -71,10 +70,10 @@ typedef _RepositoryLoad = ({
   Object? error,
 });
 
-/// A repository that could not be read during the last catalog refresh.
+/// 上次目录刷新时读取失败的仓库。
 ///
-/// Kept around so the catalog view can explain *why* rules are missing instead
-/// of silently showing a shorter list.
+/// 留着它是为了让目录视图能解释规则**为什么**少了，
+/// 而不是悄悄显示一个更短的列表。
 class RuleRepositoryFailure {
   const RuleRepositoryFailure({
     required this.repositoryUrl,
@@ -112,10 +111,10 @@ abstract class _PluginsController with Store {
         _pluginJsonWriter = pluginJsonWriter,
         _errorReporter = errorReporter ?? _defaultPluginErrorReporter;
 
-  /// Whole-catalog override; bypasses repository aggregation when set.
+  /// 整份目录的覆盖源；设置后就绕过仓库聚合。
   final PluginCatalogLoader? _catalogLoader;
 
-  /// Whole-catalog single-rule override; bypasses per-repository routing.
+  /// 整份目录下单条规则的覆盖源；设置后就绕过按仓库路由。
   final PluginLoader? _pluginLoader;
 
   final PluginRepositoryCatalogLoader _repositoryCatalogLoader;
@@ -128,26 +127,24 @@ abstract class _PluginsController with Store {
   Map<String, PluginHTTPItem> _pluginCatalogByName = const {};
   DateTime? _pluginCatalogRefreshedAt;
 
-  /// Rules hidden behind a same-named rule from an earlier repository.
+  /// 被更靠前仓库的同名规则遮住的那些规则。
   ///
-  /// Keyed by the winning name's [pluginNameKey]; the values are the shadowed
-  /// items in repository order, so the UI can show "+2" and offer a picker
-  /// without re-reading settings.
+  /// 键是胜出者的 [pluginNameKey]；值是按仓库顺序排列的被遮项，
+  /// 界面据此显示「+2」并提供选择器，无需再读一次设置。
   Map<String, List<PluginHTTPItem>> _shadowedRules = const {};
   List<RuleRepositoryFailure> _repositoryFailures = const [];
 
-  /// Bumped whenever the repository configuration changes.
+  /// 仓库配置每变更一次就递增。
   ///
-  /// An in-flight refresh that started before the bump must discard its result
-  /// instead of publishing it, otherwise a slow old request can overwrite the
-  /// new configuration's catalog and stamp `_pluginCatalogRefreshedAt`, which
-  /// would then serve stale data for [_pluginCatalogMaxAge].
+  /// 在递增之前发起的刷新必须丢弃结果而不是发布出去，
+  /// 否则一个慢的旧请求会覆盖新配置的目录并写上 `_pluginCatalogRefreshedAt`，
+  /// 之后 [_pluginCatalogMaxAge] 这段窗口内都会拿到过期数据。
   int _pluginCatalogGeneration = 0;
 
   int _optimisticReorderRevision = 0;
 
-  // Reuse a recent catalog across startup, the rule list, and the rule shop.
-  // Explicit refresh actions always bypass this window.
+  // 让启动流程、规则列表与规则商店复用同一份近期目录。
+  // 用户显式点刷新时永远绕过这个窗口。
   static const _pluginCatalogMaxAge = Duration(minutes: 5);
   static const _maxConcurrentRuleDownloads = 4;
 
@@ -180,7 +177,7 @@ abstract class _PluginsController with Store {
     }
   }
 
-  // Before 1.5.1 each rule was a separate JSON file in the parent directory.
+  // 1.5.1 之前，每条规则是父目录下的一个独立 JSON 文件。
   Future<void> _migrateLegacyPlugins(Directory legacyDirectory) async {
     final legacyFiles = legacyDirectory
         .listSync()
@@ -195,16 +192,6 @@ abstract class _PluginsController with Store {
 
   List<dynamic> _pluginListToJson() =>
       [for (final plugin in pluginList) plugin.toJson()];
-
-  Future<void> removePlugin(Plugin plugin) {
-    return _mutateAndPersist(
-      () => pluginList.removeWhere(
-        (candidate) =>
-            pluginNameKey(candidate.name) == pluginNameKey(plugin.name),
-      ),
-      errorMessage: 'Plugin: failed to persist rule removal',
-    );
-  }
 
   bool get isPluginCatalogFresh {
     final refreshedAt = _pluginCatalogRefreshedAt;
@@ -314,11 +301,9 @@ abstract class _PluginsController with Store {
     }
   }
 
-  /// Drops the cached catalog so the next read re-aggregates every enabled
-  /// repository.
+  /// 丢弃缓存目录，让下一次读取重新聚合所有已启用的仓库。
   ///
-  /// Called whenever the repository list changes. The generation bump makes any
-  /// refresh that is already in flight discard its result.
+  /// 仓库列表每次变化都会调用。代际号递增会让已经在途的刷新丢弃其结果。
   void invalidatePluginCatalog() {
     _pluginCatalogGeneration++;
     _pluginCatalogRefreshedAt = null;
@@ -343,15 +328,13 @@ abstract class _PluginsController with Store {
     });
   }
 
-  /// Loads and merges the catalog, retrying if the configuration changed
-  /// underneath an in-flight fetch.
+  /// 加载并合并目录；若在拉取途中配置变了就重试。
   ///
-  /// A refresh that started before [invalidatePluginCatalog] must not publish
-  /// its result: doing so would both show rules from a repository the user just
-  /// disabled *and* stamp `_pluginCatalogRefreshedAt`, which would keep serving
-  /// that stale catalog for [_pluginCatalogMaxAge]. Retrying against the new
-  /// configuration is cheaper than failing the call, because the caller only
-  /// ever wanted "the current catalog".
+  /// 在 [invalidatePluginCatalog] 之前发起的刷新不能发布结果：
+  /// 那样既会把用户刚禁用的仓库里的规则显示出来，**又会**写上
+  /// `_pluginCatalogRefreshedAt`，导致 [_pluginCatalogMaxAge] 期间
+  /// 一直供应这份过期目录。按新配置重试一次，
+  /// 比直接让调用失败更划算——调用方要的只是「当前目录」。
   Future<List<PluginHTTPItem>> _loadCatalog() async {
     const maxAttempts = 3;
     for (var attempt = 1;; attempt++) {
@@ -368,9 +351,9 @@ abstract class _PluginsController with Store {
     }
   }
 
-  /// One aggregation pass over the current configuration.
+  /// 对当前配置做一次聚合。
   ///
-  /// Publishes its result; the caller is responsible for generation checking.
+  /// 负责发布结果；代际校验由调用方自己做。
   Future<List<PluginHTTPItem>> _loadCatalogOnce() async {
     final wholeCatalogLoader = _catalogLoader;
     if (wholeCatalogLoader != null) {
@@ -381,8 +364,8 @@ abstract class _PluginsController with Store {
 
     final repositories = RulesRepositoryConfig.enabledRepositories();
     if (repositories.isEmpty) {
-      // Every repository was switched off. That is a legal configuration, not
-      // an error: there is simply nothing to show.
+      // 所有仓库都被关掉了。这是合法配置，不是错误：
+      // 只是没有内容可显示而已。
       _publishCatalog(const [], shadowed: const {}, failures: const []);
       return const [];
     }
@@ -413,8 +396,8 @@ abstract class _PluginsController with Store {
           merged[key] = item;
           order.add(key);
         } else {
-          // Repository order is the user's priority order: the first
-          // repository to advertise a name keeps it.
+          // 仓库顺序就是用户的优先级顺序：
+          // 第一个声明了某名字的仓库胜出。
           (shadowed[key] ??= <PluginHTTPItem>[]).add(item);
         }
       }
@@ -433,17 +416,16 @@ abstract class _PluginsController with Store {
     return catalog;
   }
 
-  /// Reads one repository, never throwing.
+  /// 读取单个仓库，且永不抛异常。
   ///
-  /// Callers aggregate with [Future.wait]; a repository that is down or
-  /// misconfigured must degrade into a missing section, not a failed refresh.
+  /// 调用方用 [Future.wait] 聚合；某个仓库挂掉或配置错误，
+  /// 只能退化成少一段内容，不能变成整次刷新失败。
   Future<_RepositoryLoad> _loadOneRepository(RuleRepository repository) async {
     try {
       final items = await _repositoryCatalogLoader(repository.url);
-      // The catalog API cannot know how the user named the repository, so it
-      // always tags items with an empty label. Stamp the configured display
-      // name here instead: this is the layer that has the setting in hand, and
-      // the rule cards read `repositoryLabel` to show where a rule came from.
+      // 目录接口不知道用户给仓库起了什么名字，所以它总是打上空标签。
+      // 这里补上配置里的显示名：这一层手上正好有设置，
+      // 而规则卡片读 `repositoryLabel` 来显示规则来源。
       final labelled = [
         for (final item in items)
           item.withRepository(
@@ -486,21 +468,21 @@ abstract class _PluginsController with Store {
     _pluginCatalogRefreshedAt = DateTime.now();
   }
 
-  /// Rules that lost the same-name conflict, keyed by the winning name.
+  /// 同名冲突中落败的规则，按胜出者名字索引。
   List<PluginHTTPItem> shadowedRulesFor(String name) {
     return _shadowedRules[pluginNameKey(name)] ?? const <PluginHTTPItem>[];
   }
 
-  /// Repositories that failed during the last successful refresh.
+  /// 上次成功刷新期间读取失败的仓库。
   List<RuleRepositoryFailure> get repositoryFailures => _repositoryFailures;
 
-  /// `baseURL` of a catalog rule, for the card's address line.
+  /// 目录规则的 `baseURL`，供卡片上的地址行使用。
   ///
-  /// The catalog file only carries name/version/author, so the address has to
-  /// come from the rule itself. An installed copy already knows it and answers
-  /// without a request, which covers the common case; the rest are downloaded
-  /// once per (repository, name, version) and cached — including failures, so
-  /// scrolling the list cannot hammer the repositories.
+  /// 索引文件只带 name/version/author，所以地址只能从规则本身取。
+  /// 已安装的那份直接就知道，无需请求即能应答，覆盖了常见情况；
+  /// 其余的才去下载
+  /// 每个 (仓库, 名称, 版本) 组合只请求一次并缓存（失败也缓存），
+  /// 这样滚动列表不会反复冲击仓库。
   final Map<String, Future<String?>> _ruleBaseUrlFutures = {};
 
   Future<String?> ruleBaseUrl(PluginHTTPItem item) {
@@ -508,8 +490,8 @@ abstract class _PluginsController with Store {
     for (final plugin in pluginList) {
       if (pluginNameKey(plugin.name) == key &&
           plugin.baseUrl.trim().isNotEmpty) {
-        // Cached like the downloads below: a fresh Future on every build would
-        // make FutureBuilder resolve forever.
+        // 和下面的下载一样要缓存：每次 build 都新建 Future，
+        // 会让 FutureBuilder 永远处于未完成状态。
         return _ruleBaseUrlFutures.putIfAbsent(
           'installed|$key|${plugin.baseUrl}',
           () => Future.value(plugin.baseUrl),
@@ -524,8 +506,8 @@ abstract class _PluginsController with Store {
         if (wholeLoader != null) {
           remote = await wholeLoader(item.name);
         } else if (item.repositoryUrl.isEmpty) {
-          // Untagged entries only reach here through a whole-catalog loader;
-          // guessing the official repository would be a surprise request.
+          // 无来源标记的条目只会经由整份目录加载器走到这里；
+          // 这时去猜官方仓库会变成一次意料之外的请求。
           return null;
         } else {
           remote = await _repositoryLoader(item.repositoryUrl, item.name);
@@ -596,10 +578,9 @@ abstract class _PluginsController with Store {
         : PluginUpdateAvailability.latest;
   }
 
-  /// Catalog entries that have a newer version than the installed rule.
+  /// 版本比已安装规则更新的目录条目。
   ///
-  /// Returns the catalog items rather than bare names so batch updates know
-  /// which repository to download each one from.
+  /// 返回目录项而不是裸名字，这样批量更新才知道每一条该去哪个仓库下载。
   List<PluginHTTPItem> _updatablePlugins() {
     final items = <PluginHTTPItem>[];
     for (final plugin in pluginList) {
@@ -630,11 +611,10 @@ abstract class _PluginsController with Store {
     });
   }
 
-  /// Downloads [name] from the repository that advertised it.
+  /// 从声明了 [name] 的仓库下载它。
   ///
-  /// [catalogItem] carries that repository. When it is null the rule is not in
-  /// any currently enabled catalog, and the official repository is used as a
-  /// last resort so an installed rule can still be refreshed directly.
+  /// [catalogItem] 带着那个仓库。为 null 时说明这条规则不在任何已启用的
+  /// 目录里，此时退回官方仓库作为兜底，让已安装的规则仍能直接刷新。
   Future<_PluginUpdateAttempt> _preparePluginUpdate(
     PluginHTTPItem? catalogItem,
     String name,
@@ -661,8 +641,8 @@ abstract class _PluginsController with Store {
       );
       return (result: PluginUpdateResult.failed, plugin: null);
     }
-    // Validate at the injected loader boundary so production and test/custom
-    // loaders follow the same integrity rule. Preserve the catalog spelling.
+    // 在注入加载器的边界上做校验，让生产、测试与自定义加载器
+    // 遵循同一套完整性规则。保留目录里的原始拼写。
     if (remotePlugin.name.isEmpty ||
         pluginNameKey(remotePlugin.name) != pluginNameKey(name)) {
       final error = FormatException(
@@ -698,7 +678,7 @@ abstract class _PluginsController with Store {
         break;
       }
     }
-    // Never downgrade an installed plugin; mirrors may lag behind upstream.
+    // 绝不把已安装插件降级；镜像可能落后于上游。
     if (local != null && !_remoteIsNewer(local.version, remotePlugin.version)) {
       return (result: PluginUpdateResult.notNewer, plugin: null);
     }

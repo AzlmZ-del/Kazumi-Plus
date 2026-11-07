@@ -212,7 +212,7 @@ class HistorySyncService {
     await GStorage.histories.flush();
   }
 
-  /// Rotate active logs for concurrent appends; retain pending files until sync commits.
+  /// 把活动日志轮转出去以便并发追加；待同步文件要留到同步提交成功之后再清。
   Future<HistorySyncLogBatch> prepareLocalLogs({
     required Directory runDirectory,
     required bool forceCheckpoint,
@@ -267,7 +267,7 @@ class HistorySyncService {
     });
   }
 
-  /// Sanitize the upload and active log so corrupt lines do not keep propagating.
+  /// 清理上传副本与活动日志，避免损坏的行一直往下传播。
   Future<File?> copyActiveLogForUpload(Directory runDirectory) {
     return _localLogQueue.run(() async {
       final activeFile = await localChangeLogFile();
@@ -297,7 +297,7 @@ class HistorySyncService {
     });
   }
 
-  /// Requires [_localLogQueue] to prevent appends during replacement.
+  /// 需要先拿 [_localLogQueue]，替换期间不允许有新追加。
   Future<void> _repairActiveLog(File activeFile, File sanitizedFile) async {
     try {
       final tempFile = File('${activeFile.path}.repair');
@@ -334,7 +334,7 @@ class HistorySyncService {
     return HistorySyncSnapshot.fromJson(json);
   }
 
-  /// Optionally skip malformed lines while logging each failure.
+  /// 可选地跳过格式错误的行，同时把每次失败都记进日志。
   Future<HistorySyncSnapshot> mergeEventFiles({
     required HistorySyncSnapshot snapshot,
     required Iterable<File> eventFiles,
@@ -360,7 +360,7 @@ class HistorySyncService {
     );
   }
 
-  /// Merge each remote file atomically so one invalid log cannot block other devices.
+  /// 逐个原子合并远端文件，这样某一份日志有问题也不会挡住其它设备的同步。
   Future<HistorySyncSnapshot> mergeRemoteEventFiles({
     required HistorySyncSnapshot snapshot,
     required Iterable<File> eventFiles,
@@ -529,7 +529,7 @@ Future<Map<String, dynamic>> _mergeHistoryEventFiles(
   };
 }
 
-// Keep the isolate entry point top-level to avoid capturing the service.
+// isolate 入口必须放在顶层，避免把 service 一起捕获进去。
 Future<Map<String, int>> _sanitizeEventLogCopy({
   required String sourcePath,
   required String targetPath,
@@ -541,7 +541,7 @@ Future<Map<String, int>> _sanitizeEventLogCopy({
   return Isolate.run(() => _copyValidEventLines(request));
 }
 
-// Drop corrupt lines before other devices can quarantine the entire log.
+// 在别的设备把整份日志隔离掉之前，先丢掉损坏的行。
 Future<Map<String, int>> _copyValidEventLines(
   Map<String, String> request,
 ) async {

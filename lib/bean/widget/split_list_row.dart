@@ -26,7 +26,7 @@ class SplitListRow extends StatefulWidget {
   final double pressedRadius;
   final VoidCallback? onTap;
 
-  /// Forward a child InkWell's onHighlightChanged here.
+  /// 把子级 InkWell 的 onHighlightChanged 转发到这里。
   static ValueChanged<bool>? pressReporterOf(BuildContext context) {
     return context
         .dependOnInheritedWidgetOfExactType<_SplitRowScope>()
@@ -53,7 +53,7 @@ class _SplitListRowState extends State<SplitListRow> {
             onHighlightChanged: _reportPress,
             child: widget.child,
           );
-    // Animate color as well as shape; Material alone snaps color changes.
+    // 颜色也要跟着动，Material 默认只对形状做过渡、颜色是硬切。
     return AnimatedContainer(
       duration: MediaQuery.disableAnimationsOf(context)
           ? Duration.zero
@@ -92,7 +92,7 @@ class _SplitRowScope extends InheritedWidget {
 
   final ValueChanged<bool> onPressChanged;
 
-  // The callback always targets the same state.
+  // 回调恒定指向同一个 state，无需通知重建。
   @override
   bool updateShouldNotify(_SplitRowScope oldWidget) => false;
 }

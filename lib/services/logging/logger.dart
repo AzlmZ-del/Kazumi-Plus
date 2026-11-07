@@ -117,7 +117,7 @@ class KazumiLogOutput extends LogOutput {
       print(line);
     }
 
-    // Write to file if: warning/error/fatal OR forceLog is enabled OR
+    // 满足以下任一条件才写盘：警告/错误/致命级别，或开启了 forceLog，或
     // Player decision lines (直连/代理决策链需要永久可查，且它们多在
     // forceLog Zone 之外产生，靠 Zone 标记圈不到).
     final forceLog = Zone.current[_forceLogKey] as bool? ?? false;
@@ -153,7 +153,7 @@ class KazumiLogOutput extends LogOutput {
     });
   }
 
-  /// Remove ANSI escape codes from string to ensure clean log files
+  /// 去掉字符串里的 ANSI 转义码，保证日志文件干净。
   String _removeAnsiCodes(String text) {
     return text.replaceAll(RegExp(r'\x1B\[[0-9;]*m'), '');
   }
@@ -182,37 +182,37 @@ class KazumiLogger {
     }
   }
 
-  /// Trace log - lowest level, very detailed information
+  /// Trace 级 —— 最低级别，极其详细的信息。
   void t(dynamic message,
       {Object? error, StackTrace? stackTrace, bool forceLog = false}) {
     _log(() => _logger.t(message, error: error), forceLog);
   }
 
-  /// Debug log - detailed information for debugging
+  /// Debug 级 —— 用于调试的详细信息。
   void d(dynamic message,
       {Object? error, StackTrace? stackTrace, bool forceLog = false}) {
     _log(() => _logger.d(message, error: error), forceLog);
   }
 
-  /// Info log - informational messages
+  /// Info 级 —— 一般性提示消息。
   void i(dynamic message,
       {Object? error, StackTrace? stackTrace, bool forceLog = false}) {
     _log(() => _logger.i(message, error: error), forceLog);
   }
 
-  /// Warning log - potentially harmful situations
+  /// Warning 级 —— 可能有害的情形。
   void w(dynamic message,
       {Object? error, StackTrace? stackTrace, bool forceLog = false}) {
     _log(() => _logger.w(message, error: error), forceLog);
   }
 
-  /// Error log - error events that might still allow the app to continue
+  /// Error 级 —— 出错但仍可能继续运行。
   void e(dynamic message,
       {Object? error, StackTrace? stackTrace, bool forceLog = false}) {
     _log(() => _logger.e(message, error: error), forceLog);
   }
 
-  /// Fatal log - very severe error events that may cause the app to abort.
+  /// Fatal 级 —— 可能导致应用中止的严重错误。
   void f(dynamic message,
       {Object? error, StackTrace? stackTrace, bool forceLog = false}) {
     _log(
@@ -226,37 +226,4 @@ class KazumiLogger {
   }
 }
 
-Future<File> getLogsPath() async {
-  final dir = (await getApplicationSupportDirectory()).path;
-  final logDir = p.join(dir, "logs");
-  final filename = p.join(logDir, "kazumi_logs.log");
 
-  final directory = Directory(logDir);
-  if (!await directory.exists()) {
-    await directory.create(recursive: true);
-  }
-
-  final file = File(filename);
-  if (!await file.exists()) {
-    await KazumiLogOutput._logLock.synchronized(() async {
-      if (!await file.exists()) {
-        await file.create();
-      }
-    });
-  }
-  return file;
-}
-
-Future<bool> clearLogs() async {
-  try {
-    final file = await getLogsPath();
-    await KazumiLogOutput._logLock.synchronized(() async {
-      await file.writeAsString('');
-    });
-    return true;
-  } catch (e) {
-    // ignore: avoid_print
-    print('Error clearing file: ${_singleLineLogText(e)}');
-    return false;
-  }
-}

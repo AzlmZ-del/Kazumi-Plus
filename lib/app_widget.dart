@@ -205,7 +205,7 @@ class _AppWidgetState extends State<AppWidget>
     }
   }
 
-  // windowManager.close() triggers this handler; exit() bypasses confirmation.
+  // windowManager.close() 会触发这个处理；exit() 则绕过确认。
   @override
   Future<void> onWindowClose() async {
     if (_isHandlingWindowClose || !mounted) return;

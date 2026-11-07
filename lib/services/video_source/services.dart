@@ -1,4 +1,4 @@
-/// Video source service exports.
+/// 视频源相关服务的统一导出。
 library;
 
 export 'video_source_service.dart';

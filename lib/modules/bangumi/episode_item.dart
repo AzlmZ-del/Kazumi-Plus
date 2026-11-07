@@ -17,7 +17,6 @@ class EpisodeInfo {
   /// 时长秒数，接口未提供时为 0。
   int durationSeconds;
 
-  /// 该集在站内的讨论数。
   int commentCount;
 
   EpisodeInfo({

@@ -41,8 +41,7 @@ class PluginCatalogView extends StatefulWidget {
 
   final PluginsController controller;
 
-  /// Opens the repository management page. `null` hides every entry point, which
-  /// is what the onboarding step wants.
+  /// 打开仓库管理页。传 `null` 会隐藏所有入口——引导页要的就是这个效果。
   final VoidCallback? onManageRepositories;
 
   final Widget Function(BuildContext context, List<Widget> slivers)?
@@ -62,13 +61,12 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
   bool _loading = true;
   bool _loadFailed = false;
 
-  /// Repository totals captured after each load, so the header can show them
-  /// without re-reading settings on every frame.
+  /// 每次加载后记下的仓库总数，让表头直接取用，
+  /// 不必每帧都去读一次设置。
   int _repositoryCount = 0;
   int _enabledRepositoryCount = 0;
 
-  /// Hosts of the repositories that failed. Cleared whenever the user dismisses
-  /// the banner; a new failure set brings it back.
+  /// 加载失败的仓库主机名。用户关掉横幅就清空，出现新的失败集合时再重新显示。
   String _dismissedFailures = '';
 
   PluginsController get _controller => widget.controller;
@@ -128,12 +126,10 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
     _startRefresh();
   }
 
-  /// Reloads the catalog, ignoring the in-flight guard.
+  /// 重新加载目录，且不受「正在加载」守卫的拦截。
   ///
-  /// Called after the repository configuration changed. Unlike [_refresh] it
-  /// must not be swallowed while the first load is still running, otherwise
-  /// switching a repository on/off would leave the list showing the old
-  /// catalog.
+  /// 仓库配置变更后调用。与 [_refresh] 不同，它不能被首次加载吞掉，
+  /// 否则开关一个仓库之后列表还停在旧目录上。
   void reload() => _startRefresh();
 
   void _startRefresh() {
@@ -306,10 +302,10 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
     );
   }
 
-  /// Compact entry point into the repository management page.
+  /// 进入仓库管理页的紧凑入口。
   ///
-  /// Only rendered when the host page wires [PluginCatalogView.onManageRepositories];
-  /// the onboarding step passes nothing and stays free of management UI.
+  /// 只有宿主页面接了 [PluginCatalogView.onManageRepositories] 才渲染；
+  /// 引导页什么都不传，因此不会出现管理界面。
   Widget _repositoryEntry() {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
@@ -356,10 +352,10 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
     );
   }
 
-  /// Yellow banner naming the repositories whose last load failed.
+  /// 黄色横幅，列出上次加载失败的仓库。
   ///
-  /// Partial failures are not errors: the rest of the catalog is perfectly
-  /// usable, so this stays dismissible instead of taking over the page.
+  /// 部分失败不算错误：其余目录仍然完全可用，所以这条横幅可以关掉，
+  /// 而不是接管整个页面。
   Widget? _failureBanner() {
     if (widget._onboarding || _loading || _loadFailed) {
       return null;
@@ -416,19 +412,18 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
     );
   }
 
-  /// Where a rule came from, as a single line under the author.
+  /// 规则的来源，排成作者下面的一行。
   ///
-  /// Repository name wins; otherwise the host of the repository URL; the
-  /// built-in repositories are always named rather than spelled out as a host.
-  /// `+N` marks rules hidden behind a same-name conflict, and tapping the line
-  /// opens them — the source line replaced the chip that used to carry both.
+  /// 优先用仓库名；没有就用仓库 URL 的主机名；内置仓库一律用固定名称，
+  /// 不展开成主机。`+N` 表示被同名冲突挡住的规则条数，点这一行可以展开——
+  /// 这行来源取代了原先同时承载两者的 chip。
   String _sourceLabel(PluginHTTPItem item) {
     final base = _repositoryName(item);
     final shadowedCount = _controller.shadowedRulesFor(item.name).length;
     return shadowedCount == 0 ? base : '$base +$shadowedCount';
   }
 
-  /// Name of the repository a catalog entry came from.
+  /// 目录条目所属仓库的名称。
   String _repositoryName(PluginHTTPItem item) {
     final builtIn = RuleRepositoryList.builtInLabelOf(item.repositoryUrl);
     if (builtIn != null) {
@@ -624,9 +619,8 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
                     final item = items[index];
                     final status = _controller.pluginStatus(item);
                     final busy = _installing.contains(item.name);
-                    // The address line shows the rule's own baseURL, which the
-                    // catalog file does not carry; it resolves asynchronously
-                    // and the line simply stays hidden until then.
+                    // 地址行显示的是规则自己的 baseURL，索引文件里没有这个字段；
+                    // 它是异步解析出来的，解析完成前这一行就不显示。
                     return FutureBuilder<String?>(
                       future: _controller.ruleBaseUrl(item),
                       builder: (context, snapshot) {

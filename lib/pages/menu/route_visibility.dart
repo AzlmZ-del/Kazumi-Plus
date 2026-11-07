@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-/// Whether the surrounding route subtree is covered by another page.
+/// 所在的页面子树是否被其他页面盖住。
 ///
-/// Published by the page that owns the route, so long-lived children can stop
-/// background work while hidden instead of inspecting the navigation stack.
+/// 由持有该路由的页面发布，长期存活的子组件据此在隐藏时停掉后台工作，
+/// 不必自己去翻导航栈。
 class RouteVisibility extends InheritedWidget {
   const RouteVisibility({
     super.key,
@@ -13,7 +13,7 @@ class RouteVisibility extends InheritedWidget {
 
   final bool isCovered;
 
-  /// Subscribes; dependents are notified only when the state flips.
+  /// 订阅这个状态；只有状态翻转时才通知依赖方。
   static bool isCoveredOf(BuildContext context) {
     return context
             .dependOnInheritedWidgetOfExactType<RouteVisibility>()

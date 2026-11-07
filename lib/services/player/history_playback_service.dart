@@ -24,18 +24,17 @@ class HistoryPlaybackUnavailable extends HistoryPlaybackResult {
   final String reason;
 }
 
-/// Restores a history entry into arguments the player route can take.
+/// 把一条历史记录还原成播放路由能接收的参数。
 ///
-/// The history page and the my page share this one resolution path; cards
-/// carry no source-lookup logic of their own.
+/// 历史页与「我的」页共用这一条解析路径；卡片自己不带任何源查找逻辑。
 class HistoryPlaybackService {
   HistoryPlaybackService(this._pluginsController, this._downloadController);
 
   final PluginsController _pluginsController;
   final DownloadController _downloadController;
 
-  /// [cancelToken] lets the caller abort the online lookup, e.g. when the
-  /// loading dialog it put up is dismissed.
+  /// [cancelToken] 让调用方能中断在线查找，
+  /// 例如它弹出的加载对话框被用户关掉时。
   Future<HistoryPlaybackResult> open(
     History history, {
     RuleCancelToken? cancelToken,
@@ -103,7 +102,7 @@ class HistoryPlaybackService {
       return null;
     }
 
-    // The page url pins the exact episode; the number is the legacy fallback.
+    // 页面 URL 能精确定位到那一集；集号是老数据才用的兜底。
     DownloadEpisode? targetEpisode;
     DownloadEpisode? numberMatch;
     for (final episode in downloadedEpisodes) {

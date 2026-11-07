@@ -12,10 +12,10 @@ import 'package:kazumi/pages/plugin_editor/rule_management_widgets.dart';
 import 'package:kazumi/plugins/plugins_controller.dart';
 import 'package:kazumi/request/config/rules_repository_config.dart';
 
-/// Manages the list of rule repositories: order, on/off, rename, edit, delete.
+/// 管理规则仓库列表：排序、启停、改名、编辑、删除。
 ///
-/// Order *is* priority: the first enabled repository to advertise a rule name
-/// wins, which is why dragging exists at all.
+/// 顺序**就是**优先级：同名规则由第一个启用且声明了它的仓库胜出，
+/// 拖拽排序的意义正在于此。
 class RuleRepositoryPage extends StatefulWidget {
   const RuleRepositoryPage({super.key, required this.controller});
 
@@ -35,18 +35,16 @@ class _RuleRepositoryPageState extends State<RuleRepositoryPage> {
   void initState() {
     super.initState();
     _repositories = RulesRepositoryConfig.repositories();
-    // Rule counts come from the aggregated catalog; load it if the page is
-    // opened before anything else touched it.
+    // 规则条数来自聚合后的目录；若本页先于其它地方打开，得先把它加载起来。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) unawaited(_refreshCatalog());
     });
   }
 
-  /// Applies a configuration change: persist, drop the cached catalog and
-  /// reload it, then report the outcome.
+  /// 应用一次配置变更：落盘、丢弃缓存目录并重新加载，最后回报结果。
   ///
-  /// A failed reload is *not* rolled back — the user may simply be offline, and
-  /// silently reverting would make the next attempt even more confusing.
+  /// 重新加载失败**不会**回滚——用户可能只是离线，
+  /// 悄悄改回去只会让下一次尝试更难理解。
   Future<void> _apply(
     Future<List<RuleRepository>> Function() change, {
     required String successMessage,
@@ -65,8 +63,7 @@ class _RuleRepositoryPageState extends State<RuleRepositoryPage> {
       if (mounted) setState(() => _repositories = RulesRepositoryConfig.repositories());
       KazumiDialog.showToast(message: error.message);
     } catch (_) {
-      // Re-read storage so an optimistic reorder cannot leave the list showing
-      // an order that was never persisted.
+      // 重新读一次存储，避免乐观排序把列表停在「从未真正落盘」的顺序上。
       if (mounted) setState(() => _repositories = RulesRepositoryConfig.repositories());
       KazumiDialog.showToast(message: '保存规则仓库失败，请重试');
     } finally {
@@ -74,13 +71,13 @@ class _RuleRepositoryPageState extends State<RuleRepositoryPage> {
     }
   }
 
-  /// Reloads the catalog, swallowing the "nothing reachable" error because the
-  /// management page cares about configuration, not about network health.
+  /// 重新加载目录，并吞掉「一个都连不上」的错误——
+  /// 管理页关心的是配置，不是网络状况。
   Future<void> _refreshCatalog() async {
     try {
       await _controller.refreshPluginCatalog();
     } catch (_) {
-      // Reported by [_reportReload] through controller.repositoryFailures.
+      // 失败由 [_reportReload] 通过 controller.repositoryFailures 上报。
     }
   }
 
@@ -113,14 +110,13 @@ class _RuleRepositoryPageState extends State<RuleRepositoryPage> {
   }
 
   Future<void> _reorder(int oldIndex, int newIndex) async {
-    // The built-in repositories are pinned at the front: the official address is
-    // what the mirror interceptor and [ApiEndpoints] constants still point at,
-    // and the personal one is defined to sit right behind it. Letting either
-    // move would make the two listed first a lie on the next decode.
+    // 内置仓库固定在队首：镜像拦截器与 [ApiEndpoints] 常量仍指向官方地址，
+    // 个人仓库则定义为紧随其后。允许它们挪位，下次解码时「前两个是内置」
+    // 这个说法就成假的了。
     final pinned = _repositories.takeWhile((repo) => repo.isBuiltIn).length;
     if (oldIndex < pinned) return;
-    // [ReorderableListView.onReorderItem] hands over an index that is already
-    // adjusted for the removal, so no offset fix-up is needed here.
+    // [ReorderableListView.onReorderItem] 给出的下标已经扣除了被移除的那一项，
+    // 这里不需要再补偏移。
     final target = newIndex < pinned ? pinned : newIndex;
     if (target == oldIndex) return;
     final next = [..._repositories];
@@ -213,14 +209,11 @@ class _RuleRepositoryPageState extends State<RuleRepositoryPage> {
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 1000),
-            // The list is never empty: [RuleRepositoryList.decode] restores the
-            // built-in repositories whenever storage holds nothing, and they
-            // cannot be deleted. Reordering is therefore always meaningful and
-            // no empty state is needed here.
+            // 列表不会为空：[RuleRepositoryList.decode] 在存储为空时会补回内置仓库，
+            // 而内置仓库不能删除。所以排序永远有意义，这里也不需要空状态。
             child: Observer(builder: (context) {
-              // Reading the observable list here is what subscribes this
-              // Observer to catalog changes; [repositoryFailures] is set in the
-              // same pass, so it needs no tracking of its own.
+              // 在这里读一次可观察列表，这个 Observer 才会订阅目录变化；
+              // [repositoryFailures] 在同一趟里赋值，无需单独追踪。
               final catalog = _controller.pluginHTTPList;
               final failures = {
                 for (final failure in _controller.repositoryFailures)
@@ -259,11 +252,10 @@ class _RuleRepositoryPageState extends State<RuleRepositoryPage> {
     );
   }
 
-  /// Number of catalog entries currently attributed to [url].
+  /// 当前归属到 [url] 的目录条目数。
   ///
-  /// Only the winners of same-name conflicts carry a repository tag, so this
-  /// undercounts when two repositories list the same rule. That is fine: the
-  /// number is a hint that the repository is reachable and non-empty.
+  /// 只有同名冲突中的胜出者才带仓库标记，所以两个仓库列了同一条规则时会少算。
+  /// 这没关系：这个数字只是「该仓库可访问且非空」的提示。
   int _ruleCountFor(String url, List<PluginHTTPItem> catalog) {
     if (!_controller.isPluginCatalogFresh) return -1;
     return catalog.where((item) => item.repositoryUrl == url).length;
@@ -334,8 +326,7 @@ class _RepositoryTile extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 2),
-                  // Full address, tappable to copy: the usual reason to look at
-                  // it is to compare or tweak it somewhere else.
+                  // 完整地址，可点击复制：看它的常见理由就是拿去别处比对或调整。
                   InkWell(
                     onTap: () => _copyAddress(context),
                     borderRadius: BorderRadius.circular(6),
@@ -460,12 +451,11 @@ class _RepositoryFooter extends StatelessWidget {
   }
 }
 
-/// Add / edit dialog.
+/// 新增 / 编辑对话框。
 ///
-/// The text controllers live in this State and are released in [dispose]:
-/// `KazumiDialog.show`'s future completes on `Route.didPop`, which happens
-/// before the subtree is torn down, so a controller disposed right after the
-/// await would still be attached to a live TextField.
+/// 文本控制器放在这个 State 里，在 [dispose] 中释放：
+/// `KazumiDialog.show` 的 future 在 `Route.didPop` 时就完成了，而那时子树还没拆，
+/// 所以 await 之后立刻 dispose 控制器，它仍会挂在一个活着的 TextField 上。
 class _RepositoryEditorDialog extends StatefulWidget {
   const _RepositoryEditorDialog({
     required this.title,
@@ -490,10 +480,9 @@ class _RepositoryEditorDialogState extends State<_RepositoryEditorDialog> {
   void initState() {
     super.initState();
     _label = TextEditingController(text: widget.initial?.label ?? '');
-    // Pre-fill the full catalog address rather than the stored directory, so the
-    // field shows the URL the user actually pasted (`.../main/index.json`) and
-    // it can be copied straight into a browser. [baseUri] trims it back to the
-    // directory on submit.
+    // 预填完整目录地址而不是存储的目录，这样输入框显示的是用户当初粘贴的 URL
+    // （`.../main/index.json`），可以直接复制进浏览器。
+    // 提交时 [baseUri] 会把它裁回目录。
     _url = TextEditingController(
       text: widget.initial == null
           ? ''
@@ -550,8 +539,8 @@ class _RepositoryEditorDialogState extends State<_RepositoryEditorDialog> {
     final theme = Theme.of(context);
     return AlertDialog(
       title: Text(widget.title),
-      // The address field grows with its content, so a long URL can push the
-      // dialog past the screen. Scrolling keeps the actions reachable.
+      // 地址框会随内容增高，长 URL 会把对话框顶出屏幕。
+      // 加滚动保证操作按钮始终够得着。
       scrollable: true,
       content: SizedBox(
         width: 420,
@@ -571,9 +560,8 @@ class _RepositoryEditorDialogState extends State<_RepositoryEditorDialog> {
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 8),
-            // A tall fixed box rather than a one-line field: long repository
-            // addresses wrap inside it, and the height stays put so the
-            // dialog does not jump around while typing.
+            // 用固定高度的多行框而不是单行输入框：长仓库地址在里面折行，
+            // 高度固定，输入时对话框不会跟着跳。
             TextField(
               controller: _url,
               autofocus: true,

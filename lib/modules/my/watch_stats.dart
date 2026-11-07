@@ -30,7 +30,7 @@ final class WatchStats {
     required List<History> histories,
     required List<DownloadRecord> downloadRecords,
   }) {
-    // Deduplicate episodes across rules and online/offline histories.
+    // 按 (番剧 ID, 集号) 去重：同一集可能因多条规则、在线与离线记录各出现一次。
     final watchedEpisodes = <(int, int)>{};
     final watchedBangumiIds = <int>{};
     for (final history in histories) {
@@ -45,7 +45,7 @@ final class WatchStats {
     return WatchStats(
       watchedEpisodeCount: watchedEpisodes.length,
       watchedBangumiCount: watchedBangumiIds.length,
-      // Count every download task, regardless of status.
+      // 所有下载任务都计数，不看状态——失败与暂停的也算。
       downloadTaskCount: downloadRecords.fold(
         0,
         (count, record) => count + record.episodes.length,

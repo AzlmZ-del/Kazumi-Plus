@@ -59,7 +59,7 @@ class BangumiEchImageService extends FileService {
     }
     return createImageFileResponse(
       response,
-      // ECH preserves wire lengths after decompression; decoded size is unknown.
+      // ECH 解压后仍是原始字节长度，解码后的实际尺寸未知。
       contentLength:
           response.compressionState ==
               HttpClientResponseCompressionState.decompressed
@@ -76,7 +76,7 @@ class BangumiEchImageService extends FileService {
     }
   }
 
-  /// New requests use fresh connections; in-flight image streams can finish.
+  /// 新请求走新连接；已经在传的图片流可以正常收尾。
   void reset() {
     _current.clear();
     for (final session in _sessions.toList()) {

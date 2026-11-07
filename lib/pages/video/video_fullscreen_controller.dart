@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:mobx/mobx.dart';
 
-/// Explicit fullscreen owns a local history entry; rotation does not.
+/// 主动进入的全屏会占一条本地历史记录；旋转屏幕不会。
 class VideoFullscreenController {
   VideoFullscreenController({
     required Future<void> Function(bool fullscreen) applyFullscreen,
@@ -66,7 +66,7 @@ class VideoFullscreenController {
   }
 
   void onDesktopFullscreenChanged(bool fullscreen) {
-    // Ignore acknowledgements of commands still in flight.
+    // 仍在途中的命令，其回执要忽略。
     if (_pendingRequests != 0) return;
     unawaited(_setFullscreen(fullscreen, updatePlatform: false));
   }

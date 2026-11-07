@@ -281,13 +281,12 @@ class AudioController {
     _artworkUri = null;
   }
 
-  /// Resolves the session artwork to a local file before the media item is
-  /// published, so each item reaches the platform in a single write.
+  /// 在发布媒体项之前，先把会话封面落到本地文件，
+  /// 这样每一项只需一次写入就能到达平台层。
   ///
-  /// A follow-up write is unsafe at any point in the session: the plugin
-  /// dispatches `setMediaItem` to a detached thread while `setState` runs
-  /// inline, so it can land after [deactivate] and repost the notification
-  /// that the idle state just cancelled.
+  /// 会话期间任何时点再做一次补写都不安全：插件把 `setMediaItem` 派发到
+  /// 独立线程，而 `setState` 是同步执行的，所以补写可能落在 [deactivate] 之后，
+  /// 把空闲态刚刚取消掉的通知又发出来一次。
   Future<void> _resolveArtwork(AsyncSession binding, String artworkUrl) async {
     Uri? resolved;
     try {
@@ -328,8 +327,8 @@ class AudioController {
     if (deactivation.isStale) return;
     final handler = _handler;
     if (handler == null) return;
-    // The platform only stops on a transition into idle. Retain the current
-    // controls so the intermediate state cannot repaint the notification.
+    // 平台只在切到空闲态时才真正停止。保留当前控制信息，
+    // 避免中间态把通知重绘一遍。
     final current = handler.playbackState.value;
     if (current.processingState == AudioProcessingState.idle) {
       handler.updatePlaybackState(

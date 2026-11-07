@@ -18,7 +18,7 @@ import 'package:kazumi/services/storage/settings_keys.dart';
 export 'package:kazumi/services/storage/settings_keys.dart';
 
 class GStorage {
-  /// Don't use favorites box, it's replaced by collectibles.
+  /// 不要再使用 favorites box，它已被 collectibles 取代。
   static late Box<BangumiItem> favorites;
   static late Box<CollectedBangumi> collectibles;
   static late Box<History> histories;
@@ -28,10 +28,10 @@ class GStorage {
   static late Box<SearchHistory> searchHistory;
   static late Box<DownloadRecord> downloads;
 
-  /// Hive directory path, initialized during init()
+  /// Hive 目录路径，在 init() 里初始化。
   static String? _hivePath;
 
-  /// Queue to serialize write operations
+  /// 用于串行化写操作的队列。
   static Future<void> _collectChangesWriteQueue = Future.value();
 
   /// 收藏数据发生变更后的通知钩子。
@@ -41,13 +41,13 @@ class GStorage {
   /// 回调必须是 fire-and-forget 的轻量函数，真正的重活由订阅者自己排队。
   static void Function()? onCollectChanged;
 
-  /// Next ID
+  /// 下一个可用的 ID。
   static int _nextCollectChangeId = 0;
 
-  /// Flag to indicate if the next ID has initialized
+  /// 标记下一个 ID 是否已初始化过。
   static bool _collectChangeIdInitialized = false;
 
-  /// Ensure collect-related write sequentially
+  /// 保证收藏相关的写入串行执行。
   static Future<T> _runCollectChangesWriteExclusive<T>(
     Future<T> Function() action,
   ) {
@@ -69,7 +69,7 @@ class GStorage {
     return completer.future;
   }
 
-  /// init id generator
+  /// 初始化 ID 生成器。
   static void _initializeNextCollectChangeIdLocked() {
     if (_collectChangeIdInitialized) {
       return;
@@ -86,12 +86,12 @@ class GStorage {
     _collectChangeIdInitialized = true;
   }
 
-  /// Generate id for collect change
+  /// 为收藏变更生成 ID。
   static int _generateCollectChangeIdLocked() {
     _initializeNextCollectChangeIdLocked();
 
     final currentSeconds = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    // Ensure ID is greater than any existing ID, or equal to current timestamp.
+    // 保证新 ID 大于任何已有 ID，否则取当前时间戳。
     var nextId = _nextCollectChangeId < currentSeconds
         ? currentSeconds
         : _nextCollectChangeId + 1;
@@ -102,7 +102,7 @@ class GStorage {
     return nextId;
   }
 
-  /// Append a new collect change
+  /// 追加一条收藏变更。
   static Future<CollectedBangumiChange> appendCollectChange({
     required int bangumiId,
     required int action,
@@ -133,19 +133,7 @@ class GStorage {
     }
   }
 
-  /// Update an existing collect change
-  static Future<void> putCollectChange(CollectedBangumiChange change) {
-    return _runCollectChangesWriteExclusive(() async {
-      _initializeNextCollectChangeIdLocked();
-      if (change.id > _nextCollectChangeId) {
-        _nextCollectChangeId = change.id;
-      }
-      await collectChanges.put(change.id, change);
-      await collectChanges.flush();
-    });
-  }
-
-  /// Put a collectible using the same write queue
+  /// 用同一条写队列写入收藏项。
   static Future<void> putCollectible(CollectedBangumi collectible) {
     return _runCollectChangesWriteExclusive(() async {
       await collectibles.put(collectible.bangumiItem.id, collectible);
@@ -153,7 +141,7 @@ class GStorage {
     });
   }
 
-  /// Delete a collectible using the shared collect write queue.
+  /// 用共享的收藏写队列删除收藏项。
   static Future<void> deleteCollectible(int bangumiId) {
     return _runCollectChangesWriteExclusive(() async {
       await collectibles.delete(bangumiId);
@@ -166,7 +154,7 @@ class GStorage {
 
     Hive.registerAdapters();
 
-    // Open each box with automatic recovery on corruption
+    // 打开每个 box，并在数据损坏时自动恢复。
     favorites = await _openBoxSafe<BangumiItem>('favorites');
     collectibles = await _openBoxSafe<CollectedBangumi>('collectibles');
     histories = await _openBoxSafe<History>('histories');
@@ -181,8 +169,8 @@ class GStorage {
     }
   }
 
-  /// Open a Hive box with automatic recovery on corruption.
-  /// If the box is corrupted, delete it and create a new empty one.
+  /// 打开一个 Hive box，损坏时自动恢复。
+  /// box 一旦损坏就删掉重建一个空的。
   static Future<Box<T>> _openBoxSafe<T>(String boxName) async {
     try {
       return await Hive.openBox<T>(boxName);
@@ -191,10 +179,10 @@ class GStorage {
           'GStorage: Box "$boxName" corrupted, attempting recovery',
           error: e);
 
-      // Delete the corrupted box files
+      // 删掉损坏的 box 文件。
       await _deleteBoxFiles(boxName);
 
-      // Try to open again (will create a new empty box)
+      // 再打开一次（会新建一个空 box）。
       try {
         final box = await Hive.openBox<T>(boxName);
         KazumiLogger()
@@ -208,7 +196,7 @@ class GStorage {
     }
   }
 
-  /// Delete Hive box files for a given box name
+  /// 删除指定 box 名的 Hive 文件。
   static Future<void> _deleteBoxFiles(String boxName) async {
     if (_hivePath == null) return;
 
@@ -265,22 +253,6 @@ class GStorage {
     }
   }
 
-  static Future<void> restoreCollectibles(String backupFilePath) async {
-    final backupFile = File(backupFilePath);
-    final backupContent = await backupFile.readAsBytes();
-    final tempBox =
-        await Hive.openBox('tempCollectiblesBox', bytes: backupContent);
-    final tempBoxItems = tempBox.toMap().entries;
-    KazumiLogger().i(
-        'WebDav: restoring collectibles. tempCollectiblesBox length ${tempBoxItems.length}');
-
-    await collectibles.clear();
-    for (var tempBoxItem in tempBoxItems) {
-      await collectibles.put(tempBoxItem.key, tempBoxItem.value);
-    }
-    await tempBox.close();
-  }
-
   static Future<List<CollectedBangumi>> getCollectiblesFromFile(
       String backupFilePath) async {
     final backupFile = File(backupFilePath);
@@ -328,7 +300,7 @@ class GStorage {
         remoteChanges: remoteChanges,
       );
 
-      // Update local storage
+      // 更新本地存储。
       await collectibles.clear();
       for (var collect in mergeResult.collectibles) {
         await collectibles.put(collect.bangumiItem.id, collect);

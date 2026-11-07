@@ -1,5 +1,4 @@
-/// Bangumi 收藏类型枚举
-/// via: https://bangumi.github.io/api/#/model-CollectionType
+/// Bangumi 收藏类型枚举，取值见 https://bangumi.github.io/api/#/model-CollectionType
 enum BangumiCollectionType {
   unknown(0, '未知'),
 

@@ -6,7 +6,7 @@ Future<FileServiceResponse> createImageFileResponse(
   required int? contentLength,
   required void Function() onComplete,
 }) async {
-  // CacheManager only consumes 200/202 bodies.
+  // CacheManager 只接受 200/202 的响应体。
   if (response.statusCode != 200 && response.statusCode != 202) {
     try {
       await response.stream.listen(null).cancel();

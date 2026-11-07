@@ -90,7 +90,7 @@ class _SearchResultGrid extends StatelessWidget {
         .copyWith(fontWeight: FontWeight.w600, height: 1.4);
 
     double textHeight(String text, TextStyle style) {
-      // Measure with nonlinear accessibility scaling.
+      // 测量时套用非线性字号缩放（无障碍设置）。
       final painter = TextPainter(
         text: TextSpan(text: text, style: style),
         textDirection: Directionality.of(context),

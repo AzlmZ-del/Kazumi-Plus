@@ -149,7 +149,7 @@ abstract class _PlayerDanmakuController with Store {
     canvasController.clear();
   }
 
-  // Apply fetched data only after VideoPageController validates the session.
+  // 等 VideoPageController 校验完会话之后再应用取回的数据。
   Future<DanmakuLoadResult> fetchDanmaku(
     int bangumiId,
     String pluginName,

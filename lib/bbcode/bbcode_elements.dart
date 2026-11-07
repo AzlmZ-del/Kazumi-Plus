@@ -70,6 +70,8 @@ class BBCodeMusume {
 }
 
 class BBCodeSticker {
+  /// 由 ctx.start!.type - 11 算得（11 是 lexer 里首个 sticker 字面量的前一位），
+  /// 重新生成 BBCodeLexer 增删字面量会整体错位且不报错。
   int id;
 
   BBCodeSticker({required this.id});
@@ -81,4 +83,6 @@ class BBCodeImg {
   BBCodeImg({required this.imageUrl});
 }
 
+/// 全局可变单例：enter/exit 靠它跨方法传下标，故解析必须同步完成。
+/// 唯一清理点是 bbcode_widget.dart 中 walk 之后紧跟的 clear()，异常路径会漏清。
 BBCodeTag bbCodeTag = BBCodeTag();

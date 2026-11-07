@@ -17,12 +17,11 @@ class PlayerLongPressShortcutActions {
   final PlayerShortcutAction onRelease;
 }
 
-/// Dispatches player shortcuts before focused controls handle the key event.
+/// 在获得焦点的控件处理按键之前先派发播放器快捷键。
 ///
-/// [focusScopeNode] must be attached to a stable ancestor of the player area.
-/// Dialog routes and explicitly blocked overlay interactions keep their normal
-/// key handling. Active long-press shortcuts are always released, even after
-/// focus leaves the player or this widget is disposed.
+/// [focusScopeNode] 必须挂在播放器区域的稳定祖先上。对话框路由与显式屏蔽的
+/// 浮层交互仍走各自的按键处理。已激活的长按快捷键一定会被释放，
+/// 即使焦点离开播放器或本组件已被销毁。
 class PlayerKeyboardShortcuts extends StatefulWidget {
   const PlayerKeyboardShortcuts({
     super.key,

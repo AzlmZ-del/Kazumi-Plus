@@ -29,7 +29,7 @@ class KazumiMenuButton extends StatelessWidget {
   final MenuController? controller;
   final bool enabled;
 
-  /// Opt in only for menus that previously animated.
+  /// 只在原本就有动画的菜单上开启。
   final bool animated;
   final bool crossAxisUnconstrained;
   final VoidCallback? onOpen;
@@ -40,7 +40,7 @@ class KazumiMenuButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return MenuButtonTheme(
       data: MenuButtonThemeData(
-        // Submenu entries must use the same inset as ordinary menu items.
+        // 子菜单项要和普通菜单项用同一套内边距，否则缩进对不齐。
         style: _menuItemStyle.merge(MenuButtonTheme.of(context).style),
       ),
       child: MenuAnchor(
@@ -78,7 +78,7 @@ class KazumiMenuItem extends StatelessWidget {
   final VoidCallback? onPressed;
   final Widget? leadingIcon;
 
-  /// Null for actions; a bool exposes single-choice selection semantics.
+  /// 为 null 表示普通动作项；传 bool 则开启单选语义。
   final bool? selected;
   final bool destructive;
   final bool requestFocusOnHover;

@@ -127,7 +127,7 @@ class _PluginTestPageState extends State<PluginTestPage>
       return;
     }
     _resetState();
-    // Ignore late responses when cancellation is not honored.
+    // 取消没有被真正执行时，迟到的响应要丢掉。
     final runId = _runId;
     final cancelToken = _testCancelToken = CancelToken();
     setState(() {

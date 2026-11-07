@@ -10,12 +10,12 @@ import 'package:kazumi/utils/async_serial_queue.dart';
 enum DanmakuShieldChange { localEdit, restore }
 
 abstract class IDanmakuShieldRepository {
-  /// Emits once per completed edit or batch restore, never per Hive key.
+  /// 每次编辑完成或批量恢复完成时发一次通知，不会按 Hive 键逐个发。
   Stream<DanmakuShieldChange> get changes;
   List<String> getRules();
   Future<void> initialize();
 
-  /// Returns false when the rule already has the requested state.
+  /// 规则已经处于目标状态时返回 false。
   Future<bool> setRule(String rule, {required bool deleted});
   Future<String> getDeviceId();
   Future<DanmakuShieldSyncState> mergeSyncState(DanmakuShieldSyncState remote);
@@ -64,7 +64,7 @@ class DanmakuShieldRepository implements IDanmakuShieldRepository {
       }
     }
     final deviceId = await _getDeviceId();
-    // Unknown edit times must not override cloud deletions.
+    // 编辑时间未知的记录不能盖过云端的删除记录。
     return DanmakuShieldSyncState([
       for (final rule in getRules())
         DanmakuShieldSyncEntry(
@@ -114,7 +114,7 @@ class DanmakuShieldRepository implements IDanmakuShieldRepository {
   Future<void> _save(
       DanmakuShieldSyncState state, DanmakuShieldChange source) async {
     final before = getRules().toSet();
-    // Commit metadata first so initialize can repair an interrupted projection.
+    // 先提交元数据，这样启动时还能修复被打断的投影重建。
     await GStorage.putSetting(
         SettingsKeys.danmakuShieldSyncState, state.encode());
     final rules = state.rules.toSet();

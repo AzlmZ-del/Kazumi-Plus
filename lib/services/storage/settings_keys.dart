@@ -40,8 +40,8 @@ class SettingKey<T> {
   }
 }
 
-// Add new settings here. SettingsKeys is the public typed registry used by
-// callers; new keys can use literal string names directly.
+// 新的设置项加在这里。SettingsKeys 是对外暴露的类型化注册表；
+// 新键也可以直接用字面量字符串名。
 class SettingsKeys {
   static const hAenable = SettingKey<bool>(
     _SettingBoxKey.hAenable,
@@ -104,7 +104,7 @@ class SettingsKeys {
     group: SettingGroup.danmaku,
   );
 
-  /// Off on desktop and on on mobile, like the B 站 client.
+  /// 桌面端默认关、移动端默认开，与 B 站客户端一致。
   static final pauseOnDanmakuEdit = SettingKey<bool>(
     'pauseOnDanmakuEdit',
     true,
@@ -267,8 +267,8 @@ class SettingsKeys {
     true,
     group: SettingGroup.proxy,
   );
-  // JSON-encoded rule repository list. An empty string means "never
-  // configured", which decodes to the built-in official repository only.
+  // JSON 编码的规则仓库列表。空串表示「从未配置过」，
+  // 此时只解码出内置的官方仓库。
   static const ruleRepositories = SettingKey<String>(
     'ruleRepositories',
     '',
@@ -290,14 +290,14 @@ class SettingsKeys {
     'original',
     group: SettingGroup.proxy,
   );
-  // Defaults to ECH: it reaches the official API without relying on a mirror.
+  // 默认走 ECH：不依赖镜像就能连上官方接口。
   static const bangumiAcceleration = SettingKey<String>(
     'bangumiAcceleration',
     'ech',
     group: SettingGroup.proxy,
   );
-  // Rules repository acceleration. An empty value falls back to the legacy
-  // `enableGitProxy` switch so existing installs keep their current behaviour.
+  // 规则仓库加速档位。值为空时退回旧版的 `enableGitProxy` 开关，
+  // 让已安装用户保持现有行为。
   static const rulesMirror = SettingKey<String>(
     'rulesMirror',
     '',
@@ -313,9 +313,9 @@ class SettingsKeys {
     '/tab/popular/',
     group: SettingGroup.interface,
   );
-  // Deep links open on top of whatever page the app was showing, so Back
-  // returns there. Opt in to reset the stack to the start page first, which
-  // costs the current tab position but makes Back land on the home tab.
+  // 深链默认叠在应用当前页之上打开，返回时回到那一页。
+  // 开启此项会先把栈重置到起始页，代价是丢掉当前标签位置，
+  // 但返回时会落在首页标签上。
   static const deepLinkReturnHome = SettingKey<bool>(
     'deepLinkReturnHome',
     false,
@@ -440,7 +440,7 @@ class SettingsKeys {
     false,
     group: SettingGroup.player,
   );
-  // Null preserves the legacy lowMemoryMode choice until a policy is selected.
+  // 为 null 时沿用旧的 lowMemoryMode 选择，直到用户选定一种策略。
   static const lowMemoryPolicy = SettingKey<String?>(
     'lowMemoryPolicy',
     null,
@@ -572,16 +572,15 @@ class SettingsKeys {
     group: SettingGroup.interface,
   );
 
-  // Opt-in R18 search. Requires a Bangumi access token; without one the API
-  // silently drops the nsfw filter, so the setting has no effect.
+  // 需手动开启的 R18 搜索。要求已存 Bangumi 访问令牌；没有令牌时
+  // 接口会静默忽略 nsfw 过滤，该设置等于无效。
   static const bangumiShowR18 = SettingKey<bool>(
     'bangumiShowR18',
     false,
     group: SettingGroup.interface,
   );
-  // Search results without a Chinese title used to be dropped silently. Keep
-  // that as the default so existing behaviour does not change, but let users
-  // opt in to the untranslated entries instead of losing them.
+  // 以前没有中文标题的搜索结果会被静默丢掉。默认保持这一行为不变，
+  // 同时让用户可以选择保留未翻译条目，而不是直接丢失。
   static const bangumiShowUntranslated = SettingKey<bool>(
     'bangumiShowUntranslated',
     false,
@@ -607,8 +606,8 @@ class SettingsKeys {
     '',
     group: SettingGroup.download,
   );
-  // macOS only: security-scoped bookmark that keeps downloadDirectory
-  // writable across app restarts under the sandbox.
+  // 仅 macOS：安全作用域书签，让 downloadDirectory 在沙盒下
+  // 跨应用重启仍可写。
   static const downloadDirectoryBookmark = SettingKey<String>(
     'downloadDirectoryBookmark',
     '',
@@ -895,10 +894,9 @@ class SettingsKeys {
   SettingsKeys._();
 }
 
-// Historical Hive key names used by settings created before the typed registry.
-// Keep these strings stable so existing users keep their saved settings.
-// New settings do not need to be added here unless they intentionally reuse an
-// existing persisted key.
+// 类型化注册表出现之前的老设置所使用的 Hive 键名。
+// 这些字符串必须保持不变，老用户的设置才不会丢。
+// 新设置不必加到这里，除非确实要复用某个已持久化的旧键。
 class _SettingBoxKey {
   static const String hAenable = 'hAenable',
       hardwareDecoder = 'hardwareDecoder',

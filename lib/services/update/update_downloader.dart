@@ -15,8 +15,8 @@ String getUpdateDownloadUrlFromAsset(
   final browserUrl = browser is String ? browser.trim() : '';
   switch (source) {
     case UpdateDownloadSource.mirror:
-      // Releases published from this fork carry no mirror_download_url, so the
-      // "mirror" source is served by prefixing the GitHub URL with a proxy.
+      // 本 fork 发布的 Release 不带 mirror_download_url，
+      // 所以「镜像」这个下载源实际是给 GitHub URL 加一层代理前缀。
       final mirrored = asset['mirror_download_url'];
       final mirroredUrl = mirrored is String ? mirrored.trim() : '';
       if (mirroredUrl.isNotEmpty) return mirroredUrl;
@@ -100,8 +100,8 @@ String getUpdateDownloadErrorMessage(Object error) {
   }
 }
 
-/// Reuses a verified cached file; otherwise downloads into a private temp
-/// directory and only moves the file to [filePath] after the hash matches.
+/// 复用已校验过的缓存文件；否则先下载到私有临时目录，
+/// 只有哈希对得上才把文件移到 [filePath]。
 Future<String> downloadUpdateFile({
   required String url,
   required String filePath,
@@ -109,7 +109,7 @@ Future<String> downloadUpdateFile({
   required CancelToken cancelToken,
   required ProgressCallback onReceiveProgress,
 }) async {
-  // Dio cancellation does not cover filesystem work or hashing.
+  // Dio 的取消覆盖不到文件系统操作与哈希计算。
   void checkCancelled() {
     if (cancelToken.isCancelled) throw cancelToken.cancelError!;
   }

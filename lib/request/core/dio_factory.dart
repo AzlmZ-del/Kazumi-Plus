@@ -76,7 +76,7 @@ class DioFactory {
   }
 
   static void reset() {
-    // Retire old adapters without interrupting requests already in flight.
+    // 换掉旧适配器时要放过已经在飞的请求。
     _apiDio?.close();
     _bangumiDio?.close();
     _rulesRepoDio?.close();
@@ -116,8 +116,8 @@ class DioFactory {
 class _RulesMirrorInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    // The mirror lives in one enum so the settings page and the request path
-    // can never disagree about which host is in use.
+    // 镜像配置只放在一个枚举里，这样设置页与请求路径永远不会
+    // 对「当前用的是哪个主机」各说各话。
     final mirrored = RulesMirror.current.map(options.uri.toString());
     if (mirrored != null) {
       KazumiLogger().d('Rules mirror: $mirrored');

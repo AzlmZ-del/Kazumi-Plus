@@ -15,7 +15,7 @@ typedef UpdateDialogChoice = ({
   UpdateDownloadSource source,
 });
 
-/// Pops with an [UpdateDialogChoice] when the user starts the update.
+/// 用户点击更新时 pop 出 [UpdateDialogChoice]，带回所选类型与下载源。
 class UpdateAvailableDialog extends StatefulWidget {
   const UpdateAvailableDialog({
     super.key,
@@ -25,7 +25,7 @@ class UpdateAvailableDialog extends StatefulWidget {
 
   final UpdateInfo updateInfo;
 
-  /// Shows the auto-update opt-out when non-null.
+  /// 非 null 时显示「不再自动检查」开关。
   final ValueChanged<bool>? onDisableAutoUpdateChanged;
 
   @override
@@ -119,7 +119,7 @@ class _UpdateAvailableDialogState extends State<UpdateAvailableDialog> {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final info = widget.updateInfo;
-    // The fallback action already opens the release page.
+    // 不能应用内下载时主按钮本身就是「前往下载」，再给日志入口就重复了。
     final showReleasePage = downloadInApp && info.releaseNotes.isNotEmpty;
 
     return Row(

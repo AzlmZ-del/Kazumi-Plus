@@ -2,11 +2,12 @@ import 'dart:convert';
 
 import 'package:kazumi/request/config/api_endpoints.dart';
 
-/// One rule repository the user has configured.
+/// 用户配置的一条规则仓库。
 ///
-/// [url] is always stored in normalized form: absolute http(s), no embedded
-/// credentials, no query or fragment, and always ending with a slash. That
-/// makes the URL a stable identity key for de-duplication and lookup.
+/// [url] 恒为规范化形式：绝对 http(s) 地址、不含内嵌凭据、不含 query 与
+/// fragment、且以斜杠结尾。这样 URL 才能当作稳定标识用于去重与查找。
+///
+/// 规范化发生在写入路径上（`RulesRepositoryConfig.baseUri`），本类假定它已跑过。
 class RuleRepository {
   const RuleRepository({
     required this.url,
@@ -14,36 +15,33 @@ class RuleRepository {
     this.enabled = true,
   });
 
-  /// Normalized repository directory URL, always ending with `/`.
+  /// 规范化后的仓库目录 URL，恒以 `/` 结尾。
   final String url;
 
-  /// User-chosen display name. Empty means "fall back to the host name".
+  /// 用户自定义的显示名。为空表示「退回主机名」。
   final String label;
 
   final bool enabled;
 
   bool get isOfficial => url == RuleRepositoryList.officialUrl;
 
-  /// The built-in repository that ships alongside the official one.
+  /// 与官方仓库并列内置的个人仓库。
   bool get isPersonal => url == RuleRepositoryList.personalUrl;
 
-  /// Built-in repositories are always present and can only be switched off.
+  /// 内置仓库恒存在，只能关闭、不能删除。
   bool get isBuiltIn => isOfficial || isPersonal;
 
-  /// Host portion of [url], used as the compact subtitle and as the last-resort
-  /// display name.
+  /// [url] 的主机部分，用作紧凑副标题，也是最后的兜底显示名。
   String get hostLabel {
     final host = Uri.tryParse(url)?.host ?? '';
     return host.isEmpty ? url : host;
   }
 
-  /// Repository name read out of the URL path.
+  /// 从 URL 路径里读出的仓库名。
   ///
-  /// Repository hosts put the name a fixed number of segments in
-  /// (`/<owner>/<repo>/<ref>/...` on GitHub's raw host, for instance), so those
-  /// are handled by [_repositoryNameIndex]. Any other layout falls back to the
-  /// last segment that is not a ref name, then to the host when the URL has no
-  /// path at all.
+  /// 各仓库托管把名字放在固定段位上（如 GitHub raw 的
+  /// `/<owner>/<repo>/<ref>/...`），这类交给 [_repositoryNameIndex] 处理。
+  /// 其它布局退回「最后一个不是 ref 名的段」，URL 完全没有路径时退回主机名。
   String get inferredLabel {
     final uri = Uri.tryParse(url);
     if (uri == null) {
@@ -65,8 +63,8 @@ class RuleRepository {
       }
     }
 
-    // Unknown layout: the tail is usually the directory the user meant, unless
-    // a deep link left a ref such as `main` behind.
+    // 布局无法识别：末尾通常就是用户想要的那个目录，
+    // 除非深链在末尾留下了一个类似 `main` 的 ref。
     for (var i = segments.length - 1; i >= 0; i--) {
       final segment = segments[i];
       if (_refNames.contains(segment.toLowerCase())) {
@@ -107,11 +105,11 @@ class RuleRepository {
   @override
   String toString() => 'RuleRepository($url, label: $label, enabled: $enabled)';
 
-  /// Known branch and tag names that can appear as a path segment.
+  /// 可能出现在路径段里的已知分支名与标签名。
   ///
-  /// Only used to skip a segment when a URL layout is unrecognized, so the list
-  /// stays deliberately short — a repository actually named `main` is far
-  /// rarer than a ref segment, and the known hosts below never consult it.
+  /// 只在 URL 布局无法识别时用来跳过一个段，所以列表刻意保持很短——
+  /// 真有仓库叫 `main` 的概率远低于这里是个 ref 段，且下面列出的已知
+  /// 主机根本不查这个集合。
   static const Set<String> _refNames = {
     'main',
     'master',
@@ -121,12 +119,11 @@ class RuleRepository {
     'latest',
   };
 
-  /// Index of the repository-name segment for [host], or null when the host has
-  /// no known layout.
+  /// [host] 上仓库名所在段的索引；主机布局未知时返回 null。
   ///
-  /// GitHub's raw host serves `/<owner>/<repo>/<ref>/<path>`; GitLab's raw host
-  /// serves `/<owner>/<repo>/-/raw/<ref>/<path>`. Everything else is layout-free
-  /// and goes through the generic tail scan.
+  /// GitHub raw 是 `/<owner>/<repo>/<ref>/<path>`；GitLab raw 是
+  /// `/<owner>/<repo>/-/raw/<ref>/<path>`。其余主机没有固定布局，
+  /// 走通用的尾部扫描。
   static int? _repositoryNameIndex(String host, int segmentCount) {
     if (segmentCount < 2) {
       return null;
@@ -135,45 +132,42 @@ class RuleRepository {
       return 1;
     }
     if (host == 'raw.gitcode.com') {
-      // `gh_mirrors/ka/KazumiRules/raw/main/`
+      // 形如 `gh_mirrors/ka/KazumiRules/raw/main/` 的镜像地址。
       return segmentCount >= 3 ? 2 : null;
     }
     if (host == 'gitlab.com' || host.endsWith('.gitlab.com')) {
       return 1;
     }
-    // jsDelivr: `/gh/<owner>/<repo>@<ref>/<path>` and `/gl/<owner>/<repo>@..`.
+    // jsDelivr 形式：`/gh/<owner>/<repo>@<ref>/<path>` 与 `/gl/<owner>/<repo>@..`。
     if (host == 'cdn.jsdelivr.net' || host == 'fastly.jsdelivr.net') {
       return segmentCount >= 3 ? 2 : null;
     }
     return null;
   }
 
-  /// Drops a `@<ref>` suffix that some hosts fold into the name segment.
+  /// 去掉某些主机会并进名字段里的 `@<ref>` 后缀。
   static String _stripRefSuffix(String segment) {
     final at = segment.indexOf('@');
     return at > 0 ? segment.substring(0, at) : segment;
   }
 }
 
-/// Persisted as a single JSON string under `SettingsKeys.ruleRepositories`.
+/// 以单条 JSON 字符串存在 `SettingsKeys.ruleRepositories` 下。
 ///
-/// An empty string means "never configured" and decodes to the built-in
-/// defaults, so upgrading users keep the current single-repository behavior
-/// without writing anything to disk.
+/// 空串表示「从未配置过」，解码得到内置默认值（官方 + 个人），
+/// 老用户升级后无需写盘就能拿到新增的内置仓库。
 class RuleRepositoryList {
   const RuleRepositoryList._();
 
-  /// The official repository address. Kept in [ApiEndpoints] because the
-  /// mirror interceptor still keys off the same constant.
+  /// 官方仓库地址。放在 [ApiEndpoints] 里，因为镜像拦截器仍以同一个常量为键。
   static String get officialUrl => ApiEndpoints.pluginShop;
 
-  /// The second built-in repository, kept next to the official one.
+  /// 第二个内置仓库，紧挨官方仓库。
   static String get personalUrl => ApiEndpoints.personalPluginShop;
 
-  /// Short name of a built-in repository address, null for anything else.
+  /// 内置仓库地址对应的短名，其它地址返回 null。
   ///
-  /// Takes an address rather than a [RuleRepository] because catalog entries
-  /// only carry the URL they came from.
+  /// 收地址而不是 [RuleRepository]，因为索引条目只带它来源的那个 URL。
   static String? builtInLabelOf(String url) {
     if (url == officialUrl) {
       return '官方仓库';
@@ -195,14 +189,12 @@ class RuleRepositoryList {
     ]);
   }
 
-  /// Decodes the persisted value.
+  /// 解码持久化的值。
   ///
-  /// Decoding is deliberately lenient: a single corrupt entry is skipped
-  /// instead of discarding the whole configuration, because otherwise one bad
-  /// row would silently reset every repository the user added.
+  /// 解码刻意宽容：单条损坏的条目跳过，而不是整份配置作废——否则一行坏数据
+  /// 就会把用户加过的所有仓库悄悄重置掉。
   ///
-  /// The built-in repositories are always present and always first; see the
-  /// "official is fixed at index 0" invariant in the design document.
+  /// 内置仓库恒存在且恒在最前：官方在索引 0、个人在索引 1，见 [_withBuiltIns]。
   static List<RuleRepository> decode(String raw) {
     if (raw.trim().isEmpty) {
       return defaults();
@@ -238,12 +230,10 @@ class RuleRepositoryList {
     return _withBuiltIns(repositories);
   }
 
-  /// Restores the "built-ins first, never missing" invariant.
+  /// 恢复「内置仓库在最前、且永不缺失」的不变量。
   ///
-  /// The official repository is pinned at index 0 because the update path falls
-  /// back to it, and the personal repository sits right behind it. Both come
-  /// back when the stored value has lost them, so an older configuration picks
-  /// them up without asking the user to add anything.
+  /// 官方仓库固定在索引 0，因为更新路径会退回它；个人仓库紧随其后。
+  /// 存储值里丢了它们时都会补回来，老配置因此不必让用户手动添加。
   static List<RuleRepository> _withBuiltIns(
     List<RuleRepository> repositories,
   ) {
@@ -279,8 +269,8 @@ class RuleRepositoryList {
     return RuleRepository(
       url: rawUrl,
       label: rawLabel is String ? rawLabel : '',
-      // A missing or non-boolean flag falls back to "enabled" rather than
-      // silently hiding a repository the user can still see in the list.
+      // 标志缺失或不是布尔值时，一律按「已启用」处理，
+      // 而不是把用户在列表里明明还看得见的仓库悄悄藏起来。
       enabled: rawEnabled is bool ? rawEnabled : true,
     );
   }

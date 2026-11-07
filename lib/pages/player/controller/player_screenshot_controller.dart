@@ -48,7 +48,7 @@ abstract class _PlayerScreenshotController with Store {
   @computed
   int get selectedCount => _selected.length;
 
-  // Selection only ever holds ids of current candidates.
+  // 选中集里只会有当前候选的 id，候选换掉时不会留下旧 id。
   @computed
   bool get allSelected =>
       _candidates.isNotEmpty && _selected.length == _candidates.length;
@@ -200,7 +200,7 @@ abstract class _PlayerScreenshotController with Store {
       _report('无法打开保存位置，请检查权限后重试', error: true);
     } finally {
       if (!_disposed) {
-        // Keep the preview stable during the batch, then release successful items.
+        // 批量保存期间先不动预览，等全部完成后再把成功的项移出候选。
         _removeCandidates(saved);
         _saving = false;
       }

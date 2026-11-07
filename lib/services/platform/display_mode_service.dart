@@ -21,7 +21,7 @@ class DisplayModeService {
         return;
       }
 
-      // Restore system orientation on exit, including an existing landscape.
+      // 退出时恢复系统方向，原本就是横屏的也要还原。
       await _attempt(() => SystemChrome.setPreferredOrientations(
             fullscreen
                 ? [
@@ -33,7 +33,7 @@ class DisplayModeService {
     });
   }
 
-  /// Outgoing pages cannot release chrome owned by the next visible page.
+  /// 正在离开的页面不能释放属于下一个可见页面的系统栏控制权。
   static Future<void> setSystemBarsHidden({
     required Object owner,
     required bool hidden,
@@ -55,7 +55,7 @@ class DisplayModeService {
       return _pendingSystemBars ?? Future.value();
     }
     _systemBarsHidden = hidden;
-    // Rotation acknowledgements must not delay immersion or route cleanup.
+    // 旋转回执不能拖慢沉浸式切换或路由清理。
     late final Future<void> request;
     request = (_pendingSystemBars ?? Future<void>.value())
         .then((_) => _attempt(() async {

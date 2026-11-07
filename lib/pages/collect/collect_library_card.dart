@@ -244,7 +244,7 @@ class _CollectListTile extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
-          // Isolate menu focus and taps from card navigation.
+          // 让菜单自己接管焦点与点击，不和卡片本身的跳转抢。
           Positioned.fill(
             child: Semantics(
               button: true,

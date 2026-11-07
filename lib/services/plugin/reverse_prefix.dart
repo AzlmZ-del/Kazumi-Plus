@@ -1,32 +1,31 @@
-/// Optional prefix that flips the order of an episode list.
+/// 可选的前缀，用来反转剧集列表的顺序。
 ///
-/// Some sites list the newest episode first (`3, 2, 1`). Writing the episode
-/// selector as `-<selector>` (XPath) or `-<jsonpath>` (API) makes Kazumi
-/// restore the natural order (`1, 2, 3`) without touching the rule itself.
+/// 有些站点把最新一集排在前面（`3, 2, 1`）。把剧集选择器写成
+/// `-<selector>`（XPath）或 `-<jsonpath>`（API），Kazumi 就会还原成
+/// 自然顺序（`1, 2, 3`），不必改规则本身。
 ///
-/// Only episode lists honour the prefix. Road lists are paired with the
-/// road-name list by index, so reversing one without the other would silently
-/// mislabel every road; the prefix is stripped and reported there instead.
+/// 只有剧集列表认这个前缀。线路列表与线路名列表按下标配对，
+/// 只反转其中一个会让每条线路都静默贴错名字；
+/// 所以线路列表那里只会剥掉前缀并给出提示。
 library;
 
-/// The one and only reverse marker.
+/// 唯一合法的反转标记。
 const String reversePrefix = '-';
 
-/// Shown in diagnostics so a misused prefix gets an understandable message.
+/// 出现在诊断信息里，让前缀用错时能给出看得懂的提示。
 const String reversePrefixLabel = '反序前缀（-）';
 
-/// Splits the optional reverse marker off [raw].
+/// 把可选的反转标记从 [raw] 里剥出来。
 ///
-/// Returns the cleaned expression and whether the caller should reverse the
-/// resulting list. The marker is only matched right at the start, so an
-/// ordinary expression that merely contains a `-` further in is untouched.
+/// 返回清理后的表达式，以及调用方是否应当反转结果列表。
+/// 标记只匹配开头，所以只是在中间某处含 `-` 的普通表达式不受影响。
 ///
-/// XPath accepts `-1` and `-.5` as legal (if pointless) numeric expressions,
-/// so callers parsing XPath pass [xpathNumericLiteral] to leave those alone.
-/// A dot only counts when a digit follows, so `-.//a` stays a reverse marker.
+/// XPath 里 `-1` 和 `-.5` 是合法的（虽然没意义的）数值表达式，
+/// 所以 XPath 调用方要传 [xpathNumericLiteral] 把它们排除在外。
+/// 点号后面必须跟数字才算数值，因此 `-.//a` 仍按反转标记处理。
 ///
-/// JSONPath always starts with `$`, so API callers leave the flag off and any
-/// `-` immediately followed by `$` is unambiguously a marker.
+/// JSONPath 恒以 `$` 开头，所以 API 调用方不必开那个标志，
+/// 任何紧跟着 `$` 的 `-` 都毫无歧义地是反转标记。
 ({String expression, bool reverse}) splitReversePrefix(
   String raw, {
   bool xpathNumericLiteral = false,

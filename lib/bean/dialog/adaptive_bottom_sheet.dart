@@ -31,7 +31,7 @@ const ShapeBorder _materialSheetShape = RoundedRectangleBorder(
   borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
 );
 
-// Native route motion and the extra surface entrance spring are separate.
+// 路由自带动画与表层入场弹簧是两套独立运动，这里只配路由那一套。
 const AnimationStyle _materialSheetAnimationStyle = AnimationStyle(
   duration: Duration(milliseconds: 250),
   reverseDuration: Duration(milliseconds: 200),
@@ -49,7 +49,7 @@ Future<T?> showAdaptiveBottomSheet<T>({
 }) {
   return showModalBottomSheet<T>(
     context: context,
-    // A single surface owns the handle and background to avoid a second cap.
+    // 手柄与背景都交给自绘 surface，这里清空默认样式，避免叠出第二层圆角帽。
     backgroundColor: Colors.transparent,
     elevation: 0,
     shape: const RoundedRectangleBorder(),
@@ -168,7 +168,7 @@ class _MaterialSheetSurfaceState extends State<_MaterialSheetSurface>
       clipBehavior: Clip.none,
       alignment: Alignment.topCenter,
       children: [
-        // Cover the bottom gap during spring overshoot.
+        // 弹簧回弹过冲时会露出底部空隙，用一块向下延伸 400 的色块盖住。
         Positioned(
           left: 0,
           right: 0,

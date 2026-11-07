@@ -21,8 +21,8 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
   late int _selectedIndex = menu.indexForPath(widget.location);
   DateTime? _lastExitPromptAt;
 
-  /// The shell sits at the bottom of the root stack and stays mounted while
-  /// other pages cover it, so it publishes that state for its subtree.
+  /// 外壳位于根栈底部，被其他页面盖住时仍保持挂载，
+  /// 因此要把这个状态发布给子树。
   bool _isCovered = false;
 
   @override
@@ -120,7 +120,7 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
 
   Widget _outlet(BuildContext context, {BorderRadius? borderRadius}) {
     Widget child = NotificationListener<NavigationNotification>(
-      // A non-poppable outlet must not override the shell's PopScope state.
+      // 不能 pop 的出口不该覆盖外壳的 PopScope 状态。
       onNotification: (notification) => !notification.canHandlePop,
       child: RouterOutlet(key: _outletKey),
     );

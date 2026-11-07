@@ -41,8 +41,8 @@ abstract class _PopularController with Store {
     bangumiList.clear();
   }
 
-  // Async actions commit each segment between awaits as one transaction,
-  // batching the completion writes into a single notification.
+  // 异步 action 把每个 await 之间的片段各自提交为一次事务，
+  // 从而把多次完成写入合并成一条通知。
   @action
   Future<void> queryBangumiByTrend({String type = 'add'}) async {
     if (type == 'init') {

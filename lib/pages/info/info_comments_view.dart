@@ -45,7 +45,7 @@ class InfoCommentsView extends StatelessWidget {
   }
 
   bool _onScrollEnd(ScrollEndNotification notification) {
-    // Nested error views must not trigger pagination.
+    // 嵌套的错误视图不能触发翻页，只认最外层滚动。
     if (notification.depth == 0 &&
         notification.metrics.axis == Axis.vertical &&
         !isLoading &&

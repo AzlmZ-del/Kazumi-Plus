@@ -1,6 +1,6 @@
-/// Response of `/api/v2/search/episodes`.
+/// `/api/v2/search/episodes` 的响应。
 ///
-/// Entries carry no cover, rating or air date, unlike `/api/v2/search/anime`.
+/// 与 `/api/v2/search/anime` 不同，这里的条目没有封面、评分与放送日期。
 class DanmakuSearchAnime {
   final int animeId;
   final String animeTitle;
@@ -24,7 +24,7 @@ class DanmakuSearchAnime {
 class DanmakuSearchResponse {
   final List<DanmakuSearchAnime> animes;
 
-  /// Result set was truncated; the user should narrow the keyword.
+  /// 结果被截断，提示用户缩小关键词范围。
   final bool hasMore;
 
   const DanmakuSearchResponse({

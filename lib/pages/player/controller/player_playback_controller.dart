@@ -196,14 +196,6 @@ abstract class _PlayerPlaybackController with Store {
     }
   }
 
-  bool get playerCompleted {
-    try {
-      return mediaPlayer?.state.completed ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
   double get playerVolume {
     try {
       return mediaPlayer?.state.volume ?? volume;
@@ -220,14 +212,6 @@ abstract class _PlayerPlaybackController with Store {
     }
   }
 
-  Duration get playerBuffer {
-    try {
-      return mediaPlayer?.state.buffer ?? buffer;
-    } catch (_) {
-      return buffer;
-    }
-  }
-
   Duration get playerDuration {
     try {
       return mediaPlayer?.state.duration ?? duration;
@@ -236,13 +220,11 @@ abstract class _PlayerPlaybackController with Store {
     }
   }
 
-  /// Android blocks network access for backgrounded apps; a prefetching
-  /// demuxer then burns through ffmpeg's reconnect/segment retries and marks
-  /// the stream EOF, leaving playback permanently stuck once foregrounded.
-  /// Suspending zeroes the readahead window so no new requests are issued
-  /// while buffered data stays available; restore values are mpv defaults,
-  /// which media_kit leaves untouched. Writes are serialized and apply the
-  /// latest requested state, so rapid lifecycle flips cannot reorder.
+  /// Android 会切断后台应用的网络；预取中的 demuxer 会把 ffmpeg 的重连与
+  /// 分片重试全部耗光，并把流标记成 EOF，回到前台后播放就永久卡死。
+  /// 挂起时把预读窗口清零，既不发起新请求又能保留已缓冲的数据；
+  /// 恢复值取 mpv 默认值（media_kit 不会改动它们）。写入是串行的，
+  /// 且只应用最新的目标状态，所以快速前后台切换不会乱序。
   Future<void> setPrefetchSuspended(bool suspended) async {
     if (!Platform.isAndroid) {
       return;
@@ -639,8 +621,7 @@ abstract class _PlayerPlaybackController with Store {
     videoController = null;
     playing = false;
     loading = true;
-    // media_kit stops playback as part of disposal before releasing native
-    // resources. Debug subscriptions can be cancelled concurrently.
+    // media_kit 会在释放原生资源前先停掉播放，调试订阅可能与它并发取消。
     await Future.wait([
       ownedPlayer?.dispose() ?? Future<void>.value(),
       _cancelDebugInfo(),
@@ -652,7 +633,7 @@ abstract class _PlayerPlaybackController with Store {
     if (player == null) {
       return null;
     }
-    // Encode the captured frame natively; PlayerState dimensions may be stale.
+    // 用原生方式编码截帧：PlayerState 里的尺寸可能是过期的。
     return player.safeScreenshot(format: 'image/png');
   }
 }

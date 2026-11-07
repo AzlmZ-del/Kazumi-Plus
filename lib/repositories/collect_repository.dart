@@ -2,20 +2,12 @@ import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/modules/collect/collect_type.dart';
 import 'package:kazumi/services/logging/logger.dart';
 
-/// 收藏数据访问接口
-///
-/// 提供收藏相关的数据访问抽象，解耦业务逻辑与数据存储
+/// 收藏的数据访问接口，把业务逻辑与存储解耦。
 abstract class ICollectRepository {
-  /// 根据收藏类型获取番剧ID集合
-  ///
-  /// [type] 收藏类型
-  /// 返回符合条件的番剧ID集合
+  /// 取某种收藏类型下的番剧 ID 集合。
   Set<int> getBangumiIdsByType(CollectType type);
 
-  /// 批量获取多种类型的番剧ID集合
-  ///
-  /// [types] 收藏类型列表
-  /// 返回符合条件的番剧ID集合（并集）
+  /// 取多种收藏类型下的番剧 ID 并集。
   Set<int> getBangumiIdsByTypes(List<CollectType> types);
 
   // ========== 搜索页过滤器设置 ==========
@@ -54,9 +46,6 @@ abstract class ICollectRepository {
   bool getPrivateMode();
 }
 
-/// 收藏数据访问实现类
-///
-/// 基于Hive实现的收藏数据访问层
 class CollectRepository implements ICollectRepository {
   final _collectiblesBox = GStorage.collectibles;
 

@@ -9,7 +9,6 @@ import 'generated/BBCodeParser.dart';
 class BBCodeBaseListener implements BBCodeListener {
   final List<dynamic> bbcode = [];
 
-  /// 记录进入标签时的位置
   void _enterTag(TagContext ctx) {
     final tagName = ctx.tagName?.text;
 
@@ -67,7 +66,7 @@ class BBCodeBaseListener implements BBCodeListener {
     }
   }
 
-  /// 对标签内所有的 BBCodeText 叠加样式
+  /// exit 按 enter 存的下标对区间内的 BBCodeText 叠加标志位（嵌套累积不覆盖）
   void _exitTag(TagContext ctx) {
     final tagName = ctx.tagName?.text;
 
@@ -99,7 +98,6 @@ class BBCodeBaseListener implements BBCodeListener {
             bbcode[i].quoted = true;
           }
         }
-        // Add icon to the end of quoted text
         bbcode.add(const Icon(Icons.format_quote));
         break;
       case 'B':
@@ -208,7 +206,7 @@ class BBCodeBaseListener implements BBCodeListener {
 
   @override
   void enterBgm(BgmContext ctx) {
-    /// 处理 (bgm35) 类型的表情
+    // 处理 (bgm35) 类型的表情
     bbcode.add(BBCodeBgm(id: int.tryParse(ctx.id!.text!) ?? 0));
   }
 
@@ -217,7 +215,7 @@ class BBCodeBaseListener implements BBCodeListener {
 
   @override
   void enterMusume(MusumeContext ctx) {
-    /// 处理 (musume_07) 类型的表情
+    // 处理 (musume_07) 类型的表情
     bbcode.add(BBCodeMusume(id: int.tryParse(ctx.id!.text!) ?? 0));
   }
 
@@ -226,8 +224,8 @@ class BBCodeBaseListener implements BBCodeListener {
 
   @override
   void enterSticker(StickerContext ctx) {
-    /// 处理 (=A=) 类型的表情
-    /// ctx.start!.type 为 BBCode.tokens 内的 token 值
+    // 处理 (=A=) 类型的表情
+    // ctx.start!.type 为 BBCode.tokens 内的 token 值
     bbcode.add(BBCodeSticker(id: ctx.start!.type - 11));
   }
 

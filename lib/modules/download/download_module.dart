@@ -45,7 +45,7 @@ class DownloadEpisode {
   @HiveField(2)
   int road;
 
-  /// 0=pending 1=resolving 2=downloading 3=completed 4=failed 5=paused
+  /// 取值见 [DownloadStatus]（0 等待、1 解析中、2 下载中、3 完成、4 失败、5 暂停）。
   @HiveField(3)
   int status;
 

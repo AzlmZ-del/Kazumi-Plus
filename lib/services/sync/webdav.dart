@@ -138,7 +138,7 @@ class WebDav {
     required Future<DanmakuShieldSyncState> Function(DanmakuShieldSyncState)
     merge,
   }) {
-    // Queue every request: an edit during an upload needs another pass.
+    // 所有请求都排队：上传过程中发生的编辑还需要再跑一轮。
     return _runWebDavExclusive(() async {
       if (!isDanmakuShieldSyncEnabled) return;
       if (!initialized) await _init();
@@ -167,7 +167,7 @@ class WebDav {
         final merged = await merge(remote);
         final upload = File('${runDirectory.path}/local.json');
         await upload.writeAsString(merged.encode(), flush: true);
-        // Per-device files prevent simultaneous uploads from losing edits.
+        // 每台设备各存一份文件，同时上传时不会互相覆盖丢编辑。
         final destination = '$_danmakuShieldPath/$deviceId.json';
         await _publishRemoteFile(
           sourceFilePath: upload.path,
@@ -560,7 +560,7 @@ class WebDav {
         snapshot: remoteSnapshot,
         eventFiles: downloads.eventFiles,
       );
-      // Salvage interrupted local writes; reject malformed remote files as a whole.
+      // 抢救被中断的本地写入；远端文件只要有格式问题就整份拒收。
       final mergedFromFiles = await historySync.mergeEventFiles(
         snapshot: mergedRemoteSnapshot,
         eventFiles: localBatch.files,
@@ -693,7 +693,7 @@ class WebDav {
       }
       try {
         final stat = await entity.stat();
-        // A recent directory may belong to another running Kazumi process.
+        // 刚生成的目录可能属于另一个正在运行的 Kazumi 进程。
         if (stat.modified.isAfter(staleBefore)) {
           continue;
         }

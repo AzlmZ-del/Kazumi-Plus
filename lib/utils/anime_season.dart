@@ -1,4 +1,4 @@
-/// This class asks for DateTime to get a string to indicate seasonal anime
+/// 这个类接收 DateTime，产出表示当季番剧区间的字符串。
 class AnimeSeason {
   late DateTime _date;
   final _seasons = ['冬季', '春季', '夏季', '秋季'];
@@ -25,8 +25,10 @@ class AnimeSeason {
     return [year, season];
   }
 
-  // Convert the DateTime to a List containing two strings (the start of the season -1 and the end of the season -1 ) eg: 2024-09-23 -> ['2024-06-01', '2024-09-01']
-  // why -1? because the air date is the launch date of the anime, it is usually a few days before the start of the season
+  // 把 DateTime 转成两个字符串（上一季的起止日期），
+  // 例如 2024-09-23 -> ['2024-06-01', '2024-09-01']。
+  // 为什么要减一季？因为播出日期是番剧开播那天，
+  // 通常比「名义上的季节开始」早几天。
   List<String> toSeasonStartAndEnd() {
     var yas = _getYearAndSeason(_date);
     int year = yas[0];

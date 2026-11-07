@@ -6,16 +6,15 @@ import 'package:kazumi/webview/captcha/impl/captcha_webview_windows_impl.dart';
 import 'package:kazumi/webview/captcha/impl/captcha_webview_linux_impl.dart';
 
 abstract class CaptchaWebviewController<T> {
-  /// WebView controller.
+  /// WebView 控制器。
   T? webviewController;
 
-  /// For type-1 (captcha image), whether a captcha image has been detected,
-  /// used to determine if verification is successful after page navigation
+  /// 针对 type-1（验证码图片）：是否已检测到验证码图片。
+  /// 页面跳转之后靠它判断验证是否通过。
   bool captchaWasFound = false;
 
-  /// For automated flows, set when JavaScript has triggered a verification
-  /// action. A later navigation can then confirm success even if no captcha
-  /// element disappears in the current DOM.
+  /// 自动化流程用：JavaScript 触发验证操作后置位。
+  /// 这样即便当前 DOM 里没有验证码元素消失，后续的页面跳转也能确认验证成功。
   bool buttonWasClicked = false;
 
   final StreamController<String> captchaImageFoundController =
@@ -102,7 +101,7 @@ class CaptchaWebviewControllerFactory {
     if (Platform.isLinux) {
       return CaptchaWebviewLinuxImpl();
     }
-    // Android, iOS, macOS
+    // Android、iOS 与 macOS 的处理。
     return CaptchaWebviewInAppWebviewImpl();
   }
 }

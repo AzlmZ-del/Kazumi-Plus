@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
+import 'package:kazumi/bean/dialog/kazumi_toast_host.dart';
 import 'package:kazumi/navigation.dart';
 
 Future<void> mountApp(WidgetTester tester, {Widget? home}) async {
@@ -10,6 +12,15 @@ Future<void> mountApp(WidgetTester tester, {Widget? home}) async {
     navigatorKey: rootNavigatorKey,
     scaffoldMessengerKey: rootScaffoldMessengerKey,
     navigatorObservers: [KazumiDialog.observer],
+    // toast 走 FToast 的 Overlay 通道，需与 MaterialApp.builder 一致地
+    // 包 FToastBuilder + KazumiToastHost，否则拿不到 Overlay 锚点。
+    builder: (context, child) => FToastBuilder()(
+      context,
+      KazumiToastHost(
+        key: toastAnchorKey,
+        child: child ?? const SizedBox.shrink(),
+      ),
+    ),
     home: home ?? const Scaffold(body: Text('home')),
   ));
   await tester.pumpAndSettle();
@@ -277,6 +288,9 @@ void main() {
     await run;
     expect(find.text('request failed'), findsOneWidget);
     expectSync(KazumiDialog.observer.hasKazumiDialog, isFalse);
+    // FToast 自带 2 秒自动消失定时器，推进到它结束，避免留下 pending timer。
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('owner disposal closes its workflow and preserves another dialog',

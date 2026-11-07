@@ -2,43 +2,31 @@ import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/modules/search/search_history_module.dart';
 import 'package:kazumi/services/logging/logger.dart';
 
-/// 搜索历史数据访问接口
-///
-/// 提供搜索历史相关的数据访问抽象
+/// 搜索历史的数据访问接口。
 abstract class ISearchHistoryRepository {
   /// 获取所有搜索历史（按时间戳倒序）
   List<SearchHistory> getAllHistories();
 
-  /// 保存搜索历史
-  ///
-  /// [keyword] 搜索关键词
-  /// 返回是否成功
+  /// 保存一条搜索历史，返回是否成功。
   Future<bool> saveHistory(String keyword);
 
-  /// 删除指定搜索历史
-  ///
-  /// [history] 要删除的历史记录
+  /// 删除指定的一条搜索历史。
   Future<void> deleteHistory(SearchHistory history);
 
   /// 清空所有搜索历史
   Future<void> clearAllHistories();
 
-  /// 删除重复的历史记录
-  ///
-  /// [keyword] 关键词
+  /// 删掉同关键词的重复记录。
   Future<void> deleteDuplicates(String keyword);
 
-  /// 检查是否达到最大历史记录数
-  ///
-  /// [maxCount] 最大记录数
-  /// 返回是否已满
+  /// 判断是否已达到 [maxCount] 条上限。
   bool isHistoryFull(int maxCount);
 
   /// 删除最旧的历史记录
   Future<void> deleteOldest();
 }
 
-/// 搜索历史数据访问实现类
+/// 基于 Hive 的搜索历史数据访问实现。
 ///
 /// 基于Hive实现的搜索历史数据访问层
 class SearchHistoryRepository implements ISearchHistoryRepository {

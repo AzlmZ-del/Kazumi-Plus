@@ -1,4 +1,4 @@
-// Persisted values match dandanplay's chConvert parameter.
+// 落库值与 dandanplay 的 chConvert 参数一致，不能随意改动。
 enum DanmakuChConvert {
   none(0),
   simplified(1),

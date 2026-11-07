@@ -46,9 +46,8 @@ String kazumiBase64ToJson(String kazumiBase64Str) {
     throw const FormatException('Kazumi rule link is empty');
   }
 
-  // Accept both standard and URL-safe Base64, with or without padding. Links
-  // are frequently wrapped by chat applications or percent-encoded by URI
-  // handlers before they reach the import dialog.
+  // 标准 Base64 与 URL-safe Base64 都接受，带不带填充都行。
+  // 链接在进入导入对话框之前，常被聊天软件折行或被 URI 处理器做过百分号编码。
   final normalized = base64.normalize(
     payload.replaceAll('-', '+').replaceAll('_', '/'),
   );

@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:kazumi/services/logging/logger.dart';
-import 'package:kazumi/request/config/api_endpoints.dart';
 import 'package:kazumi/request/config/rules_repository_config.dart';
 import 'package:kazumi/request/clients/rules_repo_client.dart';
 import 'package:kazumi/plugins/plugins.dart';
@@ -10,23 +9,16 @@ import 'package:kazumi/modules/plugin/plugin_http_module.dart';
 class PluginCatalogApi {
   static final RulesRepoClient _client = RulesRepoClient.instance;
 
-  /// Per-repository deadline for both the catalog and single-rule fetch.
+  /// 每个仓库的超时上限，目录与单规则拉取共用。
   ///
-  /// The shared [NetworkConfig] timeout is tuned for first-party endpoints;
-  /// third-party repositories are user-supplied and may be slow or dead, and a
-  /// single unresponsive one must not stall catalog aggregation.
+  /// 共用的 [NetworkConfig] 超时是按自家接口调的；第三方仓库由用户填写，
+  /// 可能很慢或已经失效，不能因为其中一个没响应就卡住整轮目录聚合。
   static const Duration repositoryTimeout = Duration(seconds: 15);
 
-  /// Fetches the catalog of the official repository.
-  static Future<List<PluginHTTPItem>> getPluginList() {
-    return getPluginListFrom(ApiEndpoints.pluginShop);
-  }
-
-  /// Fetches and parses the catalog of [repositoryUrl].
+  /// 拉取并解析 [repositoryUrl] 的目录。
   ///
-  /// Tags every returned item with [repositoryUrl] so later install/update
-  /// calls can go back to the same repository. `repositoryLabel` is left empty
-  /// here; the aggregating controller fills it in from settings.
+  /// 给每个返回项打上 [repositoryUrl]，让后续的安装/更新能回到同一个仓库。
+  /// `repositoryLabel` 在这里留空，由聚合控制器从设置里补上。
   static Future<List<PluginHTTPItem>> getPluginListFrom(
     String repositoryUrl, {
     Duration timeout = repositoryTimeout,
@@ -83,12 +75,7 @@ class PluginCatalogApi {
     }
   }
 
-  /// Fetches a single rule from the official repository.
-  static Future<Plugin> getPlugin(String name) {
-    return getPluginFromRepository(ApiEndpoints.pluginShop, name);
-  }
-
-  /// Fetches rule [name] from [repositoryUrl].
+  /// 从 [repositoryUrl] 拉取名为 [name] 的规则。
   static Future<Plugin> getPluginFromRepository(
     String repositoryUrl,
     String name, {

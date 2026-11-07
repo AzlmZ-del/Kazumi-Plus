@@ -45,8 +45,8 @@ abstract class _DownloadController with Store {
   Future<void> init() async {
     _replaceRecords(_repository.getAllRecords());
 
-    // Reset any incomplete states to 'paused' on startup
-    // This includes 'pending' because the in-memory queue is lost on restart
+    // 启动时把未完成的状态重置为「已暂停」，包括「等待中」——
+    // 内存里的下载队列在重启后就没了。
     var resetIncompleteRecords = false;
     for (final record in records) {
       bool changed = false;
@@ -371,7 +371,6 @@ abstract class _DownloadController with Store {
     return _repository.getCompletedEpisodes(bangumiId, pluginName);
   }
 
-  /// 弹幕文件路径
   String _danmakuFilePath(String downloadDirectory) {
     return '$downloadDirectory/danmaku.json';
   }
@@ -425,7 +424,6 @@ abstract class _DownloadController with Store {
         _repository.getEpisode(bangumiId, pluginName, episodeNumber);
     if (episode == null) return null;
 
-    // 从文件读取
     final fromFile = await _readDanmakuFromFile(episode.downloadDirectory);
     if (fromFile != null && fromFile.danmakus.isNotEmpty) {
       return fromFile.danmakus;
@@ -580,8 +578,7 @@ abstract class _DownloadController with Store {
 
       String? m3u8Url;
       if (plugin.hasPlayApi) {
-        // The media URL comes from an authenticated API, so a webview would
-        // never see it.
+        // 媒体地址来自带鉴权的接口，webview 拿不到它。
         try {
           if (lease.isCancelled) {
             throw const VideoSourceCancelledException();
@@ -723,7 +720,6 @@ abstract class _DownloadController with Store {
         KazumiLogger().i(
             'DownloadController: fetching danmaku for episode $episodeNumber (async)');
 
-        // 获取 DanDan 番剧 ID
         final danDanBangumiID =
             await DanmakuApi.getDanDanBangumiIDByBgmBangumiID(bangumiId);
         if (danDanBangumiID == 0) {
@@ -732,7 +728,6 @@ abstract class _DownloadController with Store {
           return;
         }
 
-        // 获取弹幕列表
         final danmakus =
             await DanmakuApi.getDanDanmaku(danDanBangumiID, episodeNumber);
         if (danmakus.isEmpty) {
@@ -741,7 +736,6 @@ abstract class _DownloadController with Store {
           return;
         }
 
-        // 写入独立文件
         await _writeDanmakuToFile(downloadDirectory, danmakus, danDanBangumiID);
 
         KazumiLogger().i(
@@ -910,8 +904,8 @@ abstract class _DownloadController with Store {
     }
   }
 
-  /// Stops downloads before their files are deleted. Active episodes are
-  /// persisted as paused first, so a failed deletion leaves them resumable.
+  /// 删除文件前先停掉下载。进行中的剧集先落盘为「已暂停」，
+  /// 这样删除失败时还能续传。
   Future<void> _stopEpisodes(
       String recordKey, Map<int, DownloadEpisode> episodes) async {
     for (final episodeNumber in episodes.keys) {

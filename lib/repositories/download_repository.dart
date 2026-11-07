@@ -3,8 +3,8 @@ import 'package:kazumi/modules/download/download_module.dart';
 import 'package:kazumi/services/logging/logger.dart';
 
 abstract class IDownloadRepository {
-  /// Emits when a record or an episode status is persisted. Progress ticks stay
-  /// in memory, so they do not emit.
+  /// 记录或剧集状态落盘时发出通知。进度 tick 只留在内存里，
+  /// 因此不会触发通知。
   Stream<void> get changes;
 
   List<DownloadRecord> getAllRecords();
@@ -16,33 +16,17 @@ abstract class IDownloadRepository {
   Future<void> deleteEpisode(String recordKey, int episodeNumber);
   bool getForceAdBlocker();
 
-  /// 获取指定番剧的下载记录
-  ///
-  /// [bangumiId] 番剧 ID
-  /// [pluginName] 插件名称
+  /// 取指定番剧的下载记录。
   DownloadRecord? getRecordByBangumiId(int bangumiId, String pluginName);
 
-  /// 获取指定集数的下载信息
-  ///
-  /// [bangumiId] 番剧 ID
-  /// [pluginName] 插件名称
-  /// [episodeNumber] 集数编号
+  /// 取指定集数的下载信息。
   DownloadEpisode? getEpisode(
       int bangumiId, String pluginName, int episodeNumber);
 
-  /// 获取已完成下载的集数列表
-  ///
-  /// [bangumiId] 番剧 ID
-  /// [pluginName] 插件名称
-  /// 返回所有已完成下载的集数
+  /// 取所有已完成下载的集数。
   List<DownloadEpisode> getCompletedEpisodes(int bangumiId, String pluginName);
 
-  /// 通过集数页面 URL 查找下载记录
-  ///
-  /// [bangumiId] 番剧 ID
-  /// [pluginName] 插件名称
-  /// [episodePageUrl] 集数页面 URL
-  /// 当 URL 为空时返回 null（兼容旧数据）
+  /// 按集数页面 URL 查下载记录，URL 为空时返回 null（兼容旧数据）。
   DownloadEpisode? getEpisodeByUrl(
       int bangumiId, String pluginName, String episodePageUrl);
 }
@@ -61,7 +45,7 @@ class DownloadRepository implements IDownloadRepository {
         try {
           final record = _downloadsBox.get(key);
           if (record != null) {
-            // Merge in-memory progress into the record
+            // 把内存里的进度合并进记录。
             final cachedEpisodes = _progressCache[key as String];
             if (cachedEpisodes != null) {
               for (final entry in cachedEpisodes.entries) {
@@ -88,7 +72,7 @@ class DownloadRepository implements IDownloadRepository {
     try {
       final record = _downloadsBox.get(key);
       if (record != null) {
-        // Merge in-memory progress into the record
+        // 把内存里的进度合并进记录。
         final cachedEpisodes = _progressCache[key];
         if (cachedEpisodes != null) {
           for (final entry in cachedEpisodes.entries) {
@@ -136,22 +120,22 @@ class DownloadRepository implements IDownloadRepository {
     }
   }
 
-  /// Track last persisted status to avoid unnecessary writes
+  /// 记住上次落盘的状态，避免不必要的写入。
   final Map<String, int> _lastPersistedStatus = {};
 
-  /// In-memory cache for progress updates (not persisted until status changes)
+  /// 进度更新的内存缓存（状态不变就不落盘）。
   final Map<String, Map<int, DownloadEpisode>> _progressCache = {};
 
   @override
   Future<void> updateEpisode(
       String recordKey, int episodeNumber, DownloadEpisode episode) async {
     try {
-      // Update in-memory cache
+      // 更新内存缓存。
       _progressCache.putIfAbsent(recordKey, () => {});
       _progressCache[recordKey]![episodeNumber] = episode;
 
-      // Only persist to Hive when status changes (not on every progress update)
-      // This dramatically reduces disk I/O and prevents corruption on crash
+      // 只在状态变化时写 Hive（不是每次进度更新都写）
+      // 这能大幅减少磁盘 I/O，也避免崩溃时把数据写坏。
       final statusKey = '${recordKey}_$episodeNumber';
       final lastStatus = _lastPersistedStatus[statusKey];
       final shouldPersist = lastStatus != episode.status;
@@ -172,17 +156,6 @@ class DownloadRepository implements IDownloadRepository {
       );
       rethrow;
     }
-  }
-
-  /// Get episode with in-memory progress if available
-  DownloadEpisode? getEpisodeWithProgress(String recordKey, int episodeNumber) {
-    // Check in-memory cache first
-    final cached = _progressCache[recordKey]?[episodeNumber];
-    if (cached != null) return cached;
-
-    // Fall back to Hive
-    final record = getRecord(recordKey);
-    return record?.episodes[episodeNumber];
   }
 
   @override

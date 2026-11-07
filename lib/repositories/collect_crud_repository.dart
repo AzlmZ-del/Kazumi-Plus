@@ -1,51 +1,27 @@
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/modules/collect/collect_module.dart';
-import 'package:kazumi/modules/collect/collect_change_module.dart';
 import 'package:kazumi/services/logging/logger.dart';
 
-/// 收藏CRUD数据访问接口
-///
-/// 提供收藏数据的增删改查操作
+/// 收藏的数据访问接口。
 abstract class ICollectCrudRepository {
-  /// Emits once per collectible write, WebDAV sync restores included.
+  /// 每次写入收藏项发一次通知，WebDAV 同步还原也算在内。
   Stream<void> get changes;
 
   /// 获取所有收藏
   List<CollectedBangumi> getAllCollectibles();
 
-  /// 获取单个收藏
-  ///
-  /// [id] 番剧ID
-  /// 返回收藏对象，如果不存在返回null
-  CollectedBangumi? getCollectible(int id);
-
-  /// 获取收藏类型
-  ///
-  /// [id] 番剧ID
-  /// 返回收藏类型值，未收藏返回0
+  /// 取收藏类型，未收藏返回 0。
   int getCollectType(int id);
 
-  /// 添加或更新收藏
-  ///
-  /// [bangumiItem] 番剧信息
-  /// [type] 收藏类型
+  /// 添加或更新收藏。
   Future<void> addCollectible(BangumiItem bangumiItem, int type);
 
-  /// 更新收藏的番剧信息
-  ///
-  /// [bangumiItem] 更新后的番剧信息
+  /// 更新收藏里缓存的番剧信息。
   Future<void> updateCollectible(BangumiItem bangumiItem);
 
-  /// 删除收藏
-  ///
-  /// [id] 番剧ID
+  /// 删除收藏。
   Future<void> deleteCollectible(int id);
-
-  /// 记录收藏变更（用于WebDAV同步）
-  ///
-  /// [change] 变更记录
-  Future<void> addCollectChange(CollectedBangumiChange change);
 
   /// 获取旧版收藏列表（用于迁移）
   List<BangumiItem> getFavorites();
@@ -54,9 +30,7 @@ abstract class ICollectCrudRepository {
   Future<void> clearFavorites();
 }
 
-/// 收藏CRUD数据访问实现类
-///
-/// 基于Hive实现的收藏CRUD数据访问层
+/// 基于 Hive 的收藏数据访问实现。
 class CollectCrudRepository implements ICollectCrudRepository {
   final _collectiblesBox = GStorage.collectibles;
   final _favoritesBox = GStorage.favorites;
@@ -74,19 +48,6 @@ class CollectCrudRepository implements ICollectCrudRepository {
         error: e,
       );
       return [];
-    }
-  }
-
-  @override
-  CollectedBangumi? getCollectible(int id) {
-    try {
-      return _collectiblesBox.get(id);
-    } catch (e) {
-      KazumiLogger().w(
-        'GStorage: get collectible failed. id=$id',
-        error: e,
-      );
-      return null;
     }
   }
 
@@ -152,20 +113,6 @@ class CollectCrudRepository implements ICollectCrudRepository {
     } catch (e, stackTrace) {
       KazumiLogger().e(
         'GStorage: delete collectible failed. id=$id',
-        error: e,
-        stackTrace: stackTrace,
-      );
-      rethrow;
-    }
-  }
-
-  @override
-  Future<void> addCollectChange(CollectedBangumiChange change) async {
-    try {
-      await GStorage.putCollectChange(change);
-    } catch (e, stackTrace) {
-      KazumiLogger().e(
-        'GStorage: record collect change failed. changeId=${change.id}',
         error: e,
         stackTrace: stackTrace,
       );

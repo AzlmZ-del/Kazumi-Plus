@@ -110,7 +110,7 @@ abstract class _SearchPageController with Store {
           rankRange: filterState.rankRange,
           scoreRange: filterState.scoreRange,
           weekdays: filterState.weekdays);
-      // Discard stale responses before mutating the current search.
+      // 先丢掉过期响应，再去改动当前搜索结果。
       if (generation != _searchGeneration) return;
       if (page == null) {
         break;

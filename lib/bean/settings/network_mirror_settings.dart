@@ -8,10 +8,9 @@ import 'package:kazumi/services/network/image_quality.dart';
 import 'package:kazumi/services/network/rules_mirror.dart';
 import 'package:kazumi/services/storage/storage.dart';
 
-/// Shows the acceleration picker shared by every mode list.
+/// 弹出加速档位选择器，各模式列表共用。
 ///
-/// Returns true when the user picked a mode different from [current] and it was
-/// persisted to [setting].
+/// 用户选了与 [current] 不同的档位并写入 [setting] 后返回 true。
 Future<bool> selectAccelerationMode<T extends AccelerationMode>(
   BuildContext context, {
   required String title,

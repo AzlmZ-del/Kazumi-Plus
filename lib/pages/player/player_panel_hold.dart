@@ -3,7 +3,7 @@ import 'package:kazumi/bean/widget/collect_button.dart';
 import 'package:kazumi/bean/widget/kazumi_menu.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 
-/// A one-shot lease that keeps the player panel visible until released.
+/// 一次性租约：持有期间播放器面板保持可见，释放后恢复自动隐藏。
 class PlayerPanelHold {
   PlayerPanelHold({required VoidCallback onRelease}) : _onRelease = onRelease;
 
@@ -25,7 +25,7 @@ class PlayerPanelHold {
   }
 }
 
-/// Release focus holds when resizing removes the input but preserves its panel.
+/// 缩放把控件移除、但面板还在时，要把焦点持有的租约释放掉。
 class PlayerPanelHoldFocusRegion extends StatefulWidget {
   const PlayerPanelHoldFocusRegion({
     super.key,
@@ -68,7 +68,7 @@ class _PlayerPanelHoldFocusRegionState
       );
 }
 
-/// Release hover holds when their controls unmount.
+/// 控件卸载时释放悬停持有的租约。
 class PlayerPanelHoldMouseRegion extends StatefulWidget {
   const PlayerPanelHoldMouseRegion({
     super.key,

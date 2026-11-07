@@ -188,7 +188,7 @@ class _CharacterPageState extends State<CharacterPage> {
     return SliverList(
       delegate: SliverChildBuilderDelegate(
         (context, index) {
-          // Keep loaded images alive to prevent scroll jumps.
+          // 让已加载的图片保持存活，否则滚动时列表会跳动。
           return KeepAlive(
             keepAlive: true,
             child: IndexedSemantics(

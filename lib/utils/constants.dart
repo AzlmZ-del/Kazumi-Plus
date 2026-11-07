@@ -4,22 +4,18 @@ import 'package:kazumi/request/config/api_endpoints.dart';
 
 class StyleString {
   static const double cardSpace = 8;
-  static const double safeSpace = 12;
-  static BorderRadius mdRadius = BorderRadius.circular(10);
   static const Radius imgRadius = Radius.circular(12);
   static const double aspectRatio = 16 / 10;
 }
 
 const String customAppFontFamily = "MI_Sans_Regular";
 
-/// Opts into the newer Material progress indicator appearance while Flutter
-/// still exposes the compatibility flag.
+/// 在 Flutter 还保留兼容开关期间，选用新版 Material 进度指示器外观。
 const ProgressIndicatorThemeData progressIndicatorTheme2024 =
     // ignore: deprecated_member_use
     ProgressIndicatorThemeData(year2023: false);
 
-/// Opts into the newer Material slider appearance while Flutter still exposes
-/// the compatibility flag.
+/// 在 Flutter 还保留兼容开关期间，选用新版 Material 滑块外观。
 const SliderThemeData sliderTheme2024 = SliderThemeData(
   // ignore: deprecated_member_use
   year2023: false,
@@ -37,7 +33,7 @@ const _pageTransitionBuilders = <TargetPlatform, PageTransitionsBuilder>{
 const PageTransitionsTheme pageTransitionsTheme2024 =
     PageTransitionsTheme(builders: _pageTransitionBuilders);
 
-// Applied only to the settings navigator; fullscreen routes use the app theme.
+// 只作用于设置页的导航器；全屏路由仍用应用主题。
 final PageTransitionsTheme settingsPageTransitionsTheme = PageTransitionsTheme(
   builders: {
     ..._pageTransitionBuilders,
@@ -46,13 +42,13 @@ final PageTransitionsTheme settingsPageTransitionsTheme = PageTransitionsTheme(
   },
 );
 
-/// Layout breakpoint according to google:
+/// 布局断点，依据 Google 的窗口尺寸分级：
 /// https://developer.android.com/develop/ui/compose/layouts/adaptive/use-window-size-classes.
 ///
-/// **It's only a suggestion since not every device meet the breakpoint requirement.
-/// You need to build layout with some more judgements.**
+/// **这只是建议值：并非所有设备都满足断点要求，
+/// 实际布局还需要结合更多判断。**
 ///
-/// Some example device(portrait) width x height:
+/// 一些示例机型的竖屏宽 x 高：
 ///
 /// * iPhone SE3: 375 x 667
 /// * iPhone 16: 393 x 852

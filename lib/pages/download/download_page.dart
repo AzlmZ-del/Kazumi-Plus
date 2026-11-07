@@ -27,7 +27,7 @@ class DownloadPage extends StatefulWidget {
 class _DownloadPageState extends State<DownloadPage> {
   DownloadController get downloadController => widget.controller;
 
-  // Keep expansion state across controller snapshot replacements.
+  // 控制器快照被替换时，展开状态不能丢。
   final Map<String, bool> _expanded = {};
 
   @override

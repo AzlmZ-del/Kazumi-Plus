@@ -248,7 +248,7 @@ class _VideoDetailsSheetState extends State<_VideoDetailsSheet>
     );
   }
 
-  // Follow new logs only while the user stays near the bottom.
+  // 只有用户停在底部附近时才自动跟随新日志。
   void _scheduleLogAutoScroll(int logCount) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_logScrollController.hasClients) {

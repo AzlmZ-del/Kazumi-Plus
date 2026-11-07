@@ -102,7 +102,7 @@ class _SourceSheetViewState extends State<_SourceSheetView> {
   void _collapseFromFooter(String name) {
     final headerContext = _headerKeys[name]?.currentContext;
     if (headerContext != null) {
-      // Anchor before shrinking, while the header is still laid out.
+      // 趁 header 还在布局中先定位，收起后就找不到锚点了。
       Scrollable.ensureVisible(headerContext, alignment: 0);
     }
     _setDisplay(name, _SourceDisplay.collapsed);

@@ -334,7 +334,7 @@ class _StatCount extends StatelessWidget {
     final theme = Theme.of(context);
     return Column(
       children: [
-        // Scale large totals without shrinking their labels.
+        // 数值很大时整体缩小，但不要连标签字号一起缩。
         FittedBox(
           fit: BoxFit.scaleDown,
           child: Text('$value',

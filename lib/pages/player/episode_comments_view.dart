@@ -115,7 +115,7 @@ class EpisodeCommentsView extends StatelessWidget {
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) => KeepAlive(
-                      // Retain BBCode image geometry and expanded discussions.
+                      // 保住 BBCode 图片的布局尺寸与已展开的讨论，滚动回来不会重排。
                       key: ObjectKey(comments[index]),
                       keepAlive: true,
                       child: IndexedSemantics(
@@ -305,7 +305,7 @@ class _EpisodeHeader extends StatelessWidget {
                   )),
             ),
             const SizedBox(height: 6),
-            // Reserve one line to prevent jumps when metadata arrives.
+            // 先占住一行，元信息到位时不会把内容顶下去。
             Tooltip(
               message: subtitle,
               child: Text(subtitle,

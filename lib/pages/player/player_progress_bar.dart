@@ -5,7 +5,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:kazumi/utils/format.dart';
 
-// Metrics follow the defaults of the former audio_video_progress_bar.
+// 尺寸沿用原 audio_video_progress_bar 的默认值。
 const double _thumbRadius = 8;
 const double _thumbGlowRadius = 18;
 const double _barHeight = 5;
@@ -17,8 +17,7 @@ const _labelStyle = TextStyle(
   fontFeatures: [FontFeature.tabularFigures()],
 );
 
-/// Every [onDragStart] is followed by exactly one [onDragEnd], also when the
-/// bar is removed mid-drag.
+/// 每次 [onDragStart] 都恰好对应一次 [onDragEnd]，拖拽中途把进度条移除也一样。
 class PlayerProgressBar extends StatefulWidget {
   const PlayerProgressBar({
     super.key,
@@ -40,7 +39,7 @@ class PlayerProgressBar extends StatefulWidget {
   final ValueChanged<Duration> onDragUpdate;
   final void Function(bool cancelled) onDragEnd;
 
-  /// Seeks from accessibility actions, outside of any drag.
+  /// 由无障碍操作触发的 seek，不属于任何拖拽。
   final ValueChanged<Duration> onSeek;
 
   @override
@@ -70,8 +69,8 @@ class _PlayerProgressBarState extends State<PlayerProgressBar> {
 
   @override
   void dispose() {
-    // The recognizer goes away without reporting an end, and disposal runs
-    // inside a frame, so the drag is closed right after it.
+    // 识别器会直接消失而不报结束，且 dispose 发生在帧内，
+    // 所以要在它之后立刻把这次拖拽收尾。
     if (_dragFraction != null) {
       final onDragEnd = widget.onDragEnd;
       scheduleMicrotask(() => onDragEnd(true));
@@ -135,8 +134,8 @@ class _PlayerProgressBarState extends State<PlayerProgressBar> {
   Widget build(BuildContext context) {
     final textScaler = MediaQuery.textScalerOf(context);
     final color = Theme.of(context).colorScheme.primary;
-    // Both labels take the width of the total time, the longest one, so the
-    // track stays put while the position label changes.
+    // 两个标签都按「总时长」的宽度排版（它最长），
+    // 这样当前位置标签变化时轨道不会左右抖动。
     final labelSize = widget.sideLabels
         ? _measureLabel(durationToString(widget.total), textScaler)
         : null;
@@ -266,7 +265,7 @@ class _Track {
   final double width;
   final double inset;
 
-  // A round cap reaches half the bar height past each end of the line.
+  // 圆头端点会越过线段两端各半个条高，布局要留出这段。
   double get start => inset + _barHeight / 2;
   double get end => width - inset - _barHeight / 2;
   bool get isEmpty => end <= start;
@@ -279,8 +278,8 @@ class _Track {
   bool covers(double dx) => !isEmpty && dx >= inset && dx <= width - inset;
 }
 
-// Accepts on contact so a press seeks at once. A cancelled pointer still ends
-// in onEnd, so the flag tells the two apart.
+// 一接触就接受，让按下即 seek。被取消的指针同样会走到 onEnd，
+// 所以用这个标记区分两者。
 class _ProgressDragRecognizer extends HorizontalDragGestureRecognizer {
   bool cancelled = false;
 

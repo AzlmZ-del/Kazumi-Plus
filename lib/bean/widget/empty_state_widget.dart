@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:kazumi/bean/widget/state_presentation.dart';
 
-/// Shrink-wraps in slivers and scrolls within bounded viewports.
+/// 在 sliver 中按内容收缩，在有界视口内可滚动。
 class GeneralEmptyState extends StatelessWidget {
   const GeneralEmptyState({
     super.key,

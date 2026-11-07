@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 typedef VideoPlayerLayout = ({bool fillsWindow, bool hasSidePanel});
 
-/// Fullscreen fills the available window; rotation belongs to the OS.
+/// 全屏是填满可用窗口；旋转由系统负责。
 class VideoPageLayout extends StatelessWidget {
   const VideoPageLayout({
     super.key,

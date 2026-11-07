@@ -4,7 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:kazumi/navigation.dart';
 import 'package:kazumi/services/platform/display_mode_service.dart';
 
-/// Place above Scaffold to measure the window without keyboard insets.
+/// 放在 Scaffold 之上，测量窗口尺寸时就不含键盘占用的高度。
 class VideoSystemBars extends StatefulWidget {
   const VideoSystemBars({
     super.key,
@@ -62,7 +62,7 @@ class _VideoSystemBarsState extends State<VideoSystemBars> with RouteAware {
     if (!_visible || _route?.isActive == false) {
       unawaited(DisplayModeService.releaseSystemBars(this));
     } else if (!widget.isPip) {
-      // PiP keeps the full-window preference until its original metrics return.
+      // 画中画在原始尺寸恢复之前，一直保持「整窗」这个偏好。
       final landscape =
           MediaQuery.orientationOf(context) == Orientation.landscape;
       unawaited(DisplayModeService.setSystemBarsHidden(

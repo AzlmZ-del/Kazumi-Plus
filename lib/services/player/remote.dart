@@ -37,7 +37,7 @@ class RemotePlay {
                   KazumiDialog.showToast(
                     message: '开始搜索',
                   );
-                  // The device stream is single-subscription.
+                  // 这个设备流是单订阅的。
                   subscription ??= dlna.devices.stream.listen((deviceList) {
                     final tiles = <Widget>[];
                     deviceList.forEach((key, value) {
@@ -71,7 +71,7 @@ class RemotePlay {
                             }
                           }));
                     });
-                    // Also rebuild when empty, so pruned devices disappear.
+                    // 列表为空时也要重建，被剔除的设备才会真的消失。
                     setState(() {
                       dlnaDevice = tiles;
                     });
@@ -91,7 +91,7 @@ class RemotePlay {
     });
   }
 
-  // DLNADevice.controlURL resolves every cast request through this service.
+  // 每个投屏请求都由 `DLNADevice.controlURL` 经这个服务解析。
   bool _supportsAVTransport(DLNADevice device) {
     return device.info.serviceList
         .any((service) => '${service['serviceId']}'.contains('AVTransport'));

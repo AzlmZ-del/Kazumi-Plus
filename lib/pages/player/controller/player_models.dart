@@ -11,7 +11,7 @@ class PlaybackInitParams {
   final int danmakuEpisodeNumber;
   final String pageUrl;
 
-  /// Parsed title number online, downloaded episode number offline.
+  /// 在线播放时是从标题解析出的集数，离线下载时是下载记录的集号。
   final int? sortNumber;
   final Map<String, String> httpHeaders;
   final bool adBlockerEnabled;

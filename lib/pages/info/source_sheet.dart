@@ -177,7 +177,7 @@ class _SourceSheetState extends State<SourceSheet> with KazumiDialogOwner {
   @override
   Widget build(BuildContext context) => Observer(
         builder: (context) {
-          // Snapshot observable values here; lazy list builders are not tracked.
+          // 可观察值要在这里先读出来：懒加载的列表构建器不在追踪范围内。
           final groupsByName = {
             for (final plugin in _pluginsController.pluginList)
               plugin.name: _SourceSearchGroup(
@@ -190,7 +190,7 @@ class _SourceSheetState extends State<SourceSheet> with KazumiDialogOwner {
           };
           final seenBySource = <String, Set<String>>{};
           String? firstResultSource;
-          // Responses follow completion order; groups keep configured order.
+          // 响应按完成先后到达，但分组要保持规则配置的顺序。
           for (final response
               in widget.infoController.pluginSearchResponseList) {
             final group = groupsByName[response.pluginName];

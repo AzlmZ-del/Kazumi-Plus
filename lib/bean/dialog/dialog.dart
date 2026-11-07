@@ -6,7 +6,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:kazumi/bean/dialog/kazumi_toast.dart';
 import 'package:kazumi/navigation.dart';
 
-/// Single-use ownership of a route, including before its first frame.
+/// 一次性持有的路由句柄，首帧渲染前就已生效。
 class KazumiDialogHandle<T> {
   Route<T>? _route;
   bool _used = false;
@@ -34,11 +34,9 @@ class KazumiDialogHandle<T> {
 
 class KazumiDialog {
   static final KazumiDialogObserver observer = KazumiDialogObserver();
-  // Allows modal sheets to use the same dismissal and route tracking.
+  // 让 modal sheet 也能共用同一套关闭与路由追踪逻辑。
   static const routeSettings = RouteSettings(name: 'KazumiDialog');
   static int _toastRevision = 0;
-
-  KazumiDialog._internal();
 
   static Future<T?> show<T>({
     BuildContext? context,
@@ -141,7 +139,7 @@ class KazumiDialog {
 
   static void _dismissRoute<T>(Route<T> route, T? result) {
     if (!route.isActive) return;
-    // Owners may be disposed while Navigator is reconciling its routes.
+    // Navigator 整理路由期间持有者可能已被销毁，此时不能直接 pop。
     if (SchedulerBinding.instance.schedulerPhase ==
         SchedulerPhase.persistentCallbacks) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -242,7 +240,7 @@ class KazumiDialogObserver extends NavigatorObserver {
     final revision = KazumiDialog._toastRevision;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _snackBarClearScheduled = false;
-      // Only clear the old page's toast, never one posted after navigation.
+      // 只清理旧页面留下的 toast，不碰跳转之后新弹的那条。
       if (revision == KazumiDialog._toastRevision) {
         rootScaffoldMessengerKey.currentState?.removeCurrentSnackBar();
         dismissKazumiToast();

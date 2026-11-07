@@ -26,7 +26,7 @@ class BangumiTimelineCard extends StatelessWidget {
 
   /// 是否已收藏（任意收藏类型，含在看/想看/看过/搁置/抛弃）。
   ///
-  /// 为 true 时卡片边框改用次级色，替代原来左下角的书签图标。
+  /// 为 true 时卡片边框改用主强调色 primary，替代原来左下角的书签图标。
   final bool isCollected;
 
   final bool compact;
@@ -64,7 +64,7 @@ class BangumiTimelineCard extends StatelessWidget {
   static const _chipPadding =
       EdgeInsets.symmetric(horizontal: 8, vertical: 4);
 
-  // Shared by the grid and card to keep their text-scaled heights in sync.
+  // 网格与卡片共用，保证两边的文字缩放后高度一致。
   //
   // 布局对齐参考图：标题（最多两行）→ 评分 + 元信息 → 弹性空间 → 放送 chip。
   //
@@ -95,7 +95,7 @@ class BangumiTimelineCard extends StatelessWidget {
   static double coverHeightFor(bool compact) => coverWidthFor(compact) * 3 / 2;
 
   String _supportingText(String title) {
-    // Calendar entries expose episode counts through info.
+    // 日历条目通过 info 字段带集数。
     final episodes = _episodePattern.firstMatch(bangumiItem.info);
     final tags = bangumiItem.metaTags.isNotEmpty
         ? bangumiItem.metaTags

@@ -169,11 +169,11 @@ class M3u8Parser {
       }
     }
 
-    // Consider it VOD if:
-    // 1. Has #EXT-X-ENDLIST, or
-    // 2. Has #EXT-X-PLAYLIST-TYPE:VOD, or
-    // 3. Has finite segments and is not explicitly a live EVENT stream.
-    // Many third-party video sources omit #EXT-X-ENDLIST for VOD content.
+    // 满足任一条就当作点播：
+    // 1. 带 #EXT-X-ENDLIST，或
+    // 2. 带 #EXT-X-PLAYLIST-TYPE:VOD，或
+    // 3. 分片数量有限，且没有明确标成直播 EVENT 流。
+    // 很多第三方视频源对点播内容同样不写 #EXT-X-ENDLIST。
     final bool isVod =
         hasEndList || isExplicitVod || (!isLiveEvent && segments.isNotEmpty);
 

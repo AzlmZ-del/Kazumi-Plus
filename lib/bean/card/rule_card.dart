@@ -134,7 +134,6 @@ class RuleCard extends StatelessWidget {
                                         style: text.titleMedium?.copyWith(
                                             fontWeight: FontWeight.w700,
                                             height: 1.2,
-                                            // 有更新时标题染色，替代原来的「可更新」标签。
                                             color: updatable
                                                 ? colors.primary
                                                 : null),

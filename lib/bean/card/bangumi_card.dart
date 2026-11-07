@@ -4,7 +4,6 @@ import 'package:kazumi/bean/card/network_img_layer.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 
-// 视频卡片 - 垂直布局
 class BangumiCardV extends StatelessWidget {
   const BangumiCardV({
     super.key,
@@ -18,7 +17,6 @@ class BangumiCardV extends StatelessWidget {
   final bool canTap;
   final bool enableHero;
 
-  /// 是否已收藏。为 true 时卡片边框用 primary 主强调色。
   final bool isCollected;
 
   @override
@@ -48,6 +46,7 @@ class BangumiCardV extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // 0.65 是番剧海报比例，全仓五处重复（另见 info_tabview、collect_library_card），改需同步。
               AspectRatio(
                 aspectRatio: 0.65,
                 child: LayoutBuilder(builder: (context, boxConstraints) {

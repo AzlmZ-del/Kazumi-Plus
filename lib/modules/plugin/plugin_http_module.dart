@@ -13,16 +13,14 @@ class PluginHTTPItem {
   /// 老仓库的 index.json 没有这个字段，[fromJson] 会留空串，界面据此不画标签。
   String type;
 
-  /// Normalized URL of the repository this item was listed by.
+  /// 该条目被列出的仓库 URL（已规范化）。
   ///
-  /// Filled in only while the catalog is aggregated from multiple
-  /// repositories, so that installing or updating a rule fetches it from the
-  /// repository that actually advertised it. It is *not* part of the catalog
-  /// file and [fromJson] deliberately leaves it empty.
+  /// 只在多仓库聚合时填充：安装或更新规则要去它实际所属的仓库取。
+  /// 它不属于索引文件本身，[fromJson] 刻意留空。
   String repositoryUrl;
 
-  /// Display name of [repositoryUrl]'s repository, captured at aggregation time
-  /// so the UI does not have to re-read settings to render a source badge.
+  /// [repositoryUrl] 对应仓库的显示名，聚合时一并捕获，
+  /// 让界面画来源标签时不必再读设置。
   String repositoryLabel;
 
   PluginHTTPItem({
@@ -49,10 +47,9 @@ class PluginHTTPItem {
     );
   }
 
-  /// Copy of this item tagged with the repository that advertised it.
+  /// 复制一份并打上来源仓库标记。
   ///
-  /// Used during catalog aggregation; the original object is left untouched so
-  /// sharing an item between repositories cannot leak the wrong source.
+  /// 聚合时使用；原对象不动，避免同一规则被多个仓库共享时串了来源。
   PluginHTTPItem withRepository({
     required String url,
     required String label,

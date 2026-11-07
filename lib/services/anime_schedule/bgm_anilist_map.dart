@@ -57,9 +57,6 @@ class BgmAniListMap {
     return last.isBefore(todayStart);
   }
 
-  /// 随精简缓存持久化（首行 ETag + 换行 + JSON）。
-  static String? get etag => _etag;
-
   static Future<Map<String, int>> _load() async {
     final cacheFile = await _cacheFile();
     try {

@@ -148,7 +148,7 @@ abstract class _PlayerDebugController with Store {
   }
 
   Future<void> cancel() async {
-    // Detach fields before awaiting so a new player cannot lose its listeners.
+    // 先把字段摘下来再去 await，否则新播放器会丢监听。
     final logSubscription = playerLogSubscription;
     final widthSubscription = playerWidthSubscription;
     final heightSubscription = playerHeightSubscription;
