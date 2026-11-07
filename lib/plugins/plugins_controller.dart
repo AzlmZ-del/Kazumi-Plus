@@ -702,6 +702,18 @@ abstract class _PluginsController with Store {
     if (local != null && !_remoteIsNewer(local.version, remotePlugin.version)) {
       return (result: PluginUpdateResult.notNewer, plugin: null);
     }
+    // 直连开关合并（用户语义）：
+    // - 用户动过开关 → 本地赢，源参数与缺省都不影响
+    // - 用户没动过 → 跟随源：源写了 directConnection 用源值；
+    //   源没写（缺省）→ 保留本地当前值（本地也没值时保持 false）
+    if (local != null) {
+      if (local.directConnectionUserOverridden) {
+        remotePlugin.directConnection = local.directConnection;
+        remotePlugin.directConnectionUserOverridden = true;
+      } else if (remotePlugin.directConnectionUnspecified) {
+        remotePlugin.directConnection = local.directConnection;
+      }
+    }
     return (result: PluginUpdateResult.updated, plugin: remotePlugin);
   }
 

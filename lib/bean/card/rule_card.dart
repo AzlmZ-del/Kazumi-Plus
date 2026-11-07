@@ -172,33 +172,46 @@ class RuleCard extends StatelessWidget {
                                 ),
                               ),
                             ],
-                            // 后续 chip 沿用同一行高与行距。
-                            for (final tag in stackedTags) ...[
+                            // 直连 chip 与「来源」同行：右列同规格，右对齐；
+                            // 源未声明直连时该行只有来源文字。
+                            // 行前间距与行高均与上两行统一（2/18），保证三枚
+                            // chip 的上下间隔一致。
+                            if ((stackedTags.isNotEmpty ||
+                                    (source != null && source!.isNotEmpty))) ...[
                               const SizedBox(height: 2),
                               SizedBox(
                                 height: 18,
-                                child: Align(
-                                  alignment: Alignment.centerRight,
-                                  child: tag,
-                                ),
-                              ),
-                            ],
-                            if (source != null && source!.isNotEmpty) ...[
-                              const SizedBox(height: 3),
-                              GestureDetector(
-                                onTap: onSourceTap,
-                                child: Text(
-                                  '来源 · $source',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: text.bodySmall?.copyWith(
-                                    color: colors.onSurfaceVariant,
-                                    decoration: onSourceTap == null
-                                        ? null
-                                        : TextDecoration.underline,
-                                    decorationStyle:
-                                        TextDecorationStyle.dotted,
-                                  ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Expanded(
+                                      child: source != null && source!.isNotEmpty
+                                          ? GestureDetector(
+                                              onTap: onSourceTap,
+                                              child: Text(
+                                                '来源 · $source',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: text.bodySmall?.copyWith(
+                                                  color: colors.onSurfaceVariant,
+                                                  decoration: onSourceTap == null
+                                                      ? null
+                                                      : TextDecoration.underline,
+                                                  decorationStyle:
+                                                      TextDecorationStyle.dotted,
+                                                ),
+                                              ),
+                                            )
+                                          : const SizedBox.shrink(),
+                                    ),
+                                    for (final tag in stackedTags) ...[
+                                      const SizedBox(width: 8),
+                                      Align(
+                                        alignment: Alignment.centerRight,
+                                        child: tag,
+                                      ),
+                                    ],
+                                  ],
                                 ),
                               ),
                             ],
