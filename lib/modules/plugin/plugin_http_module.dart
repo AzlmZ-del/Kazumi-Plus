@@ -6,6 +6,9 @@ class PluginHTTPItem {
   int lastUpdate;
   bool antiCrawlerEnabled;
 
+  /// 规则级「直连」声明，来自 index.json 条目（老索引无此键时为 false）。
+  bool directConnection;
+
   /// 规则类型（API / XPath / 混合），由规则文件的 `api` 键在生成索引时翻好。
   ///
   /// 老仓库的 index.json 没有这个字段，[fromJson] 会留空串，界面据此不画标签。
@@ -31,6 +34,7 @@ class PluginHTTPItem {
     required this.lastUpdate,
     this.type = '',
     this.antiCrawlerEnabled = false,
+    this.directConnection = false,
     this.repositoryUrl = '',
     this.repositoryLabel = '',
   });
@@ -48,6 +52,7 @@ class PluginHTTPItem {
       lastUpdate: json['lastUpdate'] ?? 0,
       type: json['type']?.toString() ?? '',
       antiCrawlerEnabled: antiCrawlerEnabled,
+      directConnection: json['directConnection'] ?? false,
     );
   }
 
@@ -67,6 +72,7 @@ class PluginHTTPItem {
       lastUpdate: lastUpdate,
       type: type,
       antiCrawlerEnabled: antiCrawlerEnabled,
+      directConnection: directConnection,
       repositoryUrl: url,
       repositoryLabel: label,
     );

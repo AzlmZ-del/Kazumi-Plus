@@ -35,9 +35,9 @@ class PluginCatalogView extends StatefulWidget {
     super.key,
     required this.controller,
     required Widget Function(BuildContext context, List<Widget> slivers)
-        builder,
-  })  : _scrollViewBuilder = builder,
-        onManageRepositories = null;
+    builder,
+  }) : _scrollViewBuilder = builder,
+       onManageRepositories = null;
 
   final PluginsController controller;
 
@@ -46,7 +46,7 @@ class PluginCatalogView extends StatefulWidget {
   final VoidCallback? onManageRepositories;
 
   final Widget Function(BuildContext context, List<Widget> slivers)?
-      _scrollViewBuilder;
+  _scrollViewBuilder;
 
   bool get _onboarding => _scrollViewBuilder != null;
 
@@ -118,8 +118,9 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
   void _captureRepositoryCounts() {
     final repositories = RulesRepositoryConfig.repositories();
     _repositoryCount = repositories.length;
-    _enabledRepositoryCount =
-        repositories.where((repository) => repository.enabled).length;
+    _enabledRepositoryCount = repositories
+        .where((repository) => repository.enabled)
+        .length;
   }
 
   void _refresh() {
@@ -160,12 +161,17 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
   }
 
   Future<void> _install(
-      PluginHTTPItem item, PluginCatalogItemStatus status) async {
+    PluginHTTPItem item,
+    PluginCatalogItemStatus status,
+  ) async {
     if (!_installing.add(item.name)) return;
     setState(() {});
     try {
-      await updatePluginWithFeedback(_controller, item.name,
-          installing: status == PluginCatalogItemStatus.install);
+      await updatePluginWithFeedback(
+        _controller,
+        item.name,
+        installing: status == PluginCatalogItemStatus.install,
+      );
     } finally {
       if (mounted) setState(() => _installing.remove(item.name));
     }
@@ -189,45 +195,49 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
         items.sort((a, b) => b.lastUpdate.compareTo(a.lastUpdate));
       case _CatalogSort.name:
         items.sort(
-            (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+          (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+        );
     }
     return items;
   }
 
   Widget _sortButton() => KazumiMenuButton(
-        builder: (context, toggle) => TextButton.icon(
-          onPressed: toggle,
-          icon: const Icon(Icons.sort_rounded, size: 20),
-          label: Text(_sort == _CatalogSort.name ? '名称排序' : '最近更新'),
+    builder: (context, toggle) => TextButton.icon(
+      onPressed: toggle,
+      icon: const Icon(Icons.sort_rounded, size: 20),
+      label: Text(_sort == _CatalogSort.name ? '名称排序' : '最近更新'),
+    ),
+    menuChildren: [
+      for (final sort in _CatalogSort.values)
+        KazumiMenuItem(
+          selected: _sort == sort,
+          onPressed: () => setState(() => _sort = sort),
+          label: sort == _CatalogSort.name ? '按名称排序' : '按更新时间排序',
         ),
-        menuChildren: [
-          for (final sort in _CatalogSort.values)
-            KazumiMenuItem(
-              selected: _sort == sort,
-              onPressed: () => setState(() => _sort = sort),
-              label: sort == _CatalogSort.name ? '按名称排序' : '按更新时间排序',
-            ),
-        ],
-      );
+    ],
+  );
 
   Widget _header(int total, int installed, int updates) {
     final theme = Theme.of(context);
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      if (!widget._onboarding) ...[
-        const RulePageIntro(
-          title: '发现更多来源',
-          description: '浏览社区规则，为你的番剧搜索添加更多选择。',
-          icon: Icons.travel_explore_rounded,
-        ),
-        if (widget.onManageRepositories != null) ...[
-          const SizedBox(height: 12),
-          _repositoryEntry(),
-        ],
-        const SizedBox(height: 20),
-        TextField(
-          controller: _search,
-          onChanged: (_) => setState(() {}),
-          decoration: ruleInputDecoration(context,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!widget._onboarding) ...[
+          const RulePageIntro(
+            title: '发现更多来源',
+            description: '浏览社区规则，为你的番剧搜索添加更多选择。',
+            icon: Icons.travel_explore_rounded,
+          ),
+          if (widget.onManageRepositories != null) ...[
+            const SizedBox(height: 12),
+            _repositoryEntry(),
+          ],
+          const SizedBox(height: 20),
+          TextField(
+            controller: _search,
+            onChanged: (_) => setState(() {}),
+            decoration: ruleInputDecoration(
+              context,
               hint: '搜索规则或作者',
               prefix: const Icon(Icons.search_rounded),
               suffix: _search.text.isEmpty
@@ -235,53 +245,65 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
                   : IconButton(
                       tooltip: '清除搜索',
                       onPressed: () => setState(_search.clear),
-                      icon: const Icon(Icons.close_rounded))),
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 4,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            for (final entry in [
-              (_CatalogFilter.all, '全部 $total'),
-              (_CatalogFilter.installed, '已安装 $installed'),
-              (_CatalogFilter.updates, '可更新 $updates'),
-            ])
-              FilterChip(
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              for (final entry in [
+                (_CatalogFilter.all, '全部 $total'),
+                (_CatalogFilter.installed, '已安装 $installed'),
+                (_CatalogFilter.updates, '可更新 $updates'),
+              ])
+                FilterChip(
                   label: Text(entry.$2),
                   selected: _filter == entry.$1,
-                  onSelected: (_) => setState(() => _filter = entry.$1)),
+                  onSelected: (_) => setState(() => _filter = entry.$1),
+                ),
+            ],
+          ),
+        ],
+        Row(
+          children: [
+            if (widget._onboarding)
+              Expanded(
+                child: Text(
+                  '规则仓库 · 已安装 $installed',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              )
+            else ...[
+              _sortButton(),
+              const Spacer(),
+            ],
+            IconButton.filledTonal(
+              tooltip: '刷新规则列表',
+              onPressed: _loading ? null : _refresh,
+              icon: const Icon(Icons.refresh_rounded),
+            ),
           ],
         ),
-      ],
-      Row(children: [
-        if (widget._onboarding)
-          Expanded(
-            child: Text('规则仓库 · 已安装 $installed',
-                style: theme.textTheme.titleSmall?.copyWith(
-                    color: theme.colorScheme.primary,
-                    fontWeight: FontWeight.w600)),
-          )
-        else ...[
-          _sortButton(),
-          const Spacer(),
-        ],
-        IconButton.filledTonal(
-            tooltip: '刷新规则列表',
-            onPressed: _loading ? null : _refresh,
-            icon: const Icon(Icons.refresh_rounded)),
-      ]),
-      if (_loading && total > 0)
-        const Padding(
+        if (_loading && total > 0)
+          const Padding(
             padding: EdgeInsets.symmetric(vertical: 8),
-            child: LinearProgressIndicator()),
-      if (_loadFailed && total > 0)
-        Padding(
+            child: LinearProgressIndicator(),
+          ),
+        if (_loadFailed && total > 0)
+          Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text('刷新失败，正在显示上次获取的规则。', style: theme.textTheme.bodySmall)),
-      const SizedBox(height: 8),
-    ]);
+            child: Text('刷新失败，正在显示上次获取的规则。', style: theme.textTheme.bodySmall),
+          ),
+        const SizedBox(height: 8),
+      ],
+    );
   }
 
   /// Compact entry point into the repository management page.
@@ -302,25 +324,33 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
         onTap: widget.onManageRepositories,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(children: [
-            Icon(Icons.lan_rounded, size: 20, color: colors.onSurfaceVariant),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(summary,
-                      style: theme.textTheme.bodyMedium
-                          ?.copyWith(fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 2),
-                  Text('加速只作用于内置仓库，第三方仓库不受影响',
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: colors.onSurfaceVariant)),
-                ],
+          child: Row(
+            children: [
+              Icon(Icons.lan_rounded, size: 20, color: colors.onSurfaceVariant),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      summary,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '加速只作用于内置仓库，第三方仓库不受影响',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Icon(Icons.chevron_right_rounded, color: colors.onSurfaceVariant),
-          ]),
+              Icon(Icons.chevron_right_rounded, color: colors.onSurfaceVariant),
+            ],
+          ),
         ),
       ),
     );
@@ -353,25 +383,34 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
         clipBehavior: Clip.antiAlias,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-          child: Row(children: [
-            Icon(Icons.cloud_off_rounded,
-                size: 20, color: colors.onTertiaryContainer),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                '${labels.join('、')} 无法访问，正在显示其他仓库的规则。',
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: colors.onTertiaryContainer),
+          child: Row(
+            children: [
+              Icon(
+                Icons.cloud_off_rounded,
+                size: 20,
+                color: colors.onTertiaryContainer,
               ),
-            ),
-            IconButton(
-              tooltip: '忽略',
-              visualDensity: VisualDensity.compact,
-              onPressed: () => setState(() => _dismissedFailures = signature),
-              icon: Icon(Icons.close_rounded,
-                  size: 18, color: colors.onTertiaryContainer),
-            ),
-          ]),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '${labels.join('、')} 无法访问，正在显示其他仓库的规则。',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colors.onTertiaryContainer,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: '忽略',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => setState(() => _dismissedFailures = signature),
+                icon: Icon(
+                  Icons.close_rounded,
+                  size: 18,
+                  color: colors.onTertiaryContainer,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -413,35 +452,42 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('同名规则在多个仓库中存在，按仓库顺序使用第一个。',
-                  style: theme.textTheme.bodySmall),
+              Text(
+                '同名规则在多个仓库中存在，按仓库顺序使用第一个。',
+                style: theme.textTheme.bodySmall,
+              ),
               const SizedBox(height: 12),
               for (final source in [item, ...shadowed])
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(children: [
-                    Icon(
-                      source == item
-                          ? Icons.check_circle_rounded
-                          : Icons.remove_circle_outline_rounded,
-                      size: 18,
-                      color: source == item
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _repositoryName(source),
-                        style: theme.textTheme.bodyMedium,
-                        overflow: TextOverflow.ellipsis,
+                  child: Row(
+                    children: [
+                      Icon(
+                        source == item
+                            ? Icons.check_circle_rounded
+                            : Icons.remove_circle_outline_rounded,
+                        size: 18,
+                        color: source == item
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurfaceVariant,
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(source.version,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _repositoryName(source),
+                          style: theme.textTheme.bodyMedium,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        source.version,
                         style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant)),
-                  ]),
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
             ],
           ),
@@ -459,8 +505,9 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
   Widget _emptyBody() {
     if (_loading) {
       return const Padding(
-          padding: EdgeInsets.all(48),
-          child: Center(child: LoadingIndicator()));
+        padding: EdgeInsets.all(48),
+        child: Center(child: LoadingIndicator()),
+      );
     }
     final manageButton = widget.onManageRepositories == null
         ? null
@@ -491,7 +538,8 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
       if (failures.isNotEmpty) {
         return GeneralErrorWidget(
           title: '无法访问任何规则仓库',
-          errMsg: '${failures.map((f) => f.repositoryLabel).join('、')} 均无法访问，'
+          errMsg:
+              '${failures.map((f) => f.repositoryLabel).join('、')} 均无法访问，'
               '请检查网络连接或仓库地址。',
           icon: Icons.cloud_off_rounded,
           onRetry: _refresh,
@@ -509,7 +557,8 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
       }
       return GeneralErrorWidget(
         title: '无法访问规则仓库',
-        errMsg: '请检查网络连接，或切换规则仓库加速后重试。'
+        errMsg:
+            '请检查网络连接，或切换规则仓库加速后重试。'
             '（当前：${RulesMirror.current.label}）',
         icon: Icons.cloud_off_rounded,
         onRetry: _refresh,
@@ -534,31 +583,38 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
   }
 
   @override
-  Widget build(BuildContext context) => Observer(builder: (context) {
-        final catalog = _controller.pluginHTTPList.toList();
-        final installed = catalog
-            .where((p) =>
-                _controller.pluginStatus(p) != PluginCatalogItemStatus.install)
-            .length;
-        final updates = catalog
-            .where((p) =>
-                _controller.pluginStatus(p) == PluginCatalogItemStatus.update)
-            .length;
-        final items = _visibleItems();
-        final slivers = <Widget>[
-          SliverPadding(
-            padding: widget._onboarding
-                ? EdgeInsets.zero
-                : const EdgeInsets.fromLTRB(16, 12, 16, 24),
-            sliver: SliverMainAxisGroup(slivers: [
+  Widget build(BuildContext context) => Observer(
+    builder: (context) {
+      final catalog = _controller.pluginHTTPList.toList();
+      final installed = catalog
+          .where(
+            (p) =>
+                _controller.pluginStatus(p) != PluginCatalogItemStatus.install,
+          )
+          .length;
+      final updates = catalog
+          .where(
+            (p) =>
+                _controller.pluginStatus(p) == PluginCatalogItemStatus.update,
+          )
+          .length;
+      final items = _visibleItems();
+      final slivers = <Widget>[
+        SliverPadding(
+          padding: widget._onboarding
+              ? EdgeInsets.zero
+              : const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          sliver: SliverMainAxisGroup(
+            slivers: [
               SliverToBoxAdapter(
-                  child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _header(catalog.length, installed, updates),
-                  ?_failureBanner(),
-                ],
-              )),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _header(catalog.length, installed, updates),
+                    ?_failureBanner(),
+                  ],
+                ),
+              ),
               if (items.isEmpty)
                 SliverToBoxAdapter(child: _emptyBody())
               else
@@ -573,65 +629,89 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
                     // and the line simply stays hidden until then.
                     return FutureBuilder<String?>(
                       future: _controller.ruleBaseUrl(item),
-                      builder: (context, snapshot) => RuleCard(
-                      key: ValueKey(item.name),
-                      title: item.name,
-                      titleTag: RuleTag(
-                          label: item.version,
-                          width: 44,
-                          height: 16,
-                          radius: 6,
-                          fontSize: 10,
-                          // 版本号固定绿色，不跟主题走：它是「版本」这个身份的
-                          // 固定记号，换了主题也该一眼认出来。
-                          background: const Color(0xFFCDEFD4),
-                          foreground: const Color(0xFF1B5E33)),
-                      // 源类型跟作者同一行：它描述规则的实现方式，
-                      // 不是身份信息，不该挤在名称旁边。
-                      subtitleTag: item.type.isEmpty
-                          ? null
-                          : RuleTag(
-                              label: item.type,
-                              width: 44,
-                              // 16 = bodySmall 的行高，再高就会把作者行撑开。
-                              height: 16,
-                              radius: 6,
-                              fontSize: 10,
-                              // 源类型固定蓝色，同样不跟主题走。
-                              background: const Color(0xFFCFE3FA),
-                              foreground: const Color(0xFF14406B)),
-                      installed: status == PluginCatalogItemStatus.installed,
-                      subtitle:
-                          item.author.isEmpty ? null : '作者 · ${item.author}',
-                      source: item.repositoryUrl.isEmpty
-                          ? null
-                          : _sourceLabel(item),
-                      onSourceTap:
-                          _controller.shadowedRulesFor(item.name).isEmpty
+                      builder: (context, snapshot) {
+                        final colors = Theme.of(context).colorScheme;
+                        return RuleCard(
+                          key: ValueKey(item.name),
+                          title: item.name,
+                          titleTag: RuleTag(
+                            label: item.version,
+                            width: 44,
+                            height: 16,
+                            radius: 6,
+                            fontSize: 10,
+                            // 版本号固定绿色，不跟主题走：它是「版本」这个身份的
+                            // 固定记号，换了主题也该一眼认出来。
+                            background: const Color(0xFFCDEFD4),
+                            foreground: const Color(0xFF1B5E33),
+                          ),
+                          // 源类型跟作者同一行：它描述规则的实现方式，
+                          // 不是身份信息，不该挤在名称旁边。
+                          subtitleTag: item.type.isEmpty
+                              ? null
+                              : RuleTag(
+                                  label: item.type,
+                                  width: 44,
+                                  // 16 = bodySmall 的行高，再高就会把作者行撑开。
+                                  height: 16,
+                                  radius: 6,
+                                  fontSize: 10,
+                                  // 源类型固定蓝色，同样不跟主题走。
+                                  background: const Color(0xFFCFE3FA),
+                                  foreground: const Color(0xFF14406B),
+                                ),
+                          // 与【我的规则】卡同款：直连声明堆在右列第三枚，
+                          // 配色同样用 tertiaryContainer 动态主题色。
+                          stackedTags: item.directConnection
+                              ? [
+                                  RuleTag(
+                                    label: '直连',
+                                    width: 44,
+                                    height: 16,
+                                    radius: 6,
+                                    fontSize: 10,
+                                    background: colors.tertiaryContainer,
+                                    foreground: colors.onTertiaryContainer,
+                                  ),
+                                ]
+                              : const [],
+                          installed:
+                              status == PluginCatalogItemStatus.installed,
+                          subtitle: item.author.isEmpty
+                              ? null
+                              : '作者 · ${item.author}',
+                          source: item.repositoryUrl.isEmpty
+                              ? null
+                              : _sourceLabel(item),
+                          onSourceTap:
+                              _controller.shadowedRulesFor(item.name).isEmpty
                               ? null
                               : () => _showShadowedSources(item),
-                      webUrl: snapshot.data,
-                      caption: item.lastUpdate > 0
-                          ? '更新 · ${formatDateTimeWithSeconds(DateTime.fromMillisecondsSinceEpoch(item.lastUpdate))}'
-                          : null,
-                        trailing: _CatalogRuleAction(
-                          status: status,
-                          busy: busy,
-                          onPressed: () => _install(item, status),
-                        ),
-                      ),
+                          webUrl: snapshot.data,
+                          caption: item.lastUpdate > 0
+                              ? '更新 · ${formatDateTimeWithSeconds(DateTime.fromMillisecondsSinceEpoch(item.lastUpdate))}'
+                              : null,
+                          trailing: _CatalogRuleAction(
+                            status: status,
+                            busy: busy,
+                            onPressed: () => _install(item, status),
+                          ),
+                        );
+                      },
                     );
                   },
                 ),
-            ]),
+            ],
           ),
-        ];
-        return widget._scrollViewBuilder?.call(context, slivers) ??
-            CustomScrollView(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              slivers: slivers,
-            );
-      });
+        ),
+      ];
+      return widget._scrollViewBuilder?.call(context, slivers) ??
+          CustomScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            slivers: slivers,
+          );
+    },
+  );
 }
 
 class _CatalogRuleAction extends StatelessWidget {
@@ -651,15 +731,19 @@ class _CatalogRuleAction extends StatelessWidget {
     if (!busy && status == PluginCatalogItemStatus.installed) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.check_rounded, size: 18, color: colors.onSurfaceVariant),
-          const SizedBox(width: 6),
-          Text('已安装',
-              style: Theme.of(context)
-                  .textTheme
-                  .labelLarge
-                  ?.copyWith(color: colors.onSurfaceVariant)),
-        ]),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.check_rounded, size: 18, color: colors.onSurfaceVariant),
+            const SizedBox(width: 6),
+            Text(
+              '已安装',
+              style: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(color: colors.onSurfaceVariant),
+            ),
+          ],
+        ),
       );
     }
     final installing = status == PluginCatalogItemStatus.install;
@@ -669,14 +753,17 @@ class _CatalogRuleAction extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16),
       ),
       onPressed: busy ? null : onPressed,
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        if (busy)
-          const LoadingIndicator(size: 20)
-        else
-          Icon(installing ? Icons.add_rounded : Icons.sync_rounded, size: 18),
-        const SizedBox(width: 6),
-        Text(installing ? (busy ? '安装中' : '安装') : (busy ? '更新中' : '更新')),
-      ]),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (busy)
+            const LoadingIndicator(size: 20)
+          else
+            Icon(installing ? Icons.add_rounded : Icons.sync_rounded, size: 18),
+          const SizedBox(width: 6),
+          Text(installing ? (busy ? '安装中' : '安装') : (busy ? '更新中' : '更新')),
+        ],
+      ),
     );
   }
 }
