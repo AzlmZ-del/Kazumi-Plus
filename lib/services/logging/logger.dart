@@ -117,9 +117,15 @@ class KazumiLogOutput extends LogOutput {
       print(line);
     }
 
-    // Write to file if: warning/error/fatal OR forceLog is enabled
+    // Write to file if: warning/error/fatal OR forceLog is enabled OR
+    // Player decision lines (直连/代理决策链需要永久可查，且它们多在
+    // forceLog Zone 之外产生，靠 Zone 标记圈不到).
     final forceLog = Zone.current[_forceLogKey] as bool? ?? false;
-    if (event.level.index >= Level.warning.index || forceLog) {
+    final isPlayerDecision = event.lines.any((line) =>
+        line.contains('Player:') && !line.contains('MPV: PlayerLog'));
+    if (event.level.index >= Level.warning.index ||
+        forceLog ||
+        isPlayerDecision) {
       _writeToFile(event);
     }
   }
