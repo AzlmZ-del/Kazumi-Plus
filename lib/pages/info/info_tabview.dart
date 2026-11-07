@@ -487,7 +487,7 @@ class _InfoTabViewState extends State<InfoTabView> {
       controller: widget.tabController,
       children: [
         Builder(
-          // Resolve the overlap handle inside the NestedScrollView.
+          // 在 NestedScrollView 内部解析重叠滚动的手柄，否则拿不到正确的控制器。
           builder: (BuildContext context) {
             return CustomScrollView(
               scrollBehavior: const ScrollBehavior().copyWith(

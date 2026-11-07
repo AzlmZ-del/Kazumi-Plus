@@ -69,9 +69,9 @@ abstract class _VideoPageController with Store implements Disposable {
   @observable
   var episodeCommentsList = ObservableList<EpisodeCommentItem>();
 
-  // Resolution state machine: [_beginEpisodeSwitch] enters the loading state;
-  // [_finishLoading] and [_failLoading] are the only terminal transitions.
-  // [_errorMessage] is non-null only in the failed state.
+  // 解析状态机：[_beginEpisodeSwitch] 进入加载态；
+  // 只有 [_finishLoading] 与 [_failLoading] 是终态迁移。
+  // [_errorMessage] 仅在失败态下非 null。
   @readonly
   bool _loading = true;
 
@@ -108,9 +108,8 @@ abstract class _VideoPageController with Store implements Disposable {
   @observable
   bool isCommentsAscending = false;
 
-  // Playback, automatic danmaku loading, and comment loading have separate
-  // owners. Manual danmaku selection can cancel auto danmaku without touching
-  // playback; comment refreshes never cancel playback.
+  // 播放、自动弹幕加载、讨论加载各自有独立的持有方。
+  // 手动选弹幕可以取消自动弹幕而不影响播放；刷新讨论也永远不会取消播放。
   final AsyncSessionOwner _playbackSessions = AsyncSessionOwner();
   final AsyncSessionOwner _danmakuSessions = AsyncSessionOwner();
   final AsyncSessionOwner _commentSessions = AsyncSessionOwner();
@@ -132,7 +131,7 @@ abstract class _VideoPageController with Store implements Disposable {
   final Map<int, int> _offlineDisplayRoadToOriginalRoad = {};
   final Map<int, int> _offlineOriginalRoadToDisplayRoad = {};
 
-  /// Title reported by the video source; may differ from [bangumiItem]'s.
+  /// 视频源上报的标题，可能与 [bangumiItem] 里的标题不同。
   String title = '';
 
   String src = '';
@@ -157,7 +156,7 @@ abstract class _VideoPageController with Store implements Disposable {
 
   StreamSubscription<String>? _logSubscription;
 
-  /// Applies the route arguments exactly once, from [VideoPage.initState].
+  /// 只在 [VideoPage.initState] 里应用一次路由参数。
   @action
   void applyPlaybackArgs(VideoPlaybackArgs args) {
     episodePinned = false;
@@ -401,16 +400,15 @@ abstract class _VideoPageController with Store implements Disposable {
     return resolvedEpisode?.danmakuEpisodeNumber ?? selection.episode;
   }
 
-  /// Resets pre-switch state as a single transaction so observers see one
-  /// notification instead of one per field.
+  /// 把切换前的状态重置成一次事务，让观察者只收到一条通知，
+  /// 而不是每个字段各发一条。
   @action
   void _beginEpisodeSwitch(VideoEpisodeSelection selection) {
     final targetCommentsEpisode = commentEpisodeForSelection(selection);
     selectedEpisode = selection;
     playingEpisode = null;
-    // The comments sheet only re-queries when [commentsEpisode] changes, so
-    // resetting comment state here without changing it would blank the sheet
-    // permanently.
+    // 讨论面板只在 [commentsEpisode] 变化时才重新查询，
+    // 所以这里若只重置状态而不改它，面板会永久空白。
     if (targetCommentsEpisode != commentsEpisode) {
       commentsEpisode = targetCommentsEpisode;
       _resetEpisodeComments();
@@ -508,10 +506,10 @@ abstract class _VideoPageController with Store implements Disposable {
     );
   }
 
-  /// Resolves the media URL through the rule's play API instead of a webview.
+  /// 通过规则的播放接口取媒体地址，而不是走 webview。
   ///
-  /// Used by rules whose media URL is handed out by an authenticated endpoint;
-  /// such a page never becomes playable inside a webview.
+  /// 用于那些媒体地址由带鉴权接口下发的规则；
+  /// 这类页面在 webview 里永远播不起来。
   Future<void> _resolveWithPlayApi(
     String url,
     int offset, {
@@ -844,7 +842,7 @@ abstract class _VideoPageController with Store implements Disposable {
     );
   }
 
-  /// Called by Modular when the '/video' route scope is disposed.
+  /// 由 Modular 在 '/video' 路由作用域销毁时调用。
   @override
   void dispose() {
     unawaited(fullscreen.close());
@@ -937,10 +935,9 @@ class EpisodeRef {
   final String displayTitle;
   final String pageUrl;
 
-  /// Episode sort number.
-  /// - Online: parsed from [displayTitle] via [extractEpisodeNumber];
-  ///   null when unparsable.
-  /// - Offline: always the download record's episodeNumber.
+  /// 剧集排序用的集号。
+  /// - 在线：由 [extractEpisodeNumber] 从 [displayTitle] 解析，解析不出为 null。
+  /// - 离线：恒为下载记录里的 episodeNumber。
   final int? sortNumber;
   final int historyEpisodeNumber;
   final int danmakuEpisodeNumber;

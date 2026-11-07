@@ -51,7 +51,7 @@ class _CollectLibraryViewState extends State<CollectLibraryView>
   final _searchController = TextEditingController();
   final _searchFocus = FocusNode();
   final _libraryFocus = FocusNode();
-  // Keep tab animations alive when the category scroll view is replaced.
+  // 分类滚动视图被替换时，保住 tab 动画的状态。
   final _categoriesKey = GlobalKey();
   late TabController _tabController;
   bool? _disableAnimations;
@@ -63,8 +63,8 @@ class _CollectLibraryViewState extends State<CollectLibraryView>
   String _query = '';
   bool _searchExpanded = false;
 
-  // The tapped tab while a tap animates, otherwise the dominant page so swipes
-  // update mid-gesture. Tab switches rebuild nothing but its listeners.
+  // 点击动画期间是「被点中的那个 tab」，其余时候是「主导页」，
+  // 这样侧滑过程中也能实时更新。切换 tab 只通知监听者，不触发重建。
   final _selectedType = ValueNotifier<CollectType?>(CollectType.watching);
 
   @override
@@ -121,7 +121,7 @@ class _CollectLibraryViewState extends State<CollectLibraryView>
   }
 
   void _resetResults() {
-    // Reset saved offsets for unmounted categories too.
+    // 连未挂载的分类的滚动位置也一起重置。
     _resultsStorage = PageStorageBucket();
     for (final controller in _scrollControllers.values) {
       if (controller.hasClients) controller.jumpTo(0);

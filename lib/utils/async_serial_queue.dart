@@ -1,6 +1,6 @@
 import 'dart:async';
 
-/// Runs asynchronous operations one at a time in submission order.
+/// 按提交顺序逐个执行异步操作，同一时刻只跑一个。
 class AsyncSerialQueue {
   Future<void> _tail = Future.value();
 

@@ -85,7 +85,7 @@ class SysAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Size get preferredSize {
-    // Reserve space for native macOS window controls.
+    // 22 是 macOS 红绿灯控件区高度，与 EmbeddedNativeControlArea 的 top 内边距对齐。
     final topOffset =
         Platform.isMacOS &&
             needTopOffset &&

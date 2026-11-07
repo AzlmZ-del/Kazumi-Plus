@@ -1,6 +1,6 @@
 import 'package:kazumi/utils/async_serial_queue.dart';
 
-/// Serializes mutations to the history Hive box across repositories and sync.
+/// 把各数据层与同步对历史 Hive box 的写操作串行化。
 class HistoryStorageCoordinator {
   HistoryStorageCoordinator._();
 

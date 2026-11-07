@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:kazumi/modules/danmaku/danmaku_shield_rule.dart';
 
-/// A rule keeps its deletion so an offline device cannot resurrect it.
+/// 删除用墓碑记录保留，避免离线设备把已删规则又同步回来。
 class DanmakuShieldSyncEntry {
   const DanmakuShieldSyncEntry({
     required this.rule,
@@ -16,6 +16,8 @@ class DanmakuShieldSyncEntry {
   final String deviceId;
   final bool deleted;
 
+  // 三级比较：时间 → 设备 ID → 删除标记。后两级只为在多端同时改动时
+  // 给出确定的全序，让合并结果与到达顺序无关（幂等），不代表业务优先级。
   int _compareTo(DanmakuShieldSyncEntry other) {
     final timeOrder = updatedAt.compareTo(other.updatedAt);
     if (timeOrder != 0) return timeOrder;

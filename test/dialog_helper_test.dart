@@ -2,17 +2,35 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
+import 'package:kazumi/bean/dialog/kazumi_toast_host.dart';
 import 'package:kazumi/navigation.dart';
 import 'package:kazumi/services/player/timed_shutdown_service.dart';
 
-Future<void> mountApp(WidgetTester tester) async {
-  await tester.pumpWidget(MaterialApp(
+/// toast 走 FToast 的 Overlay 通道，必须像 MaterialApp.builder 那样包一层
+/// FToastBuilder，并挂上 KazumiToastHost 作为锚点，否则 showKazumiToast
+/// 找不到 Overlay 会直接返回。
+Widget _withToastHost(Widget home) {
+  return MaterialApp(
     navigatorKey: rootNavigatorKey,
     scaffoldMessengerKey: rootScaffoldMessengerKey,
     navigatorObservers: [KazumiDialog.observer],
-    home: const Scaffold(body: Text('home')),
-  ));
+    builder: (context, child) => FToastBuilder()(
+      context,
+      KazumiToastHost(
+        key: toastAnchorKey,
+        child: child ?? const SizedBox.shrink(),
+      ),
+    ),
+    home: home,
+  );
+}
+
+Future<void> mountApp(WidgetTester tester) async {
+  await tester.pumpWidget(
+    _withToastHost(const Scaffold(body: Text('home'))),
+  );
   await tester.pumpAndSettle();
 }
 
@@ -23,12 +41,25 @@ Future<void> pushPage(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// FToast 自带自动消失定时器，测试结束前推进到它触发，避免 pending timer 报错。
+Future<void> _drainToastTimers(WidgetTester tester) async {
+  await tester.pump(const Duration(seconds: 3));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('observer navigation and scoped toasts work without global keys',
       (tester) async {
     late BuildContext pageContext;
     await tester.pumpWidget(MaterialApp(
       navigatorObservers: [KazumiDialog.observer],
+      builder: (context, child) => FToastBuilder()(
+        context,
+        KazumiToastHost(
+          key: toastAnchorKey,
+          child: child ?? const SizedBox.shrink(),
+        ),
+      ),
       home: Builder(builder: (context) {
         pageContext = context;
         return const Scaffold(body: Text('home'));
@@ -46,6 +77,7 @@ void main() {
     KazumiDialog.showToast(context: pageContext, message: 'scoped result');
     await tester.pumpAndSettle();
     expect(find.text('scoped result'), findsOneWidget);
+    await _drainToastTimers(tester);
   });
 
   testWidgets('dismiss removes the tracked dialog beneath a newer page',
@@ -194,6 +226,7 @@ void main() {
     await tester.pumpAndSettle();
     await dialog;
     expect(find.text('rule copied'), findsOneWidget);
+    await _drainToastTimers(tester);
   });
 
   testWidgets('page pop clears its old toast', (tester) async {
@@ -216,6 +249,7 @@ void main() {
     KazumiDialog.showToast(message: 'new result');
     await tester.pumpAndSettle();
     expect(find.text('new result'), findsOneWidget);
+    await _drainToastTimers(tester);
   });
 
   testWidgets('an action can replace its toast with progress feedback',
@@ -231,6 +265,7 @@ void main() {
     await tester.tap(find.text('update all'));
     await tester.pumpAndSettle();
     expect(find.text('updating'), findsOneWidget);
+    await _drainToastTimers(tester);
   });
 
   testWidgets('cancelling a timer only closes its own expiry dialog',

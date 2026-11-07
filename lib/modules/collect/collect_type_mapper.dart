@@ -1,9 +1,7 @@
 import 'package:kazumi/modules/bangumi/bangumi_collection_type.dart';
 import 'package:kazumi/modules/collect/collect_type.dart';
 
-/// Converting [BangumiCollectionType] to local [CollectType].
 extension BangumiCollectionTypeMapper on BangumiCollectionType {
-  /// Converts this Bangumi collection type to the equivalent local type.
   CollectType toCollectType() {
     return switch (this) {
       BangumiCollectionType.planToWatch => CollectType.planToWatch,
@@ -16,9 +14,7 @@ extension BangumiCollectionTypeMapper on BangumiCollectionType {
   }
 }
 
-/// Converting [CollectType] to [BangumiCollectionType].
 extension CollectTypeBangumiMapper on CollectType {
-  /// Converts this local collection type to the equivalent Bangumi type.
   BangumiCollectionType? toBangumiCollectionType() {
     return switch (this) {
       CollectType.planToWatch => BangumiCollectionType.planToWatch,
@@ -26,6 +22,9 @@ extension CollectTypeBangumiMapper on CollectType {
       CollectType.watching => BangumiCollectionType.watching,
       CollectType.onHold => BangumiCollectionType.onHold,
       CollectType.abandoned => BangumiCollectionType.abandoned,
+      // 返回 null 表示「不上传」：调用方 updateBangumiByType /
+      // updateBangumiCollection 见到 null 就直接 return false，
+      // 不用 unknown，因为那是 API 的读取值而非可写入值。
       CollectType.none => null,
     };
   }

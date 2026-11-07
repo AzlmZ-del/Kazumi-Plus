@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 final rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
-/// Lets [RouteAware] pages learn they were covered or revealed again.
+/// 让 [RouteAware] 页面感知自己被盖住或重新露出。
 ///
-/// Restricted to [PageRoute] on purpose: dialogs and bottom sheets are
-/// PopupRoutes, and sitting under one does not make a page hidden.
+/// 刻意限定 [PageRoute]：对话框与底部弹层都是 PopupRoute，
+/// 页面被它们盖住并不算「隐藏」。
 final rootRouteObserver = RouteObserver<PageRoute<void>>();
 
 final _closedByExternalNavigation = <Route<Object?>>{};
@@ -18,6 +18,8 @@ void closeOnExternalNavigation(Route<Object?> route) {
   _closedByExternalNavigation.add(route);
 }
 
+/// 清除标记。路由销毁后要调一次，否则这个全局 Set 会一直持有已失效的
+/// Route 对象，越积越多。
 void clearExternalNavigationMark(Route<Object?> route) {
   _closedByExternalNavigation.remove(route);
 }

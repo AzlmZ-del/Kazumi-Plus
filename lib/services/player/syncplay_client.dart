@@ -1,4 +1,4 @@
-// https://syncplay.pl/about/protocol/
+// 协议说明见 https://syncplay.pl/about/protocol/
 
 import 'dart:async';
 import 'dart:convert';
@@ -64,11 +64,11 @@ class StateMessage extends SyncplayMessage {
   final bool? doSeek;
   final String? setBy;
 
-  // Syncplay control message.
+  // Syncplay 控制消息。
   final int? clientAck;
   final int? serverAck;
 
-  // latency calculation
+  // 延迟计算相关字段。
   double clientLatencyCalculation;
   double? latencyCalculation;
   final double clientRtt;
@@ -194,9 +194,8 @@ class _TLSMessage extends SyncplayMessage {
       };
 }
 
-/// Single-use connection to a Syncplay server: [connect] may be called once,
-/// and [disconnect] permanently closes the client. Callers create a new
-/// instance for every connection attempt.
+/// 到 Syncplay 服务器的一次性连接：[connect] 只能调用一次，
+/// [disconnect] 会永久关闭该客户端。每次连接都要新建一个实例。
 class SyncplayClient {
   final String _host;
   final int _port;
@@ -204,7 +203,7 @@ class SyncplayClient {
   bool _closed = false;
   bool _isTLS = false;
   RawSocket? _socket;
-  // Retained across STARTTLS so a stalled RawSecureSocket can be force-closed.
+  // 跨 STARTTLS 保留，以便 RawSecureSocket 卡住时能强制关闭。
   RawSocket? _transportSocket;
   StreamSubscription<RawSocketEvent>? _socketSubscription;
   Completer<void>? _tlsHandshakeCompleter;
@@ -228,13 +227,13 @@ class SyncplayClient {
       StreamController.broadcast();
   double? _lastLatencyCalculation;
 
-  // Network status
+  // 网络状态。
   double _clientRtt = 0.0;
   double _serverRtt = 0.0;
   double _avrRtt = 0.0;
   double _fd = 0.0;
 
-  // IgnoringOnTheFly
+  // 服务端是否忽略即时调整（IgnoringOnTheFly）。
   int _clientIgnoringOnTheFly = 0;
   int _serverIgnoringOnTheFly = 0;
 
@@ -272,7 +271,7 @@ class SyncplayClient {
       : _host = host,
         _port = port;
 
-  /// Opens the connection using the TLS policy selected by the caller.
+  /// 按调用方选定的 TLS 策略建立连接。
   Future<void> connect({required bool enableTLS}) async {
     if (_closed) {
       throw StateError('SyncplayClient cannot connect after disconnect');
@@ -456,8 +455,8 @@ class SyncplayClient {
       await subscription?.cancel();
     } catch (_) {}
 
-    // RawSecureSocket.close() can wait for buffered TLS writes indefinitely.
-    // Closing its retained transport is the force-close path in that case.
+    // RawSecureSocket.close() 可能一直等缓冲里的 TLS 写入完成而卡死。
+    // 这种情况下关掉它保留的底层传输，才是强制关闭的正确路径。
     if (transportSocket != null) {
       await _forceCloseSocket(transportSocket);
     }
@@ -924,24 +923,24 @@ class SyncplayClient {
   void _updateClientRttAndFd(double? timestamp, double senderRtt) {
     if (timestamp == null) return;
 
-    // Calculate RTT: current time minus the passed timestamp
+    // 算 RTT：当前时间减去传进来的时间戳。
     double newClientRtt =
         DateTime.now().millisecondsSinceEpoch / 1000.0 - timestamp;
 
-    // If the new RTT is less than 0, it means the server is not responding
+    // 新 RTT 小于 0 说明服务端没有响应。
     if (newClientRtt < 0 || senderRtt < 0) return;
     _clientRtt = newClientRtt;
 
-    // If it's the first time calculating, initialize the average RTT
+    // 第一次计算时，先用它初始化平均 RTT。
     if (_avrRtt == 0) {
       _avrRtt = _clientRtt;
     }
 
-    // Use moving average to update RTT, smooth the delay data
+    // 用滑动平均更新 RTT，把延迟数据抹平。
     _avrRtt = _avrRtt * _pingMovingAverageWeight +
         _clientRtt * (1 - _pingMovingAverageWeight);
 
-    // Calculate the forward delay based on the sender's RTT
+    // 按发送方的 RTT 推算正向延迟。
     if (senderRtt < _clientRtt) {
       _fd = _avrRtt / 2 + (_clientRtt - senderRtt);
     } else {

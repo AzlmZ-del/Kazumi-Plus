@@ -61,7 +61,7 @@ class ApiEndpoints {
   /// Bangumi 官网
   static const String bangumiIndex = 'https://bangumi.tv/';
 
-  /// bangumi API
+  /// Bangumi API 地址。
   static const String bangumiAPIDomain = 'https://api.bgm.tv';
 
   /// Bangumi 鉴权 API
@@ -69,9 +69,6 @@ class ApiEndpoints {
 
   /// Telegram 群组
   static const String telegramGroup = 'https://t.me/kazumi_app';
-
-  /// 番剧信息
-  static const String bangumiInfoByID = '/v0/subjects/{0}';
 
   /// 条目关联信息
   static const String bangumiRelationsByID = '/v0/subjects/{0}/subjects';
@@ -99,7 +96,7 @@ class ApiEndpoints {
   static const String bangumiGetAllCollections =
       '/v0/users/{0}/collections?subject_type=2&limit={1}&offset={2}';
 
-  /// Bangumi Next API Domain
+  /// Bangumi Next API 域名。
   static const String bangumiAPINextDomain = 'https://next.bgm.tv';
 
   static const bangumiPublicApiHosts = {'api.bgm.tv', 'next.bgm.tv'};
@@ -137,7 +134,7 @@ class ApiEndpoints {
   static const String bangumiCharacterCommentsByIDNext =
       '/p1/characters/{0}/comments';
 
-  /// DanDanPlay API Domain
+  /// DanDanPlay API 域名。
   static const String dandanAPIDomain = 'https://api.dandanplay.net';
 
   /// 获取弹幕

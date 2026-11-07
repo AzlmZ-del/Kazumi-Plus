@@ -30,7 +30,7 @@ class _LoadingIndicatorState extends State<LoadingIndicator>
     MaterialShapes.oval,
     MaterialShapes.cookie7Sided,
   ];
-  // Share expensive morph matching across indicator instances.
+  // 形态插值开销大，做成静态共享，各实例不再各算一份。
   static final _morphs = List.generate(
     _shapes.length,
     (index) => Morph(_shapes[index], _shapes[(index + 1) % _shapes.length]),
@@ -96,7 +96,7 @@ class _LoadingShapePainter extends CustomPainter {
     final index = position.floor() % morphs.length;
     final progress = Curves.easeInOutCubicEmphasized.transform(position % 1);
     final path = morphs[index].toPath(progress: progress, path: _path);
-    // Fit the diagonal so rotation stays inside small indicator slots.
+    // 按对角线缩放，旋转时图形才不会超出小尺寸占位框。
     final scale = size.shortestSide / math.sqrt2;
     canvas.save();
     canvas.translate(size.width / 2, size.height / 2);

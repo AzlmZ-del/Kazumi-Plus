@@ -102,9 +102,9 @@ class _PlayerItemPanelState extends State<PlayerItemPanel> {
   final FocusNode textFieldFocus = FocusNode();
   int? _danmakuPauseTick;
 
-  /// Whether this editor currently owns a pause. The sleep timer bumps
-  /// [TimedShutdownService.expiryTicks] when it actually expires, which revokes
-  /// the ownership even if the panel was rebuilt in between.
+  /// 本编辑器当前是否持有一个暂停。定时关闭真正到期时会推高
+  /// [TimedShutdownService.expiryTicks]，即使面板中途重建过，
+  /// 那个暂停也会因此失效。
   bool get _pausedByDanmakuEdit =>
       _danmakuPauseTick == TimedShutdownService().expiryTicks.value;
   bool _holdResumeForDestinationSheet = false;
@@ -175,15 +175,15 @@ class _PlayerItemPanelState extends State<PlayerItemPanel> {
       );
       unawaited(playerController.sendSyncPlayChatMessage(message));
     } else {
-      // This provider has no send API; display a local echo.
+      // 这个 provider 没有发送接口，只能本地回显。
       playerController.danmaku.canvasController
           .addDanmaku(DanmakuContentItem(message, selfSend: true));
     }
     textController.clear();
   }
 
-  // A SyncPlay room is left alone: a local pause there is either broadcast to
-  // everyone or undone by the next server state message.
+  // SyncPlay 房间里不插手：本地暂停要么广播给所有人，
+  // 要么被下一条服务端状态消息撤掉。
   void _onDanmakuEditFocusChanged() {
     if (playerController.syncplay.hasSession) return;
     if (textFieldFocus.hasFocus) {
@@ -198,9 +198,8 @@ class _PlayerItemPanelState extends State<PlayerItemPanel> {
     }
   }
 
-  /// Only undoes a pause this editor created, and only when nothing else owns
-  /// playback: no destination sheet, no app in the background (desktop window
-  /// switches report inactive), and no dialog on top.
+  /// 只撤销本编辑器自己发起的暂停，且必须没有别的持有方：
+  /// 没有选集面板、应用不在后台（桌面切窗会报 inactive）、顶层也没有对话框。
   bool get _canResumeAfterDanmakuEdit =>
       _pausedByDanmakuEdit &&
       !_holdResumeForDestinationSheet &&
@@ -209,9 +208,8 @@ class _PlayerItemPanelState extends State<PlayerItemPanel> {
       (ModalRoute.of(context)?.isCurrent ?? false);
 
 
-  // Keeps the tap that dismisses the composer away from the video and the play
-  // button. The region must stay in the text field's group, or the paste/copy/
-  // select-all toolbar stops responding.
+  // 让「点空白收起输入框」那一下不落到视频与播放键上。
+  // 这块区域必须留在输入框的手势组里，否则粘贴/复制/全选工具条会失灵。
   Widget _danmakuEditBarrier(Widget child) {
     return ListenableBuilder(
       listenable: textFieldFocus,
@@ -459,7 +457,7 @@ class _PlayerItemPanelState extends State<PlayerItemPanel> {
         Positioned(
           top: 25,
           child: Observer(builder: (context) {
-            // Hidden HUDs must not observe playback ticks.
+            // 隐藏的 HUD 不该继续监听播放 tick。
             final visible = playerController.panel.showSeekTime;
             return PlayerSeekHud(
               visible: visible,
@@ -757,7 +755,7 @@ class _PlayerItemPanelState extends State<PlayerItemPanel> {
               tooltip: '下一集',
               onPressed: widget.onNextEpisode,
             ),
-            // Playback ticks only rebuild the progress bar and its time labels.
+            // 播放 tick 只重建进度条与时间标签。
             progressBuilder: ({required sideLabels}) => Observer(
                 builder: (context) => PlayerProgressBar(
                       sideLabels: sideLabels,
@@ -916,8 +914,8 @@ class _PlayerItemPanelState extends State<PlayerItemPanel> {
                   ),
                   KazumiMenuItem(
                     onPressed: () {
-                      // Renderers fetch the URL themselves: they cannot reach
-                      // a file on this device or send the rule's Referer.
+                      // 渲染器自己去取这个 URL：它拿不到本机文件，
+                      // 也没法带上规则配置的 Referer。
                       if (playerController.isLocalPlayback) {
                         KazumiDialog.showToast(message: '暂不支持离线视频');
                         return;

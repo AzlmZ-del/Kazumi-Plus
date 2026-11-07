@@ -4,31 +4,22 @@ import 'bangumi_collection_type.dart';
 
 /// NOTE: 该类仅用于解析 Bangumi API 返回的收藏数据，不适用本地收藏
 class BangumiCollection {
-  /// 最后更新时间
   DateTime updatedAt;
 
-  /// Bangumi ID
   int bangumiId;
 
-  /// Bangumi 收藏类型。
   BangumiCollectionType type;
 
-  /// 上映日期
   String? date;
 
-  /// 番剧名称
   String name;
 
-  /// 番剧中文名称
   String nameCn;
 
-  /// 简介
   String shortSummary;
 
-  /// 平均评分
   double score;
 
-  /// 排名
   int rank;
 
   /// 图片链接，包含 large、common、medium、small、grid 五种尺寸

@@ -34,7 +34,7 @@ class _KeyboardSettingsPageState extends State<KeyboardSettingsPage> {
   String? listeningFunction;
   int? listeningIndex;
 
-  // An empty original value marks a new, uncommitted binding.
+  // 原始值为空表示这是一条新建、尚未提交的绑定。
   String originalValue = '';
 
   late Map<String, List<String>> shortcuts;
@@ -46,7 +46,7 @@ class _KeyboardSettingsPageState extends State<KeyboardSettingsPage> {
   @override
   void initState() {
     super.initState();
-    // Repair persisted placeholders and keep at least one binding per action.
+    // 修掉落盘留下的占位值，并保证每个动作至少留一条绑定。
     shortcuts = {};
     for (final key in defaultShortcuts.keys) {
       final stored = GStorage.getStringListSettingByName(
@@ -74,7 +74,7 @@ class _KeyboardSettingsPageState extends State<KeyboardSettingsPage> {
     super.dispose();
   }
 
-  // Also called during dispose; do not setState here.
+  // dispose 期间也会走到这里，所以本方法内不能 setState。
   void cancelListening() {
     if (!isListening) return;
     final func = listeningFunction!;
@@ -135,7 +135,7 @@ class _KeyboardSettingsPageState extends State<KeyboardSettingsPage> {
     return true;
   }
 
-  // Persist a new binding only after recording or cancellation.
+  // 新绑定要等录制结束或被取消之后才落盘。
   void onAddKey(String func) {
     setState(() {
       cancelListening();
@@ -153,7 +153,7 @@ class _KeyboardSettingsPageState extends State<KeyboardSettingsPage> {
     final keyValue = shortcuts[func]![index];
     setState(() {
       cancelListening();
-      // Cancellation can shift indices; locate the binding again by value.
+      // 取消操作可能让下标错位，所以按值重新定位这条绑定。
       final idx = shortcuts[func]!.indexOf(keyValue);
       if (idx >= 0) {
         beginListening(func, idx);
@@ -309,7 +309,7 @@ class _KeyboardSettingsPageState extends State<KeyboardSettingsPage> {
 
   Widget _buildKeyCap(String func, List<String> keys, int i) {
     final listening = listeningFunction == func && listeningIndex == i;
-    // Pending placeholders must not count toward the last-binding safeguard.
+    // 占位值不能算进「最后一条绑定」的保护判断里。
     final realCount = keys.where((value) => value != '...').length;
     return _KeyCap(
       label: listening ? '按任意键' : keyAliases[keys[i]] ?? keys[i],

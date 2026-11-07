@@ -30,10 +30,10 @@ class Plugin {
   String version;
   bool muliSources;
 
-  /// Legacy schema field retained for rule import/export compatibility.
+  /// 旧版 schema 字段，为兼容规则的导入导出而保留。
   bool useWebview;
 
-  /// Legacy schema field retained for rule import/export compatibility.
+  /// 旧版 schema 字段，为兼容规则的导入导出而保留。
   bool useNativePlayer;
   bool usePost;
   bool useLegacyParser;
@@ -59,8 +59,8 @@ class Plugin {
   String chapterResult;
   String referer;
 
-  /// Optional XPath list whose texts name each chapter road, index-aligned
-  /// with [chapterRoads]. Empty means the roads fall back to generated
+  /// 可选的 XPath 列表，其文本作为各章节线路的名字，与 [chapterRoads]
+  /// 按下标一一对应。为空时线路退回自动生成的名称，
   /// "播放线路N" labels.
   String chapterRoadName;
   String searchMode;
@@ -69,8 +69,8 @@ class Plugin {
   ApiChapterConfig chapterApiConfig;
   AntiCrawlerConfig antiCrawlerConfig;
 
-  /// Optional per-rule login flow. Null for rules that need no
-  /// authentication; credentials themselves are stored locally.
+  /// 可选的单规则登录流程。不需要鉴权的规则为 null；
+  /// 凭据本身存在本地。
   ApiAuthConfig? auth;
 
   /// 规则源类型标签：API / XPath / 混合，由搜索结果与章节的解析模式推导。
@@ -227,8 +227,8 @@ class Plugin {
       'referer': referer,
       'searchMode': searchMode,
       'chapterMode': chapterMode,
-      // Persisting re-serializes the whole plugin list, so a configured API
-      // rule must survive even while the mode points at XPath.
+      // 落盘会重新序列化整个插件列表，所以即使当前模式指向 XPath，
+      // 已配置好的 API 规则也要原样保住。
       if (searchMode == RuleMode.api || searchApiConfig.request.url.isNotEmpty)
         'searchApiConfig': searchApiConfig.toJson(),
       if (chapterMode == RuleMode.api ||
@@ -267,13 +267,12 @@ class Plugin {
         play: chapterApiConfig.play,
       );
 
-  /// Whether playback can skip the webview by calling the rule's play API.
+  /// 播放能否跳过 webview，直接调用规则的播放接口。
   bool get hasPlayApi => chapterApiConfig.play != null;
 
-  /// Resolves the media URL for [episodeUrl] through the rule's play API.
+  /// 通过规则的播放接口为 [episodeUrl] 解析媒体地址。
   ///
-  /// Throws [ChapterErrorException] when the request fails or the rule
-  /// declares no play endpoint.
+  /// 请求失败或规则未声明播放接口时抛 [ChapterErrorException]。
   Future<String> resolvePlayUrl(
     String episodeUrl, {
     RuleCancelToken? cancelToken,
@@ -285,18 +284,15 @@ class Plugin {
     );
   }
 
-  /// Whether the rule declares a login flow at all.
-  bool get hasAuth => authEnabled;
-
-  /// Whether the rule's login flow is actually used; a rule can keep its
-  /// login template around while the switch is off.
+  /// 规则的登录流程是否真正启用；规则可以在开关关闭时
+  /// 仍保留登录模板。
   bool get authEnabled => auth?.enabled ?? false;
 
-  /// Runs the rule's login flow now and caches the fresh token.
+  /// 立刻跑一遍规则的登录流程并缓存新令牌。
   ///
-  /// Throws [ApiRuleFormatException] when the rule declares no login flow,
-  /// [RuleAuthRequiredException] when no account is saved and
-  /// [RuleAuthFailedException] when the login endpoint rejects the request.
+  /// 规则未声明登录流程时抛 [ApiRuleFormatException]；
+  /// 没存账号时抛 [RuleAuthRequiredException]；
+  /// 登录接口拒绝请求时抛 [RuleAuthFailedException]。
   Future<String> login({RuleCancelToken? cancelToken}) {
     return _ruleEngine.login(_executionConfig, cancelToken: cancelToken);
   }
@@ -323,9 +319,8 @@ class Plugin {
     );
   }
 
-  /// Parses HTML harvested from the captcha webview as a search result;
-  /// returns null when not applicable, letting callers fall back to
-  /// [queryBangumi].
+  /// 把验证 webview 里抓到的 HTML 当作搜索结果解析；
+  /// 不适用时返回 null，让调用方退回 [queryBangumi]。
   PluginSearchResponse? parseHarvestedSearch(String html) {
     return _ruleEngine.tryParseHarvestedSearch(_executionConfig, html);
   }
@@ -358,7 +353,7 @@ class Plugin {
     return normalizeEpisodeUrl(baseUrl, urlItem);
   }
 
-  /// Headers used when resolving or downloading the final media resource.
+  /// 解析或下载最终媒体资源时使用的请求头。
   ///
   /// 播放/下载层保持浏览器 UA：媒体 CDN 一般不做 TLS 指纹校验，反而常见按
   /// 浏览器 UA 做防盗链，换成非浏览器 UA 有被拒的风险。WAF 指纹问题只出现在

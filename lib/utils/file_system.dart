@@ -25,7 +25,7 @@ Future<void> ensureDirectoryWritable(String directoryPath) async {
         await probe.delete();
       }
     } on FileSystemException {
-      // The write check already succeeded; a leftover probe is not fatal.
+      // 写入检查已经过了，残留一个探测文件不算致命问题。
     }
   }
 }

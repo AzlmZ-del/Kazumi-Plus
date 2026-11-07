@@ -59,7 +59,7 @@ class _DanmakuSettingsSheet extends StatefulWidget {
 }
 
 class _DanmakuSettingsSheetState extends State<_DanmakuSettingsSheet> {
-  // The slider uses stored duration, before playback speed scales it.
+  // 滑块用的是落盘的原始时长，未经播放速度缩放。
   late double _duration;
 
   DanmakuOption get _option => widget.danmakuController.option;

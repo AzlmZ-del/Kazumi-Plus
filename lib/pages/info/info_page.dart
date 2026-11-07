@@ -315,7 +315,7 @@ class _InfoPageState extends State<InfoPage>
   Future<void> _loadBangumiInfo() async {
     final loadingStartedAt = DateTime.now();
     try {
-      // Attach metadata without replacing rendered image URLs.
+      // 只补元信息，不替换已渲染的图片地址，避免图片重新加载。
       await infoController.queryBangumiInfoByID(
         infoController.bangumiItem.id,
         type: 'attach',

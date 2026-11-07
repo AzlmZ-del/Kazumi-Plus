@@ -1,10 +1,9 @@
 import 'package:kazumi/plugins/api_rule_config.dart';
 
-/// Per-rule login flow definition.
+/// 单规则的登录流程定义。
 ///
-/// Credentials themselves never live here (or anywhere in the rule JSON):
-/// they are entered by the user and stored locally. This config only
-/// describes *how* to exchange credentials for a token and where to put it.
+/// 凭据本身永远不在这里（也不在规则 JSON 的任何位置）：它们由用户输入、
+/// 存在本地。这份配置只描述**如何**用凭据换到令牌，以及令牌该放在哪。
 class ApiAuthConfig {
   ApiAuthConfig({
     ApiRequestConfig? login,
@@ -19,35 +18,33 @@ class ApiAuthConfig {
   static const String defaultTokenPath = r'$.data.token';
   static const String defaultHeaderName = 'Authorization';
 
-  /// Whether the login flow is used at runtime.
+  /// 运行时是否启用这条登录流程。
   ///
-  /// Turning the login off in the editor keeps the configuration around
-  /// instead of deleting it: the request template stays in the rule JSON and
-  /// only this flag flips, so re-enabling restores everything as it was.
+  /// 在编辑器里关掉登录只会改这个标志，配置原样保留：
+  /// 请求模板仍留在规则 JSON 里，重新打开即恢复原样。
   final bool enabled;
 
-  /// Login request template. `@username` / `@password` are rendered from the
-  /// locally stored credentials via the regular template mechanism.
+  /// 登录请求模板。`@username` / `@password` 会通过常规模板机制
+  /// 从本地凭据渲染出来。
   final ApiRequestConfig login;
 
-  /// JSONPath over the login response that yields the token string.
+  /// 在登录响应上取令牌字符串的 JSONPath。
   final String tokenPath;
 
-  /// Request header the token is sent in.
+  /// 令牌放在哪个请求头里发送。
   final String headerName;
 
-  /// Prepended to the token when building the header value. Empty by
-  /// default: some sites return tokens that already carry "Bearer ".
+  /// 拼装请求头值时加在令牌前面的前缀。默认为空：
+  /// 有些站点返回的令牌本身就带 "Bearer "。
   final String tokenPrefix;
 
-  /// Response status codes that invalidate the cached token and trigger one
-  /// re-login + retry.
+  /// 会判定缓存令牌失效的响应状态码，命中后重新登录并重试一次。
   final List<int> refreshOnStatus;
 
   bool shouldRefreshOn(int statusCode) => refreshOnStatus.contains(statusCode);
 
-  /// Same flow, enabled flag flipped. Used by the editor when the user turns
-  /// the login off but wants the template kept.
+  /// 同一套流程，但翻转启用标志。用户关掉登录又想保留模板时，
+  /// 编辑器用它来构造新配置。
   ApiAuthConfig copyWith({bool? enabled}) => ApiAuthConfig(
         login: login,
         tokenPath: tokenPath,
@@ -65,8 +62,8 @@ class ApiAuthConfig {
     if (loginConfig.method == 'GET' &&
         loginConfig.bodyType == ApiBodyType.none &&
         loginConfig.body == null) {
-      // Login endpoints are POST in practice; ApiRequestConfig itself
-      // defaults to GET because it also serves search/chapter requests.
+      // 登录接口实际都是 POST；ApiRequestConfig 自身默认 GET，
+      // 因为它同时要服务搜索与章节请求。
       loginConfig = ApiRequestConfig(
         method: 'POST',
         url: loginConfig.url,

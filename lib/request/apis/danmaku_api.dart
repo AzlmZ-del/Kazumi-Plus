@@ -29,8 +29,8 @@ class DanmakuApi {
     return DanmakuEpisodeResponse.fromJson(jsonData);
   }
 
-  // v2 episode search avoids the anime search's 25-result cap.
-  // Fetch full episode lists separately; search results can truncate them.
+  // v2 的剧集搜索可以绕开动画搜索那个 25 条上限。
+  // 完整剧集列表要另外拉；搜索结果可能会被截断。
   static Future<DanmakuSearchResponse> searchAnimes(String title) async {
     final endPoint =
         ApiEndpoints.dandanAPIDomain + ApiEndpoints.dandanAPISearchEpisodes;
@@ -61,7 +61,7 @@ class DanmakuApi {
     if (bangumiID == 0) {
       return [];
     }
-    // Automatic matching relies on an undocumented episode ID convention.
+    // 自动匹配依赖一套没有文档记录的剧集 ID 约定。
     return _getComments(episodeIdOf(bangumiID, episode));
   }
 

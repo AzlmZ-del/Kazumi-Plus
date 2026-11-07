@@ -33,7 +33,7 @@ class ScreenshotExportService {
           .replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1f]'), '_')
           .trim()
           .replaceAll(RegExp(r'[. ]+$'), '');
-      // Leave room for the ID within common 255-byte filename limits.
+      // 在常见的 255 字节文件名上限里，给 ID 预留出位置。
       return String.fromCharCodes(safe.runes.take(24));
     }
 

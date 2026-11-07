@@ -1,5 +1,10 @@
 import 'dart:convert';
 
+/// 以图搜图接口的响应，对应一个上传帧的识别结果。
+///
+/// 与 [ResultItem] 的区别：[ImageSearchItem] 是「一次上传」的顶层结果，
+/// 可能带 [error]（识别失败）或 [frameCount]（GIF 多帧）；[ResultItem]
+/// 是它内部单条候选番剧。
 class ImageSearchItem {
   final int? frameCount;
   final String? error;
@@ -32,7 +37,7 @@ class ImageSearchItem {
 class ResultItem {
   final Anilist? anilist;
   final String? filename;
-  final dynamic episode; // num, List<num> or null
+  final dynamic episode; // 可能是 num、List<num> 或 null，取决于 API 返回
   final double? from;
   final double? at;
   final double? to;
@@ -92,6 +97,11 @@ class ResultItem {
       };
 }
 
+/// AniList 主体信息，也是查询的根对象。
+///
+/// 其余类都是它的嵌套字段：[AnilistTitle]、[DateInfo]、[CoverImage]、
+/// [Studios]→[StudioEdge]→[StudioNode]、[Relations]→[RelationEdge]→
+/// [RelationNode]，以及 [ExternalLink]。
 class Anilist {
   final int? id;
   final String? type;

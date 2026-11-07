@@ -23,7 +23,7 @@ class MeteredNetworkService {
     if (!_supported) return;
     final revision = ++_revision;
     try {
-      // Reset event deduplication after missed background network changes.
+      // 错过后台网络变化后，要重置事件去重状态。
       final previous = _subscription;
       _subscription = null;
       await previous?.cancel();
@@ -40,7 +40,7 @@ class MeteredNetworkService {
       final results = await Connectivity()
           .checkConnectivity()
           .timeout(const Duration(seconds: 3));
-      // Discard queries superseded by a refresh or a network event.
+      // 被刷新或网络事件顶替掉的查询要丢掉。
       if (revision == _revision) {
         _apply(results);
       }
@@ -59,7 +59,7 @@ class MeteredNetworkService {
     _metered.value = metered;
   }
 
-  // WLAN wins during handovers; unknown transports retain the last known state.
+  // 切换网络时以 WLAN 为准；无法识别的传输方式沿用上次已知状态。
   static bool? _isMetered(List<ConnectivityResult> results) {
     if (results.contains(ConnectivityResult.wifi) ||
         results.contains(ConnectivityResult.ethernet)) {

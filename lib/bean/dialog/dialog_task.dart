@@ -39,8 +39,8 @@ class KazumiDialogController extends ChangeNotifier {
 
   bool get isRunning => _current?._isActive ?? false;
 
-  /// Await steps through the task to stop on cancellation. Replacing or disposing
-  /// the owner skips [onCancelled]; user cancellation calls it after cleanup.
+  /// await 会把取消异常穿过任务体；换掉或销毁持有者不会触发 [onCancelled]，
+  /// 只有用户主动取消才会在清理之后调用它。
   Future<void> run(
     Future<void> Function(KazumiDialogTask task) action, {
     String? errorMessage,
@@ -130,7 +130,7 @@ class KazumiDialogTask {
     }
   }
 
-  /// Stops waiting, not the operation itself; late errors are still consumed.
+  /// 只停止等待，不停底层操作；迟到的错误仍会被消费掉。
   Future<T> wait<T>(Future<T> future) async {
     final result = await Future.any<T>([
       future,
@@ -168,7 +168,7 @@ class KazumiDialogTask {
       _checkActive();
       result = await wait(action());
     } finally {
-      // A system pop can precede completion of the dialog's Future.
+      // 系统返回手势可能先于对话框 Future 完成，此时也要按取消处理。
       if (!dialog.isActive) cancel();
       _dialog = null;
       _onCancel = null;
@@ -179,7 +179,7 @@ class KazumiDialogTask {
     return result;
   }
 
-  /// A dismissed choice cancels the workflow; an explicit false remains a result.
+  /// 点遮罩关闭算取消整个流程；明确返回 false 则仍是一个结果值。
   Future<T> show<T extends Object>({
     required WidgetBuilder builder,
     bool clickMaskDismiss = true,

@@ -218,7 +218,8 @@ class _HistoryCardState extends State<_HistoryCard> with KazumiDialogOwner {
   @override
   Widget build(BuildContext context) {
     return Observer(builder: (context) {
-      // getCollectType reads storage, so track the observable list explicitly.
+      // getCollectType 是直接读存储的，所以要显式订阅这份可观察列表，
+      // 否则收藏状态变化不会触发重建。
       _collectController.collectibles.length;
       return HistoryRecordTile(
         history: widget.history,

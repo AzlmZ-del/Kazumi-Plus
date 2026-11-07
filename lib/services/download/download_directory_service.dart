@@ -17,9 +17,9 @@ class DownloadDirectoryException implements Exception {
   String toString() => message;
 }
 
-/// Owns where downloads are stored. Access is settled when the directory is
-/// picked and, on macOS, restored once per launch, so downloads, playback and
-/// deletion all work with plain filesystem paths.
+/// 负责下载存放位置。访问权在选定目录时就确定了，
+/// 在 macOS 上还会每次启动恢复一次，因此下载、播放与删除
+/// 都能直接用普通的文件系统路径工作。
 class DownloadDirectoryService {
   static final DownloadDirectoryService _instance =
       DownloadDirectoryService._internal();
@@ -35,13 +35,13 @@ class DownloadDirectoryService {
   bool get supportsCustomDirectory =>
       Platform.isAndroid || Platform.isMacOS || Platform.isWindows;
 
-  /// Empty while the default directory is in use.
+  /// 使用默认目录时为空。
   String get customDirectory => supportsCustomDirectory
       ? GStorage.getSetting(SettingsKeys.downloadDirectory).trim()
       : '';
 
-  /// Restores sandbox access to the custom directory before anything reads or
-  /// writes downloads. Other platforms keep the access granted when picking.
+  /// 在任何读写下载内容之前，先恢复沙盒对自定义目录的访问权。
+  /// 其它平台在选定目录时获得的访问权会一直有效。
   Future<void> restoreAccess() async {
     final directory = customDirectory;
     if (!Platform.isMacOS || directory.isEmpty) return;
@@ -52,7 +52,7 @@ class DownloadDirectoryService {
       );
       _accessLost =
           !await _bookmarks.startAccessingSecurityScopedResource(restored);
-      // The bookmark follows the directory when the user moves it.
+      // 用户搬动目录时，书签会跟着走。
       if (!_accessLost && !path.equals(restored.path, directory)) {
         await GStorage.putSetting(
           SettingsKeys.downloadDirectory,
@@ -68,8 +68,8 @@ class DownloadDirectoryService {
     }
   }
 
-  /// Root for new downloads. A custom directory whose access could not be
-  /// restored fails instead of silently redirecting downloads elsewhere.
+  /// 新下载的根目录。自定义目录若访问权恢复失败，
+  /// 就直接报错，而不是悄悄把下载改到别处。
   Future<String> getDownloadDirectory() async {
     final directory = customDirectory;
     if (directory.isEmpty) return getDefaultDownloadDirectory();
@@ -79,8 +79,8 @@ class DownloadDirectoryService {
     return directory;
   }
 
-  /// Returns null when the user cancels. The directory is saved only after
-  /// it proves writable and its access is persisted.
+  /// 用户取消时返回 null。目录要等验证过可写、且访问权已持久化之后
+  /// 才会被保存下来。
   Future<String?> selectDirectory() async {
     if (!supportsCustomDirectory) {
       throw const DownloadDirectoryException('当前平台不支持手动选择目录');
@@ -95,7 +95,7 @@ class DownloadDirectoryService {
     await ensureDirectoryWritable(selected);
     await _persistAccess(selected);
     await GStorage.putSetting(SettingsKeys.downloadDirectory, selected);
-    // The picker grant covers the rest of this session.
+    // 选择器给出的授权覆盖本次会话剩余时间。
     _accessLost = false;
     return selected;
   }
@@ -114,7 +114,7 @@ class DownloadDirectoryService {
       );
     }
     try {
-      // A document tree grant alone does not allow direct file paths.
+      // 只拿到文档树授权，还不足以使用直接文件路径。
       final granted =
           await _androidChannel.invokeMethod<bool>('requestStorageAccess') ??
           false;

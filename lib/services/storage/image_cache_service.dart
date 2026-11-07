@@ -20,7 +20,7 @@ class ImageCacheService {
   Future<int> sizeInBytes() async {
     var bytes = 0;
     await for (final file in _files()) {
-      // Files may expire during enumeration.
+      // 枚举过程中可能正好有文件到期。
       final stat = await file.stat();
       if (stat.type == FileSystemEntityType.file) bytes += stat.size;
     }
@@ -28,14 +28,14 @@ class ImageCacheService {
   }
 
   Future<void> clear() async {
-    // Include orphaned files, but leave images cached after this snapshot.
+    // 连孤儿文件一起算，但这份快照之后才缓存进来的图片不碰。
     final files = await _files().toList();
     await DefaultCacheManager().emptyCache();
     for (final file in files) {
       try {
         await file.delete();
       } on PathNotFoundException {
-        // Already removed by the cache manager.
+        // 已经被缓存管理器删掉了。
       }
     }
     PaintingBinding.instance.imageCache.clear();

@@ -80,7 +80,7 @@ class _ImageSearchPageState extends State<ImageSearchPage> {
 
   void _onUrlChanged() {
     final value = _urlController.text.trim();
-    // Ignore cursor moves so they do not clear active results.
+    // 光标移动不算内容变化，否则会把已有结果清掉。
     if (value == _lastUrlText) return;
     _lastUrlText = value;
     _previewDebounce?.cancel();
@@ -198,7 +198,7 @@ class _ImageSearchPageState extends State<ImageSearchPage> {
     try {
       if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
     } catch (_) {
-      // Fall through to the shared error message.
+      // 落到下面那条统一错误提示。
     }
     if (!mounted) return;
     KazumiDialog.showToast(context: context, message: '暂时无法打开链接，请稍后再试');
@@ -286,7 +286,7 @@ class _ImageSearchPageState extends State<ImageSearchPage> {
       ..sort((a, b) => (b.similarity ?? 0).compareTo(a.similarity ?? 0));
     final showResults = searching || results.isNotEmpty || error.isNotEmpty;
     final short = constraints.maxHeight < 440;
-    // Keep the form scrollable when the keyboard consumes most of the height.
+    // 键盘占掉大半高度时，表单要还能滚动。
     final pinAction =
         splitLayout && (showResults || short) && constraints.maxHeight >= 240;
     final source = _buildSource(context, searching, showResults,
@@ -304,7 +304,7 @@ class _ImageSearchPageState extends State<ImageSearchPage> {
     if (splitLayout) {
       final contentWidth = constraints.maxWidth.clamp(0.0, 1440.0);
       final inset = (constraints.maxWidth - contentWidth) / 2 + padding;
-      // Keep the right gutter inside the viewport for edge scrolling.
+    // 右侧留白留在视口内，边缘才能继续拖动滚动。
       return Center(
         child: Padding(
           padding: EdgeInsets.fromLTRB(inset, 0, showResults ? 0 : inset, 16),
@@ -373,7 +373,7 @@ class _ImageSearchPageState extends State<ImageSearchPage> {
         child: source,
       ),
     );
-    // Preserve input focus when the keyboard changes button placement.
+    // 键盘弹出改变按钮位置时，输入框不能丢焦点。
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,

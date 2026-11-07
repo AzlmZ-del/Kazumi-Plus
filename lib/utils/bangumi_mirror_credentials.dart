@@ -1,5 +1,5 @@
-// Bangumi mirror API credentials for the search signature flow.
-// Release/PR CI injects them via --dart-define=KAZUMI_APPID / KAZUMI_KEY.
+// 搜索签名流程要用的 Bangumi 镜像接口凭据。
+// Release/PR 的 CI 通过 --dart-define=KAZUMI_APPID / KAZUMI_KEY 注入。
 const Map<String, String> bangumiMirrorCredentials = {
   'id': String.fromEnvironment('KAZUMI_APPID'),
   'value': String.fromEnvironment('KAZUMI_KEY'),

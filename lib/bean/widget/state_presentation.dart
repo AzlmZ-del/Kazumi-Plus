@@ -91,7 +91,7 @@ class StateActionButton extends StatelessWidget {
   /// 会盖掉 `AnimatedTheme` 下发的 `IconTheme`（`button_style_button.dart:553`）。
   final double iconSize;
 
-  /// Reserves label space for a longer status without changing button size.
+  /// 用一个更长的占位文字预留标签宽度，按钮尺寸不变。
   final String? reserveText;
 
   /// 覆盖默认样式（`styleOf`）。传了就完全以这里为准，

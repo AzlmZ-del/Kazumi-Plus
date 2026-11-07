@@ -155,7 +155,6 @@ class _BangumiInfoCardVState extends State<BangumiInfoCardV> {
         return BarChart(
           duration: const Duration(milliseconds: 80),
           BarChartData(
-            // alignment: BarChartAlignment.spaceEvenly,
             maxY: maxCount > 0 ? chartMaxY : 1,
             borderData: FlBorderData(show: false),
             gridData: FlGridData(show: false),
@@ -213,7 +212,6 @@ class _BangumiInfoCardVState extends State<BangumiInfoCardV> {
                     ),
                   ),
                 ],
-                // showingTooltipIndicators: [0],
               ),
             ),
             titlesData: FlTitlesData(
@@ -281,7 +279,7 @@ class _BangumiInfoCardVState extends State<BangumiInfoCardV> {
 
   /// 宽屏右侧常驻的评分透视。
   ///
-  /// 用 Expanded 而不是固定比例：这里的高度由外层 Row 撑满，
+  /// 用 Flexible 而不是固定比例：这里的高度由外层 Row 撑满，
   /// 若再用 AspectRatio(2) 反推宽度，算出来的宽度会超过这一栏实际的
   /// 宽度，柱子被画到卡片外、右侧两根直接看不见。
   Widget get voteBarChart {
@@ -398,8 +396,7 @@ class _BangumiInfoCardVState extends State<BangumiInfoCardV> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Shrink under large system font so the collect button
-                      // stays inside the fixed-height card.
+                      // 系统字号放大时整体缩小，收藏按钮才不会被挤出固定高度的卡片。
                       Flexible(
                         child: Container(
                           width: double.infinity,

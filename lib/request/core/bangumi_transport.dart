@@ -13,10 +13,9 @@ import 'package:kazumi/services/network/bangumi_mirror_signature.dart';
 
 const _echRequestKey = 'bangumiEch';
 
-/// Set on [RequestOptions.extra] to keep a request on the official host even
-/// when the mirror is selected. Callers use it to retry an endpoint the mirror
-/// cannot serve (it forwards anonymously, so subject-gated data like R18
-/// comments comes back as an upstream error).
+/// 写进 [RequestOptions.extra]，让请求即使选了镜像也仍走官方主机。
+/// 调用方用它重试镜像提供不了的接口——镜像转发时不带凭据，
+/// 所以像 R18 评论这类需要主体权限的数据会返回上游错误。
 const bangumiForceOfficialKey = 'bangumiForceOfficial';
 
 class BangumiAccelerationInterceptor extends Interceptor {
@@ -37,9 +36,9 @@ class BangumiAccelerationInterceptor extends Interceptor {
           options.queryParameters = {};
           options.extra[_echRequestKey] = true;
         case BangumiAcceleration.mirror:
-          // Signed endpoints answer 401 on the mirror when the build has no
-          // credentials, while the official host serves them anonymously.
-          // Keep those paths on the official host rather than returning empty.
+          // 构建里没有凭据时，需要签名的接口在镜像上会返回 401，
+          // 而官方主机是允许匿名访问的。所以这些路径留在官方主机上，
+          // 而不是返回空数据。
           if (!hasBangumiMirrorCredentials &&
               isSignatureProtectedBangumiPath(options.method, uri.path)) {
             KazumiLogger().d(
@@ -83,7 +82,7 @@ class BangumiEchAdapter implements HttpClientAdapter {
         connectTimeout +
         _positive(options.receiveTimeout, _config.receiveTimeout) +
         _positive(options.sendTimeout, const Duration(seconds: 12));
-    // Native timeouts are client-wide; only matching settings share a pool.
+    // 原生超时是客户端级别的；只有设置相同的客户端才共用一个连接池。
     return _clients.putIfAbsent(
       (proxy, dohProxy, connectTimeout, timeout),
       () => EchClient(
@@ -140,7 +139,7 @@ class BangumiEchAdapter implements HttpClientAdapter {
               : value.toString();
         }
       }
-      // Native connect timeouts exclude DoH discovery.
+      // 原生连接超时不含 DoH 解析耗时。
       final timeout =
           _positive(options.connectTimeout, _config.connectTimeout) +
           _positive(options.receiveTimeout, _config.receiveTimeout);

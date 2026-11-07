@@ -3,9 +3,9 @@ import 'package:kazumi/modules/download/download_module.dart';
 import 'package:kazumi/modules/roads/road_module.dart';
 import 'package:kazumi/plugins/plugins.dart';
 
-/// Route arguments for '/video/'. Entry points hand playback context over
-/// through the route instead of pre-filling a shared controller, which lets
-/// [VideoPageController] live and die with the route.
+/// '/video/' 的路由参数。各入口通过路由把播放上下文传进来，
+/// 而不是预先写进一个共享控制器——这样 [VideoPageController]
+/// 的生命周期就与路由一致。
 sealed class VideoPlaybackArgs {
   const VideoPlaybackArgs({required this.bangumiItem});
 

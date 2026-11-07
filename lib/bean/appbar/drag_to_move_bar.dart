@@ -2,24 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:kazumi/utils/device.dart';
 
-/// A widget for drag to move window.
-///
-/// When you have hidden the title bar, you can add this widget to move the window position.
-///
-/// {@tool snippet}
-///
-/// The sample creates a red box, drag the box to move the window.
-///
-/// ```dart
-/// DragToMoveArea(
-///   child: Container(
-///     width: 300,
-///     height: 32,
-///     color: Colors.red,
-///   ),
-/// )
-/// ```
-/// {@end-tool}
+/// 隐藏标题栏之后，把本组件放进界面就能拖动窗口位置。
 class DragToMoveArea extends StatelessWidget {
   const DragToMoveArea({
     super.key,

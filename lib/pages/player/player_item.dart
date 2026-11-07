@@ -118,7 +118,7 @@ class _PlayerItemState extends State<PlayerItem>
   late bool backgroundPlayback;
   late bool brightnessVolumeGesture;
 
-  // Auto-hide delay in milliseconds.
+  // 自动隐藏延迟，单位毫秒。
   late int playerControllerLayerDisappearTime;
 
   Timer? hideTimer;
@@ -159,7 +159,7 @@ class _PlayerItemState extends State<PlayerItem>
   void didChangeAppLifecycleState(AppLifecycleState state) async {
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.paused && !backgroundPlayback) {
-      // Suspend before awaiting pause so a later resume wins; pause alone keeps prefetching.
+      // 先挂起预取再 await 暂停：否则后到的恢复会被它覆盖，单靠 pause 预取仍在跑。
       final suspend = playerController.playback.setPrefetchSuspended(true);
       if (playerController.playback.mediaPlayer != null &&
           playerController.playback.playerPlaying) {
@@ -216,7 +216,7 @@ class _PlayerItemState extends State<PlayerItem>
     }
     final bool playing = playerController.playback.playing;
     final bool danmakuEnabled = playerController.danmaku.danmakuOn;
-    // In picture in picture the measured rect is the small window itself.
+    // 画中画模式下量到的矩形就是那个小窗本身。
     final Rect? sourceRect = videoPageController.isPip
         ? _lastPipSourceRect
         : _androidPIPSourceRect();
@@ -239,7 +239,7 @@ class _PlayerItemState extends State<PlayerItem>
     );
   }
 
-  // Android PiP expects the letterboxed video bounds in physical pixels.
+  // Android 画中画要求传「含黑边的视频区域」的物理像素尺寸。
   Rect? _androidPIPSourceRect() {
     if (!mounted) {
       return null;
@@ -266,7 +266,7 @@ class _PlayerItemState extends State<PlayerItem>
         height: videoHeight * scale,
       );
     }
-    // Convert the fitted video rectangle to window coordinates for native PiP.
+    // 把适配后的视频矩形换算成窗口坐标，交给原生画中画。
     rect = MatrixUtils.transformRect(renderObject.getTransformTo(null), rect);
     final double ratio = MediaQuery.devicePixelRatioOf(context);
     return Rect.fromLTRB(
@@ -277,7 +277,7 @@ class _PlayerItemState extends State<PlayerItem>
     );
   }
 
-  // Remove controls before PiP entry to avoid rebuilding during the resize animation.
+  // 进画中画之前先摘掉控制层，否则缩放动画期间会触发重建。
   Future<void> enterAndroidPictureInPicture() async {
     if (!Platform.isAndroid || !mounted) {
       return;
@@ -834,7 +834,7 @@ class _PlayerItemState extends State<PlayerItem>
       if (mounted) {
         hold.release();
         widget.keyboardFocus.requestFocus();
-        // Resume only the same local playback, respecting the sleep timer.
+        // 只恢复同一个本地播放，并遵守定时关闭的剩余时间。
         if (resume &&
             identical(player, playerController.playback.mediaPlayer) &&
             videoPageController.playbackEpisode == episode &&
@@ -864,7 +864,7 @@ class _PlayerItemState extends State<PlayerItem>
   Future<void> handleSuperResolutionChange(SuperResolutionMode mode) async {
     if (!mounted) return;
 
-    // The mediacodec_embed renderer cannot apply super-resolution shaders.
+    // mediacodec_embed 渲染器无法套用超分辨率着色器。
     if (Platform.isAndroid && mode != SuperResolutionMode.off) {
       final String androidVideoRenderer =
           GStorage.getSetting(SettingsKeys.androidVideoRenderer);
@@ -973,7 +973,7 @@ class _PlayerItemState extends State<PlayerItem>
       playerController.panel.canHidePlayerPanel && _playerPanelHolds.isEmpty;
 
   void showVideoController({bool restartHideTimer = true}) {
-    // Re-forwarding restarts the ticker and stalls a frame, so hover must not.
+    // 重复转发会重启 ticker 并卡掉一帧，所以悬停事件不能转发。
     if (!_panelVisibilityController.isForwardOrCompleted) {
       _panelVisibilityController.forward();
     }
@@ -1019,7 +1019,7 @@ class _PlayerItemState extends State<PlayerItem>
     }
   }
 
-  // Fullscreen and system overlays can dispose controls before their holds are released.
+  // 全屏切换与系统浮层可能在控制层释放前就把它销毁。
   void _releasePlayerPanelHolds() {
     for (final hold in _playerPanelHolds.toList()) {
       hold.releaseSilently();
@@ -1212,7 +1212,7 @@ class _PlayerItemState extends State<PlayerItem>
           videoPageController.roadList[playingSelection.road];
       if (playerController.playback.completed && !videoPageController.loading) {
         if (playerController.playback.resumedNearEnd) {
-          // Replay stale near-end resumes instead of advancing to the next episode.
+          // 末尾附近的过期续播要重播，不要直接跳下一集。
           unawaited(playerController.playback.restartFromBeginning());
         } else if (playingSelection.episode < playingRoadData.data.length &&
             autoPlayNext) {
@@ -1220,7 +1220,7 @@ class _PlayerItemState extends State<PlayerItem>
             episode: playingSelection.episode + 1,
             road: playingSelection.road,
           );
-          // Let the controller report resolution failures without retrying every tick.
+          // 解析失败交给控制器上报，不要每个 tick 都重试。
           final nextRef = videoPageController.resolveEpisode(nextSelection);
           if (nextRef != null) {
             KazumiDialog.showToast(message: '正在加载${nextRef.displayTitle}');
@@ -1362,7 +1362,7 @@ class _PlayerItemState extends State<PlayerItem>
 
   @override
   void dispose() {
-    // The route-scoped PlayerController owns playback disposal.
+    // 播放资源的释放由路由级的 PlayerController 负责。
     // 离开播放页是观看记录最完整的时刻，顺手把本地备份刷一次。
     _backupHistoryLocally();
     _fullscreenListener();
@@ -1398,7 +1398,7 @@ class _PlayerItemState extends State<PlayerItem>
                   ? SystemMouseCursors.none
                   : SystemMouseCursors.basic,
               onHover: (PointerEvent pointerEvent) {
-                // Android taps can emit hover events.
+                // Android 上点击也会发出悬停事件。
                 if (isDesktop()) {
                   if (pointerEvent.position.dy > 50 &&
                       pointerEvent.position.dy <
@@ -1511,7 +1511,7 @@ class _PlayerItemState extends State<PlayerItem>
                           area: _danmakuArea,
                           opacity: _opacity,
                           fontSize: _fontSize,
-                          // Speed scaling is applied after canvas creation.
+                          // 速度缩放要在 canvas 创建之后套用。
                           duration: _danmakuDuration,
                           lineHeight: _danmakuLineHeight,
                           strokeWidth: _border ? _danmakuBorderSize : 0.0,

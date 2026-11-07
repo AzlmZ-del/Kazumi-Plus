@@ -7,8 +7,8 @@ class StaffResponse {
     required this.data,
   });
 
-  /// Parses `GET /v0/subjects/{id}/persons`, which returns a flat
-  /// (person × relation) list, so entries are merged by person id.
+  /// 解析 `GET /v0/subjects/{id}/persons`。该接口返回扁平的
+  /// （人物 × 职位）列表，因此按人物 id 合并。
   factory StaffResponse.fromJson(List list) {
     final Map<int, Staff> staffById = {};
     final Map<int, List<String>> relationsById = {};
@@ -37,7 +37,7 @@ class StaffResponse {
     return index < 0 ? _staffRelationPriority.length : index;
   }
 
-  /// Key roles pinned to the top of the staff list, in this order.
+  /// 置顶的关键职位，按此顺序排列。
   static const List<String> _staffRelationPriority = [
     '动画制作',
     '原作',

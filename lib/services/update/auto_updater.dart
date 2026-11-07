@@ -31,7 +31,7 @@ enum InstallationType {
 
   final String label;
 
-  /// Types without a matching asset are updated from the release page.
+  /// 找不到对应安装包的类型，引导用户去 Release 页更新。
   bool get downloadsInApp => getUpdateFilePatterns(this).isNotEmpty;
 }
 
@@ -160,8 +160,8 @@ class AutoUpdater {
   }
 
   Future<Map<String, dynamic>> _latestRelease() async {
-    // Prefer the proxy first so the check works without direct GitHub access,
-    // then fall back to the canonical API.
+    // 先走代理，这样直连不上 GitHub 时也能检查更新；
+    // 代理不通再退回官方 API。
     Object? lastError;
     for (final url in [
       ApiEndpoints.latestAppMirror,

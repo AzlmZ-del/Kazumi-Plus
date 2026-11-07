@@ -300,7 +300,7 @@ class _VideoPageState extends State<VideoPage>
 
   void _closeSidePanel() => _sidePanelKey.currentState?.close();
 
-  // Only desktop PiP participates in local navigation.
+  // 只有桌面端画中画参与本地导航。
   void _syncDesktopPipHistory(bool isPip) {
     if (!isDesktop()) return;
     if (isPip && _desktopPipEntry == null) {
@@ -354,7 +354,7 @@ class _VideoPageState extends State<VideoPage>
                 child: Focus(
                   focusNode: keyboardFocus,
                   autofocus: true,
-                  // Cleanup resets loading while the route is still visible.
+                  // 清理会在路由还可见时就重置加载态。
                   child: _isExiting
                       ? const SizedBox.expand()
                       : Observer(builder: (_) => _buildPlayerBody(layout)),
@@ -526,7 +526,7 @@ class _VideoPageState extends State<VideoPage>
                 downloads[episode.episodePageUrl] = episode;
               } else if (episode.road >= 0 &&
                   episode.road < videoPageController.roadList.length) {
-                // Older records have no URL; only match within their own road.
+                // 旧记录没有 URL，只在各自线路内匹配。
                 final urls = videoPageController.roadList[episode.road].data;
                 if (episode.episodeNumber > 0 &&
                     episode.episodeNumber <= urls.length) {

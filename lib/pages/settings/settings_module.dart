@@ -87,7 +87,7 @@ final settingsModule = createModule(
       },
     );
     c
-      // Root route: the license browser must cover the settings shell.
+      // 注册成根路由：许可浏览页要能盖住设置外壳。
       ..route(
         '/about/license',
         child: (context, state) => const LicensePage(

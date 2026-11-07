@@ -31,22 +31,16 @@ abstract class IHistoryRepository {
   /// 获取所有历史记录（按时间倒序）
   List<History> getAllHistories();
 
-  /// 获取特定番剧的历史记录
-  ///
-  /// [adapterName] 适配器名称
-  /// [bangumiItem] 番剧信息
-  /// 返回历史记录，不存在返回null
+  /// 取特定番剧的历史记录，不存在返回 null。
   History? getHistory(
     String adapterName,
     BangumiItem bangumiItem, {
     String entryKind = HistoryEntryKind.online,
   });
 
-  /// 更新或创建历史记录
+  /// 更新或创建历史记录。
   ///
-  /// [identity] 播放历史身份
-  /// [progress] 观看进度
-  /// [duration] 视频总时长；距结尾 [nearEndWatchedThreshold] 以内的进度视为
+  /// [duration] 是视频总时长；距结尾 [nearEndWatchedThreshold] 以内的进度视为
   /// 已看完，归零保存。传 [Duration.zero] 表示时长未知，不做该判断
   Future<void> updateHistory({
     required PlaybackHistoryIdentity identity,
@@ -54,23 +48,14 @@ abstract class IHistoryRepository {
     Duration duration = Duration.zero,
   });
 
-  /// 获取上次观看的进度
-  ///
-  /// [bangumiItem] 番剧信息
-  /// [adapterName] 适配器名称
-  /// 返回观看进度，不存在返回null
+  /// 取上次观看的进度，不存在返回 null。
   Progress? getLastWatchingProgress(
     BangumiItem bangumiItem,
     String adapterName, {
     String entryKind = HistoryEntryKind.online,
   });
 
-  /// 查找特定集数的观看进度
-  ///
-  /// [bangumiItem] 番剧信息
-  /// [adapterName] 适配器名称
-  /// [episode] 集数
-  /// 返回观看进度，不存在返回null
+  /// 查特定集数的观看进度，不存在返回 null。
   Progress? findProgress(
     BangumiItem bangumiItem,
     String adapterName,
@@ -78,9 +63,7 @@ abstract class IHistoryRepository {
     String entryKind = HistoryEntryKind.online,
   });
 
-  /// 删除历史记录
-  ///
-  /// [history] 要删除的历史记录
+  /// 删除历史记录。
   Future<void> deleteHistory(History history);
 
   /// 清空所有历史记录
@@ -90,9 +73,6 @@ abstract class IHistoryRepository {
   bool getPrivateMode();
 }
 
-/// 历史记录数据访问实现类
-///
-/// 基于Hive实现的历史记录数据访问层
 class HistoryRepository implements IHistoryRepository {
   HistoryRepository({
     Box<History>? historiesBox,

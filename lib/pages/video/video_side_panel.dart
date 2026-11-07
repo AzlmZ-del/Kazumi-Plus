@@ -61,7 +61,7 @@ class VideoSidePanelState extends State<VideoSidePanel>
   @override
   void didUpdateWidget(VideoSidePanel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Reset before rendering the new mode to avoid a sidebar flash.
+    // 渲染新模式前先重置，避免侧栏闪一下。
     if (oldWidget.fullscreen != widget.fullscreen) _animation.value = 0;
   }
 
@@ -105,7 +105,7 @@ class VideoSidePanelState extends State<VideoSidePanel>
             );
           },
           child: SizedBox(
-            // Keep space outside the panel for dismissal.
+            // 面板外留出空间，供点击关闭。
             width: math.min(constraints.maxWidth * 0.9,
                 (constraints.maxWidth / 3).clamp(320.0, 420.0)),
             height: constraints.maxHeight,
@@ -116,7 +116,7 @@ class VideoSidePanelState extends State<VideoSidePanel>
                 bottomStart: Radius.circular(28),
               ),
               clipBehavior: Clip.antiAlias,
-              // Consume the hidden status-bar inset for the entire overlay.
+              // 整个浮层都要吃掉被隐藏状态栏留下的内边距。
               child: MediaQuery.removePadding(
                 context: context,
                 removeTop: true,

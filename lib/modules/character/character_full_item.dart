@@ -69,7 +69,7 @@ class CharacterFullItem {
   static String _text(Object? value) =>
       value is String || value is num ? value.toString().trim() : '';
 
-  // /p1 uses `values`; /v0 uses `value`, including labeled aliases.
+  // /p1 用 `values`，/v0 用 `value`（含带标签的别名），两个接口不统一。
   static List<CharacterInfoField> _parseInfobox(Object? raw) {
     if (raw is! List) return const [];
     final fields = <CharacterInfoField>[];
@@ -92,7 +92,7 @@ class CharacterFullItem {
     return fields;
   }
 
-  // The mirror replaces infobox with text; preserve lines without a field key.
+  // 镜像源会把 infobox 降级成纯文本，没有「键：值」的行要原样保留。
   static (List<CharacterInfoField>, String) _parseInfo(String info) {
     final fields = <CharacterInfoField>[];
     final remaining = <String>[];

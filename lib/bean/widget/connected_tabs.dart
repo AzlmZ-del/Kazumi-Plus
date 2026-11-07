@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-// Material 3 connected-button small tokens.
+// Material 3 connected-button 小尺寸规格。
 
 const double _connectedGroupHeight = 40;
 const double _connectedGroupGap = 2;
@@ -91,7 +91,7 @@ class _ConnectedSegmentState extends State<_ConnectedSegment> {
       button: true,
       inMutuallyExclusiveGroup: true,
       selected: selection > 0.5,
-      // Selection already follows the tab animation; tween only the press.
+      // 选中态已由 tab 动画驱动，这里的 tween 只负责按下反馈。
       child: TweenAnimationBuilder<double>(
         tween: Tween<double>(end: _pressed ? 1 : 0),
         duration: const Duration(milliseconds: 180),

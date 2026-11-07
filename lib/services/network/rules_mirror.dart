@@ -2,11 +2,11 @@ import 'package:kazumi/request/config/api_endpoints.dart';
 import 'package:kazumi/services/network/acceleration_mode.dart';
 import 'package:kazumi/services/storage/storage.dart';
 
-/// Rule repository acceleration.
+/// 规则仓库加速。
 ///
-/// gh-proxy and ghfast are prefix proxies: the whole original URL is appended.
-/// GitCode only mirrors the official repository by path, so the personal
-/// repository stays on gh-proxy no matter which mode is picked.
+/// gh-proxy 与 ghfast 是前缀代理：把完整原始 URL 接在后面即可。
+/// GitCode 只按路径镜像官方仓库，所以无论选哪种模式，
+/// 个人仓库都还是走 gh-proxy。
 enum RulesMirror implements AccelerationMode {
   ghProxy,
   ghfast,
@@ -33,7 +33,7 @@ enum RulesMirror implements AccelerationMode {
     direct => '直连访问',
   };
 
-  /// Rewrites [url] onto this mirror, or returns null when it stays untouched.
+  /// 把 [url] 改写到本镜像上；不需要改写时返回 null。
   String? map(String url) {
     final official = url.startsWith(ApiEndpoints.pluginShop);
     final personal = url.startsWith(ApiEndpoints.personalPluginShop);

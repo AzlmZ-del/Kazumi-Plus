@@ -55,7 +55,7 @@ class PlaybackCachePolicy {
     }
     try {
       final pp = player.platform as NativePlayer;
-      // A stale player's initialization must not block its replacement's writes.
+      // 旧播放器的初始化不能挡住接替者的写入。
       await pp.waitForPlayerInitialization;
       await _writes.run(() async {
         if (!identical(_currentPlayer(), player)) {

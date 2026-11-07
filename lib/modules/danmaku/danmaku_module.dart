@@ -2,13 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:kazumi/utils/danmaku.dart';
 
 class DanmakuEntry {
-  // 弹幕内容
   String message;
-  // 弹幕时间
   double time;
   // 弹幕类型 (1-普通弹幕，4-底部弹幕，5-顶部弹幕)
   int type;
-  // 弹幕颜色
   Color color;
   // 弹幕来源 ([BiliBili], [Gamer])
   String source;

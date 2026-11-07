@@ -76,7 +76,7 @@ class _CollectSyncDialogState extends State<CollectSyncDialog> {
       _StepState(CollectSyncStep.upload),
   ];
 
-  // Removed routes can stay mounted until their exit animation ends.
+  // 路由被移除后，退出动画结束前仍处于 mounted 状态。
   bool get _active => mounted && (ModalRoute.of(context)?.isActive ?? false);
   bool get _hasFailure =>
       _steps.any((step) => step.status == _StepStatus.failed);

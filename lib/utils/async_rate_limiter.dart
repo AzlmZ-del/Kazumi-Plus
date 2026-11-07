@@ -1,13 +1,13 @@
 import 'dart:async';
 
-/// Ensures asynchronous operations are spaced apart by at least a minimum interval.
+/// 保证异步操作之间至少相隔一个最小时间间隔。
 class AsyncRateLimiter {
   AsyncRateLimiter(this.period);
 
   final Duration period;
   DateTime _nextAllowedTime = DateTime.now();
 
-  /// Waits until the next allowed time slot and reserves the following slot.
+  /// 等到下一个允许的时间点，并顺手把再下一个也占掉。
   Future<void> acquire() async {
     final now = DateTime.now();
     final scheduledTime =
@@ -19,7 +19,7 @@ class AsyncRateLimiter {
     }
   }
 
-  /// Runs [action] after acquiring a rate-limited time slot.
+  /// 拿到限速时间片之后才执行 [action]。
   Future<T> run<T>(Future<T> Function() action) async {
     await acquire();
     return await action();

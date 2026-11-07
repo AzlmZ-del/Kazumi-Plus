@@ -53,7 +53,7 @@ class ImageFileService extends FileService {
         if (!BangumiImageUrlRewriter.isBangumiImage(source)) {
           return _fetch(source, headers);
         }
-        // ECH keeps talking to the same host, so the token stays with Bangumi.
+        // ECH 模式下还是连同一个主机，所以令牌仍只发给 Bangumi。
         final accelerated = await _echService.get(
           source.replace(scheme: 'https').toString(),
           headers: _withToken(headers, token),
@@ -63,7 +63,7 @@ class ImageFileService extends FileService {
       case ImageAcceleration.mirror:
         final target = BangumiImageUrlRewriter.rewrite(source);
         if (target == source) return _fetch(source, _withToken(headers, token));
-        // wsrv.nl is a third party; never forward the access token to it.
+        // wsrv.nl 是第三方，绝不能把访问令牌转发给它。
         final accelerated = await _fetch(target, _withoutToken(headers));
         return _retryWithToken(accelerated, source, token, headers);
     }
@@ -83,9 +83,9 @@ class ImageFileService extends FileService {
     return {...headers}..remove('Authorization');
   }
 
-  /// Bangumi serves R18 covers only to authenticated callers. The wsrv mirror
-  /// forwards anonymously and answers 404, so replay the original URL with the
-  /// token and keep the accelerated result when that fails as well.
+  /// Bangumi 只对已鉴权的调用方提供 R18 封面。wsrv 镜像是匿名转发的，
+  /// 会返回 404，所以带上令牌把原始地址再请求一次；
+  /// 若那样也失败，就沿用加速源的结果。
   Future<FileServiceResponse> _retryWithToken(
     FileServiceResponse accelerated,
     Uri source,

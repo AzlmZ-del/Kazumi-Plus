@@ -75,7 +75,7 @@ class ApiSearchConfig {
   String namePath;
   String sourcePath;
 
-  /// Detail page URL built by replacing `@source`; empty keeps the raw value.
+  /// 把 `@source` 替换掉后得到的详情页 URL；留空则保留原值。
   final String sourceTemplate;
 
   ApiSearchConfig({
@@ -107,10 +107,10 @@ class ApiSearchConfig {
 }
 
 class ApiEpisodePageConfig {
-  /// Template for the final playback page URL.
+  /// 最终播放页 URL 的模板。
   String url;
 
-  /// Query parameters rendered with response and episode index variables.
+  /// 查询参数，可用响应与集索引变量渲染。
   Map<String, dynamic> query;
 
   ApiEpisodePageConfig({
@@ -131,19 +131,18 @@ class ApiEpisodePageConfig {
       };
 }
 
-/// Turns the episode page URL into a media URL by calling an API.
+/// 通过调用接口把剧集页 URL 换成媒体 URL。
 ///
-/// Rules that serve a player page are resolved in a webview. Sites that hand
-/// out a signed media URL through an authenticated endpoint cannot be handled
-/// that way, because the webview has no credentials. Such rules declare this
-/// block instead: the episode URL is requested as an API call and the media
-/// URL is read out of the JSON response.
+/// 提供播放页的规则是在 webview 里解析的。而那些通过带鉴权接口
+/// 下发签名媒体地址的站点没法这样处理，因为 webview 没有凭据。
+/// 这类规则改为声明本块：把剧集 URL 当接口调用请求一次，
+/// 再从 JSON 响应里读出媒体地址。
 class ApiPlayConfig {
-  /// Request used to fetch the media URL. An empty [ApiRequestConfig.url]
-  /// means the episode page URL itself is the endpoint.
+  /// 用来取媒体地址的请求。若 [ApiRequestConfig.url] 为空，
+  /// 就以剧集页 URL 本身当接口地址。
   ApiRequestConfig request;
 
-  /// JSONPath of the media URL inside the response.
+  /// 媒体地址在响应里的 JSONPath。
   String urlPath;
 
   ApiPlayConfig({
@@ -168,32 +167,31 @@ class ApiChapterConfig {
   ApiRequestConfig request;
   String format;
 
-  // Nested JSON response mapping.
+  // 嵌套 JSON 响应的字段映射。
   String roadsPath;
   String roadNamePath;
   String episodesPath;
   String episodeNamePath;
 
-  /// JSONPath for a playback entry URL (page URL or direct media URL).
-  /// May be empty when [episodePage] constructs the final playback page URL.
+  /// 指向播放入口 URL（播放页或直链媒体）的 JSONPath。
+  /// 若由 [episodePage] 自行拼出最终播放页 URL，这里可以留空。
   String episodeUrlPath;
 
-  // Delimited string response mapping.
+  // 分隔符字符串响应的字段映射。
   String roadNamesPath;
   String roadEpisodesPath;
   String roadSeparator;
   String episodeSeparator;
   String fieldSeparator;
 
-  /// Named JSONPath captures over the chapter response, exposed as template
-  /// variables to [episodePage].
+  /// 对章节响应做的具名 JSONPath 捕获，作为模板变量暴露给 [episodePage]。
   Map<String, String> variables;
 
-  /// Optional final playback page template used instead of a response URL.
+  /// 可选的最终播放页模板，用它替代响应里给出的 URL。
   ApiEpisodePageConfig? episodePage;
 
-  /// Optional API call that turns the episode URL into a media URL. When set,
-  /// playback skips the webview and requests the endpoint directly.
+  /// 可选：把剧集 URL 换成媒体 URL 的接口调用。设置之后，
+  /// 播放会跳过 webview，直接请求该接口。
   ApiPlayConfig? play;
 
   ApiChapterConfig({
@@ -242,9 +240,8 @@ class ApiChapterConfig {
     );
   }
 
-  /// Whether any nested-format field deviates from its default. Persisting
-  /// re-serializes every plugin, so a customized inactive side must survive
-  /// even while [format] points at the other one.
+  /// 是否有任何嵌套格式的字段偏离了默认值。落盘时会重新序列化每个插件，
+  /// 所以即使 [format] 指向另一种格式，被改过的非活动那一侧也必须保住。
   bool get _hasNestedConfig =>
       roadsPath != r'$.data.roads[*]' ||
       roadNamePath != r'$.name' ||
@@ -255,8 +252,8 @@ class ApiChapterConfig {
   bool get _hasDelimitedConfig =>
       roadNamesPath.isNotEmpty || roadEpisodesPath.isNotEmpty;
 
-  /// Serializes the active [format]'s fields, plus the inactive format's
-  /// fields when they carry non-default configuration.
+  /// 序列化当前 [format] 的字段；若另一种格式带有非默认配置，
+  /// 连同它的字段一起序列化。
   Map<String, dynamic> toJson() => {
         'request': request.toJson(),
         'format': format,

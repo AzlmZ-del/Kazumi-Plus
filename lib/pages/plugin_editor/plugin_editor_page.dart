@@ -290,7 +290,7 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
   String chapterApiMethod = 'GET';
   String chapterApiBodyType = ApiBodyType.none;
   String chapterApiFormat = ApiChapterFormat.nested;
-  // Preserve legacy fields that the editor no longer exposes.
+  // 编辑器已不再展示的旧字段也要原样保留，避免保存时丢数据。
   late String _api;
   late String _type;
   late bool _muliSources;
@@ -519,8 +519,8 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
     context.pushNamed('/settings/plugin/test', arguments: editedPlugin);
   }
 
-  /// Runs the login flow of the plugin **as currently edited**, so the user
-  /// can verify both the flow and the saved account before saving the rule.
+  /// 按**当前编辑中**的内容跑一遍插件登录流程，
+  /// 让用户在保存规则前就能验证流程本身与已保存的账号。
   Future<void> _checkLogin() async {
     if (_loginChecking) return;
     final ruleName = nameController.text.trim();
@@ -1434,8 +1434,8 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
         captchaDetectValue: captchaDetectValueController.text,
         captchaScript: captchaScriptController.text,
       ),
-      // Built from the 登录 tab; null when login is not enabled. A null here
-      // still means "the user turned it off", not "silently dropped".
+      // 由「登录」页签构造；未启用登录时为 null。这里的 null 表示
+      // 「用户主动关掉了」，不是「被悄悄丢弃」。
       auth: authConfig,
     );
   }
@@ -1514,8 +1514,7 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
                 '播放页查询参数',
               ),
             ),
-      // The editor has no fields for the play endpoint yet, but saving the form
-      // must not silently drop it.
+      // 编辑器还没有播放接口的输入框，但保存表单时不能把它悄悄丢掉。
       play: widget.plugin.chapterApiConfig.play,
     );
     if (chapterMode != RuleMode.api) return config;

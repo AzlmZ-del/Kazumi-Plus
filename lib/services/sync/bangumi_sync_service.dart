@@ -83,7 +83,7 @@ class BangumiSyncService extends ChangeNotifier {
     }
   }
 
-  // Validate draft credentials before exposing them to other requests.
+  // 先把草稿凭据校验过，再让别的请求用它们。
   Future<void> saveToken(String value) {
     return _operations.run(() async {
       final token = value.trim();
@@ -143,7 +143,7 @@ class BangumiSyncService extends ChangeNotifier {
 
   Future<void> _applyLocalMutation(BangumiLocalMutation mutation) async {
     await GStorage.putCollectible(mutation.collectible);
-    // Remote changes must also reach WebDAV's incremental change log.
+    // 远端改动也要写进 WebDAV 的增量变更日志。
     await GStorage.appendCollectChange(
       bangumiId: mutation.collectible.bangumiItem.id,
       action: mutation.changeAction,

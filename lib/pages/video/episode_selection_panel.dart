@@ -63,7 +63,7 @@ class EpisodeSelectionPanelState extends State<EpisodeSelectionPanel> {
   Future<void> revealCurrentEpisode() async {
     if (!_canLocate) return;
     setState(() => _visibleRoad = widget.selectedRoad);
-    // Wait for the observer to bind the new road's sliver after layout.
+    // 等布局完成后，观察者才能绑上新线路的 sliver。
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted ||
         !_scrollController.hasClients ||
@@ -255,7 +255,7 @@ class _EpisodeToolbar extends SliverPersistentHeaderDelegate {
   @override
   Widget build(
           BuildContext context, double shrinkOffset, bool overlapsContent) =>
-      // Fill minExtent even when desktop controls use a smaller touch target.
+      // 桌面端控件触摸区更小时，仍要撑满 minExtent。
       SizedBox.expand(child: ColoredBox(color: color, child: child));
 
   @override
@@ -320,7 +320,7 @@ class _RoadSelectorState extends State<_RoadSelector> {
       return;
     }
     if (previousFocus is FocusScopeNode) {
-      // Do not restore the scope's last child: it may be this menu button.
+      // 不要恢复作用域的上一个焦点子项：它可能就是这枚菜单按钮自己。
       previousFocus.requestScopeFocus();
     } else {
       previousFocus.requestFocus();

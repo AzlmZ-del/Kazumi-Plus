@@ -16,7 +16,7 @@ class MediaErrorWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // Media surfaces stay black regardless of the app theme.
+    // 媒体区域固定深色，不跟随 App 主题。
     return Theme(
       data: theme.copyWith(
         colorScheme: ColorScheme.fromSeed(

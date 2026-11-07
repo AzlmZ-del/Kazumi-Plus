@@ -18,8 +18,8 @@ class TimedShutdownService {
 
   final ValueNotifier<int> remainingSecondsNotifier = ValueNotifier<int>(0);
 
-  /// Bumped every time the timer actually expires, so the mounted player panel
-  /// can drop its resume ownership without the service holding a stale widget.
+  /// 定时器每真正到期一次就递增，让挂载中的播放面板能据此放弃续播持有权，
+  /// 服务本身也不必持有一个已失效的组件引用。
   final ValueNotifier<int> expiryTicks = ValueNotifier<int>(0);
   final ValueNotifier<int> setMinutesNotifier = ValueNotifier<int>(0);
 

@@ -44,7 +44,7 @@ class _SourceCaptchaFlow {
           },
           onVerified: verified.complete,
         ));
-        // Submission returns after the JS click, before verification completes.
+        // 提交在 JS 点击后就返回了，此时验证还没真正完成。
         if (!finalizing) {
           timeout?.cancel();
           timeout = Timer(const Duration(seconds: 8), task.cancel);

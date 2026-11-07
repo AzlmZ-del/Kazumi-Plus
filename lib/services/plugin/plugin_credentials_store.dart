@@ -3,16 +3,15 @@ import 'dart:convert';
 import 'package:hive_ce/hive.dart';
 import 'package:kazumi/services/logging/logger.dart';
 
-/// Locally stored credentials and cached tokens for rules that declare a
-/// login flow (`auth` in the rule JSON).
+/// 声明了登录流程的规则（规则 JSON 里的 `auth`）所用的本地凭据与令牌缓存。
 ///
-/// Credentials are entered by the user in the "规则账号" settings page and
-/// never leave this device — they must not end up in rule files, logs or
-/// any network request other than the rule's own login endpoint.
+/// 凭据由用户在「规则账号」设置页里输入，之后
+/// 绝不离开这台设备——不能出现在规则文件、日志或任何导出内容里。
+/// 除了规则自己的登录接口，不会发出任何其它网络请求。
 class PluginCredentialsStore {
   PluginCredentialsStore._();
 
-  /// A fresh store with empty in-memory state; used by tests.
+  /// 一个内存状态为空的干净实例，供测试使用。
   factory PluginCredentialsStore.fresh() => PluginCredentialsStore._();
 
   static PluginCredentialsStore instance = PluginCredentialsStore._();
@@ -45,8 +44,8 @@ class PluginCredentialsStore {
     }
   }
 
-  /// Restores cached entries from disk. Call once after GStorage.init();
-  /// failures leave the store empty (user re-enters credentials).
+  /// 从磁盘恢复缓存条目。要在 GStorage.init() 之后调用一次；
+  /// 失败时存储保持为空（用户重新输一遍凭据）。
   Future<void> load() async {
     try {
       final box = await _getBox();
@@ -58,7 +57,7 @@ class PluginCredentialsStore {
           final entry = _Entry.fromJson(jsonDecode(raw) as Map<String, dynamic>);
           _cache['$key'] = entry;
         } catch (_) {
-          // Skip malformed entries instead of failing the whole store.
+          // 跳过格式损坏的条目，而不是让整个存储失效。
         }
       }
     } catch (error) {
@@ -67,15 +66,15 @@ class PluginCredentialsStore {
     }
   }
 
-  /// Username previously saved for [pluginName], or null.
+  /// [pluginName] 之前保存的用户名，没有则为 null。
   String? usernameFor(String pluginName) =>
       _entryFor(pluginName)?.username;
 
-  /// Password previously saved for [pluginName], or null.
+  /// [pluginName] 之前保存的密码，没有则为 null。
   String? passwordFor(String pluginName) =>
       _entryFor(pluginName)?.password;
 
-  /// Whether the user has entered credentials for [pluginName].
+  /// 用户是否已经为 [pluginName] 填过凭据。
   bool hasCredentials(String pluginName) {
     final entry = _entryFor(pluginName);
     return entry != null &&
@@ -83,8 +82,8 @@ class PluginCredentialsStore {
         entry.password.isNotEmpty;
   }
 
-  /// Saves or replaces the credentials for [pluginName]. The cached token is
-  /// kept: saving identical credentials should not force a re-login.
+  /// 保存或替换 [pluginName] 的凭据。已缓存的令牌保持不变：
+  /// 保存一份完全相同的凭据不该强制重新登录。
   Future<void> saveCredentials(
     String pluginName, {
     required String username,
@@ -98,10 +97,9 @@ class PluginCredentialsStore {
     await _putEntry(pluginName, entry);
   }
 
-  /// Replaces only the username, keeping the stored password.
+  /// 只替换用户名，保留已存的密码。
   ///
-  /// Returns false when there is no password to keep, in which case the
-  /// caller must ask the user for one.
+  /// 没有可保留的密码时返回 false，此时调用方必须向用户索要密码。
   Future<bool> saveUsername(String pluginName, String username) async {
     final existing = _entryFor(pluginName);
     if (existing == null || existing.password.isEmpty) return false;
@@ -109,25 +107,25 @@ class PluginCredentialsStore {
     return true;
   }
 
-  /// Cached token for [pluginName], or null.
+  /// [pluginName] 缓存的令牌，没有则为 null。
   String? tokenFor(String pluginName) => _entryFor(pluginName)?.token;
 
-  /// Caches the login token for [pluginName].
+  /// 缓存 [pluginName] 的登录令牌。
   Future<void> saveToken(String pluginName, String token) async {
     final existing = _entryFor(pluginName) ?? _Entry();
     await _putEntry(
         pluginName, existing.copyWith(token: token));
   }
 
-  /// Drops the cached token (not the credentials) so the next request
-  /// triggers a fresh login. Used when the server rejects the token.
+  /// 丢掉缓存的令牌（不动凭据），让下一次请求触发重新登录。
+  /// 服务端拒绝令牌时用。
   Future<void> clearToken(String pluginName) async {
     final existing = _entryFor(pluginName);
     if (existing == null || existing.token == null) return;
     await _putEntry(pluginName, existing.copyWith(token: null));
   }
 
-  /// Removes everything stored for [pluginName].
+  /// 清掉 [pluginName] 名下存储的全部内容。
   Future<void> clearAll(String pluginName) async {
     _cache.remove(_key(pluginName));
     try {
@@ -159,7 +157,7 @@ class _Entry {
     return _Entry(
       username: username ?? this.username,
       password: password ?? this.password,
-      // Explicit null clears the token.
+      // 显式传 null 表示清空令牌。
       token: token == null && this.token != null ? null : (token ?? this.token),
     );
   }

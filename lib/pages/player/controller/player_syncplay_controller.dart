@@ -41,9 +41,8 @@ abstract class _PlayerSyncPlayController with Store {
   final Future<void> Function({bool enableSync}) play;
   final Future<void> Function(Duration duration, {bool enableSync}) seek;
 
-  /// Set before the socket opens and cleared on teardown, so unlike
-  /// [syncplayRoom] it also covers the window where the connection is still
-  /// being established.
+  /// 在 socket 打开之前就赋值、拆除时清空，所以与 [syncplayRoom] 不同，
+  /// 它还能覆盖「连接正在建立」这段窗口期。
   @observable
   SyncplayClient? syncplayController;
   final AsyncSessionOwner _connectionSessions = AsyncSessionOwner();
@@ -331,7 +330,7 @@ abstract class _PlayerSyncPlayController with Store {
     try {
       await operation();
     } on SyncplayConnectionException {
-      // Socket handlers report active connection failures.
+      // 连接失败由 socket 回调上报，这里不再重复处理。
     }
   }
 

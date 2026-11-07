@@ -37,8 +37,7 @@ class _PluginShopPageState extends State<PluginShopPage> {
   Future<void> _openRepositories() async {
     await context.pushNamed('/settings/plugin/shop/repositories');
     if (!mounted) return;
-    // The management page may have changed which repositories are enabled; the
-    // catalog has to be recomputed, not just re-fetched.
+    // 管理页可能改过哪些仓库被启用，所以目录要重新计算，不只是重新拉取。
     _catalogKey.currentState?.reload();
   }
 }

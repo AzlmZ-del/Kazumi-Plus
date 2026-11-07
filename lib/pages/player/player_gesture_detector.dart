@@ -44,7 +44,7 @@ class _PlayerGestureDetectorState extends State<PlayerGestureDetector> {
 
         return Listener(
           behavior: HitTestBehavior.translucent,
-          // Flutter reports pointer cancellation as onEnd for accepted drags.
+          // Flutter 对已接受的拖拽会把指针取消报成 onEnd，所以要单独拦 onPointerCancel。
           onPointerCancel: (_) => _endSeek(cancelled: true),
           child: GestureDetector(
             onHorizontalDragStart: (details) {

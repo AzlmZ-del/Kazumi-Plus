@@ -34,7 +34,7 @@ abstract class _MyController with Store {
   final List<StreamSubscription<void>> _subscriptions = [];
   Timer? _refreshDebounceTimer;
 
-  // Route swaps can briefly attach two page instances.
+  // 路由切换期间可能短暂地同时挂上两个页面实例。
   void attach() {
     _viewerCount++;
     if (_subscriptions.isEmpty) {
@@ -61,7 +61,7 @@ abstract class _MyController with Store {
   }
 
   void _scheduleRefresh() {
-    // Coalesce frequent playback history writes.
+    // 播放历史写得很频繁，合并成一次刷新。
     _refreshDebounceTimer?.cancel();
     _refreshDebounceTimer = Timer(_refreshDebounce, _refresh);
   }
@@ -101,7 +101,7 @@ abstract class _MyController with Store {
   }
 
   Future<void> loadShieldList() async {
-    // Keep this subscription alive during playback.
+    // 播放期间让这个订阅一直活着，不要重建。
     _shieldSubscription ??=
         _shieldRepository.changes.listen((_) => _refreshShieldList());
     _refreshShieldList();

@@ -1,9 +1,7 @@
-import 'package:kazumi/request/config/api_endpoints.dart';
 import 'package:kazumi/modules/characters/character_item.dart';
 
-/// The response from [ApiEndpoints.bangumiInfoByID]
-/// It contains a list of [CharacterItem]
-/// It is used to show general information about seraval bangumi characters
+/// `/v0/subjects/{0}` 中角色字段的响应。
+/// 内含 [CharacterItem] 列表，用于展示番剧角色概况。
 class CharactersResponse {
   final List<CharacterItem> charactersList;
 

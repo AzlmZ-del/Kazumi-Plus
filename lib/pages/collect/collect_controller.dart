@@ -294,7 +294,7 @@ abstract class _CollectController with Store {
     return true;
   }
 
-  // Upload without merging again after Bangumi updates the local collection.
+  // Bangumi 已更新本地收藏后，直接上传，不再合并一次。
   Future<bool> uploadCollectiblesToWebDav({
     required ValueChanged<String> onError,
   }) async {
@@ -313,7 +313,7 @@ abstract class _CollectController with Store {
     if (favorites.isNotEmpty) {
       int count = 0;
       for (BangumiItem bangumiItem in favorites) {
-        // Migration must work before Bangumi is initialized.
+        // 迁移要在 Bangumi 初始化之前也能跑通。
         final int currentCollectType = getCollectType(bangumiItem);
         final int collectChangeAction = currentCollectType == 0 ? 1 : 2;
         await _collectCrudRepository.addCollectible(bangumiItem, 1);

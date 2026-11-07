@@ -98,7 +98,7 @@ class RestrictedJsonPath {
   }
 }
 
-/// Executes API request templates and parses supported JSON response shapes.
+/// 执行 API 请求模板，并解析受支持的几种 JSON 响应形态。
 class ApiRuleStrategy {
   const ApiRuleStrategy();
 
@@ -138,8 +138,8 @@ class ApiRuleStrategy {
     );
   }
 
-  /// Validates all JSONPath expressions in a search rule. Also used by the
-  /// plugin editor to reject invalid rules before saving.
+  /// 校验搜索规则里所有 JSONPath 表达式。
+  /// 插件编辑器也用它，在保存前拒掉非法规则。
   void validateSearchConfig(ApiSearchConfig config) {
     RestrictedJsonPath.validate(config.listPath);
     RestrictedJsonPath.validate(config.namePath);
@@ -171,7 +171,7 @@ class ApiRuleStrategy {
           diagnostics.add('搜索节点 $index 缺少名称或来源，已跳过');
           continue;
         }
-        // Plain replacement so @source may follow a letter (`/GV@source`).
+        // 用普通字符串替换，这样 @source 可以紧跟字母（如 `/GV@source`）。
         final src = template.isEmpty
             ? source
             : template.replaceAll('@source', Uri.encodeComponent(source));
@@ -237,9 +237,8 @@ class ApiRuleStrategy {
     String baseUrl,
     List<String> diagnostics,
   ) {
-    // Only the episode list honours the reverse prefix; the road list and the
-    // road-name list are paired by index, so the marker is stripped and
-    // reported there instead.
+    // 只有剧集列表认反转前缀；线路列表与线路名列表按下标配对，
+    // 所以那里只剥掉标记并给出提示。
     final episodesSelector = splitReversePrefix(config.episodesPath);
     final roadsSelector = splitReversePrefix(config.roadsPath);
     if (roadsSelector.reverse) {
@@ -450,9 +449,8 @@ class ApiRuleStrategy {
     if (page.url.trim().isEmpty) {
       throw const ApiRuleFormatException('播放页地址模板不能为空');
     }
-    // The template language has no arithmetic, so both 0-based and 1-based
-    // indices must be provided; @episodeUrl carries the raw value extracted
-    // by episodeUrlPath and has no substitute.
+    // 模板语言没有算术能力，所以从 0 起和从 1 起的下标都得提供；
+    // @episodeUrl 带的是 episodeUrlPath 抽出来的原始值，没有替代变量。
     final variables = <String, Object?>{
       ...rootVariables,
       'episodeUrl': rawUrl,
@@ -479,10 +477,10 @@ class ApiRuleStrategy {
     );
   }
 
-  /// Builds the request that turns an episode URL into a media URL.
+  /// 构造那个把剧集 URL 换成媒体 URL 的请求。
   ///
-  /// An empty template means the episode URL already is the endpoint, which is
-  /// the common case: the chapter rule's `episodePage` template produced it.
+  /// 模板为空表示剧集 URL 本身就是接口地址，这是常见情况：
+  /// 它由章节规则的 `episodePage` 模板生成。
   PreparedRuleRequest preparePlayRequest(
     ApiPlayConfig config,
     String episodeUrl,
@@ -513,7 +511,7 @@ class ApiRuleStrategy {
     );
   }
 
-  /// Reads the media URL out of a play API response.
+  /// 从播放接口的响应里读出媒体地址。
   String parsePlayUrl(String raw, ApiPlayConfig config) {
     final document = decodeResponse(raw);
     final value = RestrictedJsonPath.readFirst(document, config.urlPath);
@@ -524,9 +522,8 @@ class ApiRuleStrategy {
     return url;
   }
 
-  /// Validates the JSONPath expressions and format-specific invariants of a
-  /// chapter rule. Also used by the plugin editor to reject invalid rules
-  /// before saving.
+  /// 校验章节规则的 JSONPath 表达式与各格式特有的不变量。
+  /// 插件编辑器也用它，在保存前拒掉非法规则。
   void validateChapterConfig(ApiChapterConfig config) {
     for (final path in config.variables.values) {
       RestrictedJsonPath.validate(path);

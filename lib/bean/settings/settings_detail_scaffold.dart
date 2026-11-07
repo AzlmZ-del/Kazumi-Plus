@@ -79,7 +79,6 @@ class SettingsDetailScaffold extends StatelessWidget {
       );
     }
 
-    // Keep routed panes opaque during transitions.
     return Scaffold(
       appBar: appBar,
       body: body,

@@ -40,7 +40,7 @@ class _SearchPageState extends State<SearchPage> {
   final _input = TextEditingController();
   final _inputFocus = FocusNode();
   final _scroll = ScrollController();
-  // Preserve the input subtree when the header moves in or out of the scroll view.
+  // 表头进出滚动视图时，保住输入框那棵子树的状态。
   final _searchHeaderKey = GlobalKey();
   String? _submittedQuery;
   bool _managingHistory = false;

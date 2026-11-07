@@ -1,4 +1,4 @@
-/// Per-plugin search progress, written solely by PluginSearchService.
+/// 单个插件的搜索进度，只由 PluginSearchService 写入。
 enum PluginSearchStatus { pending, success, error, noResult, captcha }
 
 class SearchItem {

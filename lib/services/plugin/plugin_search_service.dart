@@ -16,8 +16,8 @@ class PluginSearchService {
   final PluginsController pluginsController;
   final RuleCancelToken _cancelToken = RuleCancelToken();
 
-  /// Per-plugin sessions so a replacement query (alias/manual search)
-  /// invalidates the write-back of the still-running previous one.
+  /// 按插件分会话，这样发起替换查询（别名搜索 / 手动搜索）时，
+  /// 仍在跑的旧查询的回写会失效。
   final Map<String, AsyncSessionOwner> _querySessions = {};
   bool _isCancelled = false;
 
@@ -35,9 +35,8 @@ class PluginSearchService {
     }
   }
 
-  /// Publishes the result page harvested by the captcha webview, skipping
-  /// one network round trip. Returns false when the HTML does not parse
-  /// into results; callers should fall back to [querySource].
+  /// 把验证 webview 抓到的结果页直接发布出去，省掉一次网络往返。
+  /// HTML 解析不出结果时返回 false，调用方应退回 [querySource]。
   bool applyHarvestedSearchResult(String pluginName, String html) {
     if (_isCancelled) return false;
     for (final plugin in pluginsController.pluginList) {

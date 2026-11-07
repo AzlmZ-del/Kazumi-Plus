@@ -93,9 +93,9 @@ class BangumiClient {
         (accessToken ??
                 GStorage.getSetting<String>(SettingsKeys.bangumiAccessToken))
             .trim();
-    // `anonymous` exists for the auth fallback path: `bangumiSyncEnable` adds
-    // the token to every request, so without an explicit opt-out a retry that
-    // asks for no auth would still replay the rejected credentials.
+    // `anonymous` 是为鉴权兜底路径准备的：`bangumiSyncEnable` 会给每个请求
+    // 都带上令牌，所以如果不显式关掉，一个「要求不带鉴权」的重试
+    // 仍会把刚被拒的凭据再发一遍。
     if (!anonymous &&
         (requiresAuth || bangumiSyncEnable) &&
         token.isNotEmpty) {

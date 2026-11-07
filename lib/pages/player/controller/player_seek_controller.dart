@@ -72,7 +72,7 @@ class PlayerSeekController {
       try {
         await _onSeekCompleted(enableSync);
       } catch (e) {
-        // Callers often drop this future; it must not complete with an error.
+        // 调用方经常不 await 这个 future，所以它不能以错误完成，否则会变成未捕获异常。
         KazumiLogger()
             .w('PlayerSeekController: seek completion failed', error: e);
       }
@@ -91,7 +91,7 @@ class PlayerSeekController {
   void beginInteractiveSeek() {
     final initialPosition = _playback.currentPosition;
     final previousSession = _interactiveSession;
-    // Keep the original playing state across overlapping gestures.
+    // 手势可能重叠，要沿用最早那次会话的播放状态，而不是当前值。
     final wasPlaying = previousSession != null && _isCurrent(previousSession)
         ? previousSession.wasPlaying
         : _playback.playerPlaying;
@@ -136,7 +136,7 @@ class PlayerSeekController {
         return false;
       }
       if (cancelled) {
-        // Only the preview moved; cancellation needs no native seek.
+        // 只有预览位置动过，取消时不需要真的 seek，改回记录值即可。
         _playback.currentPosition = session.initialPosition;
       }
       await session.pauseCompleted;

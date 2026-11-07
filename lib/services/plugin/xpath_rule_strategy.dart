@@ -92,8 +92,7 @@ class XPathRuleStrategy {
         kind: XPathRuleFormatKind.invalidUrl,
       );
     }
-    // XPath chapter requests historically go out without stored cookies;
-    // only search requests attach them.
+    // XPath 章节请求历来不带存储的 cookie，只有搜索请求才会带。
     return PreparedRuleRequest(method: 'GET', url: url);
   }
 
@@ -159,10 +158,9 @@ class XPathRuleStrategy {
     final root = _documentElement(raw);
     final roads = <Road>[];
     final diagnostics = <String>[];
-    // Only the episode selector honours the reverse prefix. The road list is
-    // paired with the road-name list by index, so reversing one without the
-    // other would silently mislabel every road; the prefix is stripped and
-    // reported there instead.
+    // 只有剧集选择器认反转前缀。线路列表与线路名列表按下标配对，
+    // 只反转其中一个会让每条线路静默贴错名字；
+    // 所以那里只剥掉前缀并给出提示。
     final episodeSelector = splitReversePrefix(
       config.chapterResult,
       xpathNumericLiteral: true,
@@ -179,9 +177,8 @@ class XPathRuleStrategy {
       roadsSelector.expression,
       () => root.queryXPath(roadsSelector.expression).nodes,
     );
-    // Optional: road names live outside the road nodes on many sites (tab
-    // headers vs. tab panes), so they are queried separately and matched to
-    // the roads by index.
+    // 可选：很多站点把线路名放在线路节点之外（标签页头与标签页面板），
+    // 所以要单独查询，再按下标与线路配对。
     final roadNameSelector = splitReversePrefix(
       config.chapterRoadName,
       xpathNumericLiteral: true,
@@ -190,8 +187,8 @@ class XPathRuleStrategy {
     if (roadNameSelector.reverse) {
       diagnostics.add('$reversePrefixLabel 只对剧集列表生效，线路名称列表已忽略');
     }
-    // Starts as an empty list of the same element type, so the optional field
-    // can be skipped without a second type parameter.
+    // 初始化为同一元素类型的空列表，这样可选字段可以被跳过，
+    // 不必再引入第二个类型参数。
     var roadNameNodes = roadNodes.sublist(0, 0);
     if (roadNameExpression.isNotEmpty) {
       roadNameNodes = _runSelector(
@@ -217,9 +214,8 @@ class XPathRuleStrategy {
           episodeSelector.expression,
           () => roadNode.queryXPath(episodeSelector.expression).nodes,
         );
-        // Sites that list the newest episode first are parsed back into
-        // broadcast order so "第1集"（or the site's own `1`）lines up with the
-        // first episode the user expects.
+        // 把「最新一集排在前面」的站点解析回来，让「第1集」（或站点自己的 `1`）
+        // 对上用户期望的第一集。
         final orderedEpisodes =
             episodeSelector.reverse ? episodeNodes.reversed.toList() : episodeNodes;
         for (var episodeIndex = 0;

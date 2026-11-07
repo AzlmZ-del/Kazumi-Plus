@@ -16,8 +16,8 @@ class _CollectCategories extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    // Each lerped weight is a new font instance, so TabBar animates only the
-    // color and the selected label turns bold once per category change.
+    // 插值出来的字重每帧都是新的字体实例，所以这里只用 w500 常量字重——
+    // TabBar 只对颜色做过渡，选中项在切换时一次性变粗。
     final labelStyle =
         theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500);
     return TabBar(

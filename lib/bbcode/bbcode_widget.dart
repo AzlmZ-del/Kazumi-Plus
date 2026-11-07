@@ -147,6 +147,8 @@ class _BBCodeWidgetState extends State<BBCodeWidget> {
                   ),
                 );
               } else if (e is BBCodeBgm) {
+                // id 段位对应 bangumi 三套图床路径：11/23 是 bgm 系列的 gif，
+                // 其余 bgm 用 png，24-32 是 tv01-tv09（补零），33 起 tv10 不带零。
                 String url;
                 if (e.id == 11 || e.id == 23) {
                   url = 'https://bangumi.tv/img/smiles/bgm/${e.id}.gif';
@@ -168,6 +170,7 @@ class _BBCodeWidgetState extends State<BBCodeWidget> {
                   ),
                 );
               } else if (e is BBCodeMusume) {
+                // musume 表情只在 lain.bgm.tv，与 bgm/sticker 的 bangumi.tv 不是同一图床。
                 return WidgetSpan(
                   child: CachedNetworkImage(
                     imageUrl:

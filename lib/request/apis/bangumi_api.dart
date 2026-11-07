@@ -57,8 +57,8 @@ class BangumiApi {
     return bangumiCalendar;
   }
 
-  // Official fallback for season switching. Mirror mode uses the cached
-  // /kazumi/v1/calendar/season endpoint instead of Bangumi search.
+  // 换季时的官方兜底。镜像模式改用缓存的
+  // /kazumi/v1/calendar/season 接口，而不是 Bangumi 搜索。
   static Future<List<List<BangumiItem>>> getCalendarBySearch(
       List<String> dateRange, int limit, int offset) async {
     List<BangumiItem> bangumiList = [];
@@ -336,23 +336,21 @@ class BangumiApi {
       final url = ApiEndpoints.formatUrl(
           ApiEndpoints.bangumiAPIDomain + ApiEndpoints.bangumiRankSearch,
           [limit, offset]);
-      // The nsfw filter only takes effect for authenticated requests. When the
-      // saved token is stale the API answers 401, so drop back to an anonymous
-      // request instead of failing the whole search.
+      // nsfw 过滤只对带鉴权的请求生效。若存下的令牌已过期，
+      // 接口会返回 401，此时退回匿名请求，而不是让整次搜索失败。
       final jsonData = wantNsfw
           ? await _requestWithAuthFallback(
               (anonymous) => _client.post(url,
                   data: params,
                   anonymous: anonymous,
-                  // The nsfw filter is only honoured for authenticated
-                  // callers, so ask for the token explicitly instead of
-                  // relying on the sync toggle having been enabled.
+                  // nsfw 过滤只对已鉴权的调用方生效，所以这里显式取令牌，
+                  // 而不是指望同步开关刚好是开着的。
                   requiresAuth: !anonymous),
             )
           : await _client.post(url, data: params);
       final jsonList = jsonData['data'];
-      // Untranslated entries used to be dropped unconditionally. Keep that as
-      // the default, but honour the setting so users can see them.
+      // 以前无条件的丢掉未翻译条目。现在仍以丢掉为默认，
+      // 但尊重设置项，让用户可以选择看到它们。
       final showUntranslated =
           GStorage.getSetting(SettingsKeys.bangumiShowUntranslated);
       for (dynamic jsonItem in jsonList) {
@@ -378,8 +376,8 @@ class BangumiApi {
     }
   }
 
-  /// Runs [request] with the saved credentials first and retries anonymously
-  /// when the server rejects them. Other failures propagate unchanged.
+  /// 先用存下的凭据执行 [request]，服务端拒绝时改为匿名重试一次。
+  /// 其它失败原样抛出。
   static Future<dynamic> _requestWithAuthFallback(
     Future<dynamic> Function(bool anonymous) request,
   ) async {
@@ -401,8 +399,8 @@ class BangumiApi {
                   ApiEndpoints.bangumiInfoByIDNext,
               [id]),
           anonymous: anonymous,
-          // R18 subject details are only served to authenticated callers, so
-          // the first attempt always carries the token when one is saved.
+          // R18 条目详情只对已鉴权的调用方开放，所以只要存了令牌，
+          // 第一次尝试就一定带上它。
           requiresAuth: !anonymous,
         ),
       );
@@ -482,9 +480,8 @@ class BangumiApi {
           'offset': offset,
           'limit': limit,
         };
-        // R18 subjects only expose their episode list to authenticated
-        // callers on the official host, while the mirror serves them
-        // anonymously. Ask for the token first and fall back to anonymous.
+        // R18 条目只在官方主机上、且只有已鉴权的调用方能拿到剧集列表，
+        // 镜像那边则允许匿名。所以先带令牌请求，失败再退回匿名。
         final jsonData = await _requestWithAuthFallback(
           (anonymous) => _client.get(
             ApiEndpoints.bangumiAPIDomain + ApiEndpoints.bangumiEpisodeByID,
@@ -544,13 +541,11 @@ class BangumiApi {
     return CharacterCommentResponse.fromJson(jsonData);
   }
 
-  /// Fetches a comment page, falling back to the official host when the
-  /// configured acceleration cannot serve it.
+  /// 拉取评论分页；配置的加速源提供不了时，退回官方主机。
   ///
-  /// The mirror forwards `/p1/.../comments` without credentials, so subjects
-  /// that require authentication (R18 among them) come back as an upstream
-  /// error. Retrying on the official host with the saved token recovers them;
-  /// anonymous works for everything else, so a rejected token still degrades.
+  /// 镜像转发 `/p1/.../comments` 时不带凭据，所以需要鉴权的条目
+  /// （包括 R18）会返回上游错误。带上存下的令牌去官方主机重试就能拿回来；
+  /// 其它条目匿名也行，所以令牌被拒时仍能降级处理。
   static Future<dynamic> _getCommentsWithFallback(String url) async {
     try {
       return await _client.get(url);

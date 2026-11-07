@@ -668,12 +668,11 @@ class HistorySyncMerger {
   HistorySyncMerger._();
 }
 
-/// Incrementally reduces history events without retaining the full stream.
+/// 增量归并历史事件，不保留完整事件流。
 ///
-/// Only the latest last-write-wins event for each progress slot, watch state,
-/// delete tombstone, and global clear is retained. The bounded set is sorted
-/// when materializing a snapshot so results stay identical even when files
-/// arrive in a different order.
+/// 每个进度槽、观看状态、删除墓碑与全局清空只保留最新的一条（last-write-wins），
+/// 内存占用有界。生成快照时会对集合排序，因此即使文件到达顺序不同，
+/// 合并结果也完全一致。
 class HistorySyncStreamMerger {
   HistorySyncStreamMerger(HistorySyncSnapshot snapshot) : _snapshot = snapshot;
 
@@ -751,8 +750,7 @@ class HistorySyncStreamMerger {
     }
   }
 
-  /// Callers must run [_validate] first: upsert events always carry
-  /// [HistorySyncEvent.adapterName] and [HistorySyncEvent.bangumiItem].
+  /// 调用前必须先跑 [_validate]：upsert 事件保证带 adapterName 与 bangumiItem。
   String _upsertEntityKey(HistorySyncEvent event) {
     return History.scopedKey(
       event.adapterName!,
@@ -785,6 +783,9 @@ class HistorySyncStreamMerger {
   }
 }
 
+// 本地快照派生的事件（eventId 以 `local-state:` 开头、deviceId 同为
+// `local-state`）只用于参与合并比较，不再回写观看状态：它们已经是从本地
+// History 里读出来的值，重复应用只会覆盖掉更新的远端结果。
 bool _carriesLegacyWatchState(HistorySyncEvent event) {
   final hasWatchStatePayload = event.carriesWatchState ||
       event.lastSrc != null ||

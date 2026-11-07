@@ -52,7 +52,7 @@ class _CollectPageState extends State<CollectPage> with KazumiDialogOwner {
   @override
   void initState() {
     super.initState();
-    // Read once; page switches never change the saved default.
+    // 只读一次：切换页面不会改变已保存的默认布局。
     _layout = CollectLayout.fromValue(
       GStorage.getSetting(SettingsKeys.defaultCollectLayout),
     );

@@ -218,7 +218,11 @@ void main() {
       expect(decoded.every((repository) => !repository.enabled), isTrue);
     });
 
-    test('moves a personal repository saved under its old address', () {
+    test('keeps a repository saved under the personal repository\'s old address',
+        () {
+      // 旧地址迁移在 c21e21d7 主动删除（改地址是 2.4.1/2.4.2 时代的事，
+      // 那两个版本从未内置个人仓库，实际没人会在配置里留下旧地址）。
+      // 现在旧地址条目按普通自定义仓库保留，内置个人仓库仍补在 index 1。
       final decoded = RuleRepositoryList.decode(
         jsonEncode([
           {'url': RuleRepositoryList.officialUrl, 'enabled': true},
@@ -231,12 +235,13 @@ void main() {
         ]),
       );
 
-      // One personal repository, not two: the stale address is rewritten
-      // instead of being kept next to the built-in one.
-      expect(decoded, hasLength(2));
+      expect(decoded, hasLength(3));
+      expect(decoded[0].url, RuleRepositoryList.officialUrl);
       expect(decoded[1].url, RuleRepositoryList.personalUrl);
-      expect(decoded[1].label, '个人仓库');
-      expect(decoded[1].enabled, isFalse);
+      expect(decoded[2].url,
+          'https://raw.githubusercontent.com/AzlmZ-del/KazumiRules/main/');
+      expect(decoded[2].label, '个人仓库');
+      expect(decoded[2].enabled, isFalse);
     });
   });
 

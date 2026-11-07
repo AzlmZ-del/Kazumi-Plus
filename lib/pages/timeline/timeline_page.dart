@@ -297,7 +297,7 @@ class _TimelinePageState extends State<TimelinePage> {
             top: false,
             child: LayoutBuilder(
                 builder: (context, viewport) => NestedScrollView(
-                      // Keep the outer viewport clamped and unstretched so tabs stay fixed.
+                      // 外层视口保持收窄且不拉伸，标签栏才会固定不动。
                       physics: const ClampingScrollPhysics(),
                       scrollBehavior: ScrollConfiguration.of(context).copyWith(
                         overscroll: false,
@@ -372,7 +372,7 @@ class _TimelinePageState extends State<TimelinePage> {
 
   Widget _buildLoading(double viewportHeight, double overlapHeight) {
     return LayoutBuilder(builder: (context, constraints) {
-      // Center loading in the full viewport, including the scroll headers.
+      // 加载态在整个视口内居中，把滚动表头也算进去。
       final contentHeight =
           (constraints.maxHeight - overlapHeight).clamp(0.0, double.infinity);
       final headerHeight = viewportHeight - contentHeight;

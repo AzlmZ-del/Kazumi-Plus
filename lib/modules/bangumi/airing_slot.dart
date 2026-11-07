@@ -5,7 +5,6 @@ class AiringSlot {
     required this.airTime,
   });
 
-  /// 集号（第几集）。
   final int episode;
 
   /// 放送时刻，已转换为设备本地时区。

@@ -81,7 +81,7 @@ class _InitPageState extends State<InitPage> {
     if (!mounted) {
       return;
     }
-    // Installs that predate the flag already have rules; don't re-onboard them.
+    // 早于该开关版本的安装已经有规则了，不要再走一遍引导。
     if (!GStorage.getSetting(SettingsKeys.onboardingCompleted) &&
         pluginsController.pluginList.isEmpty) {
       context.navigate('/onboarding');
@@ -145,7 +145,7 @@ class _InitPageState extends State<InitPage> {
     };
   }
 
-  // migrate collect from old version (favorites)
+  // 迁移旧版本的收藏数据（favorites）。
   Future<void> _migrateStorage() async {
     await collectController.migrateCollect();
   }

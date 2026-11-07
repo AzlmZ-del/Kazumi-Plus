@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:kazumi/bean/widget/state_presentation.dart';
 
-/// Shrink-wraps in slivers and scrolls within bounded page or media surfaces.
+/// 在 sliver 中按内容收缩，在有界页面或媒体区域内可滚动。
 class GeneralErrorWidget extends StatelessWidget {
   const GeneralErrorWidget({
     required this.errMsg,

@@ -14,7 +14,7 @@ class BangumiEchResolver {
       client: bootstrap,
       endpoint: endpoint,
       hosts: _hosts,
-      // Shared Cloudflare ECH config and pinned IPs bypass polluted Bangumi DNS.
+      // 共用的 Cloudflare ECH 配置与固定 IP，绕开被污染的 Bangumi DNS。
       configDomains: {for (final host in _hosts) host: 'crypto.cloudflare.com'},
       addressOverrides: {for (final host in _hosts) host: _addresses},
     );
@@ -41,7 +41,7 @@ class RetryingEchResolver implements EchResolver {
 
   final EchResolver _inner;
 
-  /// The DoH bootstrap client owned by [_inner], released with this resolver.
+  /// 由 [_inner] 持有的 DoH 引导客户端，随本解析器一起释放。
   final http.Client client;
 
   @override

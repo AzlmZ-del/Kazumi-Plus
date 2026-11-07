@@ -61,7 +61,7 @@ class _HistoryListViewState extends State<HistoryListView> {
     final colors = theme.colorScheme;
     final groups =
         groupHistoryEntries(widget.entries, query: _query, source: _source);
-    // Separate sliver delegates eagerly lay out the first card of every date.
+    // 拆成多个 sliver 委托时，每个日期分组的第一张卡片都会被提前布局。
     final rows = <_HistoryListRow>[
       for (final group in groups) ...[
         _HistoryListRow(group),
@@ -97,7 +97,7 @@ class _HistoryListViewState extends State<HistoryListView> {
         autofocus: true,
         child: LayoutBuilder(builder: (context, constraints) {
           final contentWidth = constraints.maxWidth.clamp(0.0, 960.0);
-          // Preserve full-width scrolling while centering the content.
+          // 内容居中，但滚动区域仍保持整宽。
           final inset = (constraints.maxWidth - contentWidth) / 2 +
               (constraints.maxWidth < 600 ? 16.0 : 24.0);
           return Scrollbar(

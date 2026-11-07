@@ -107,7 +107,7 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
       defaultThemeMode = theme;
     });
 
-    // Update Windows title bar theme
+    // 同步更新 Windows 标题栏的明暗主题。
     if (Platform.isWindows) {
       await windowManager.setBrightness(
           themeProvider.isEffectiveDark() ? Brightness.dark : Brightness.light);

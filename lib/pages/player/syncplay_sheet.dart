@@ -14,7 +14,7 @@ import 'package:kazumi/services/player/syncplay_endpoint.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/utils/device.dart';
 
-// Close each step before opening the next to avoid stacked modal routes.
+// 每一步都先关掉上一步再开下一步，避免模态路由层层堆叠。
 enum _SyncPlayDestination { create, join, server }
 
 Future<void> showSyncPlaySheet(
@@ -163,12 +163,12 @@ class _SyncPlayHomeSheet extends StatelessWidget {
     final ColorScheme colorScheme = Theme.of(context).colorScheme;
 
     return Observer(builder: (context) {
-      // Read all observables here; the deferred body builder is not tracked.
+      // 可观察值要在这里全部读出来：延迟执行的 body builder 不在追踪范围内。
       final bool hasSession = playerController.syncplay.hasSession;
       final String room = playerController.syncplay.syncplayRoom;
       final int rtt = playerController.syncplay.syncplayClientRtt;
       final bool connected = room.isNotEmpty;
-      // Lock server selection while connected, even before joining a room.
+      // 连接期间锁住服务器选择，即使还没加入房间。
       final bool connecting = hasSession && !connected;
 
       return _SyncPlaySheetScaffold(
@@ -597,7 +597,7 @@ class _SyncPlayServerSheetState extends State<_SyncPlayServerSheet> {
   late String _selectedEndPoint;
   String? _customEndPointError;
 
-  // Request keyboard focus only after an explicit custom-server selection.
+  // 只有用户明确选了自定义服务器之后才请求键盘焦点。
   bool _focusCustomEndPoint = false;
 
   @override

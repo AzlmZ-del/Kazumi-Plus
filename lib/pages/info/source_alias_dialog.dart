@@ -100,7 +100,7 @@ class _AliasPickerDialogState extends State<_AliasPickerDialog> {
           TextButton(
             onPressed: () {
               KazumiDialog.dismiss();
-              // Aliases are shared across source rules.
+              // 别名是所有源规则共用的，删一个要通知所有引用方刷新。
               setState(() => widget.aliases.removeAt(index));
               widget.onAliasesChanged();
               if (widget.aliases.isEmpty) {

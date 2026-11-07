@@ -56,7 +56,7 @@ void main() async {
     if (isDesktop()) {
       await windowManager.ensureInitialized();
       windowManager.waitUntilReadyToShow(null, () async {
-        // window_manager controls desktop visibility to avoid startup flicker.
+        // 桌面端窗口可见性交给 window_manager 控制，避免启动闪烁。
         await windowManager.show();
         await windowManager.focus();
       });
@@ -84,7 +84,7 @@ void main() async {
       size: lowResolution ? const Size(840, 600) : const Size(1280, 860),
       center: true,
       skipTaskbar: false,
-      // macOS embeds native buttons in the Flutter view.
+      // macOS 把原生按钮嵌在 Flutter 视图里，所以要隐藏标题栏。
       titleBarStyle: (Platform.isMacOS || !showWindowButton)
           ? TitleBarStyle.hidden
           : TitleBarStyle.normal,
@@ -92,7 +92,7 @@ void main() async {
       title: 'Kazumi Plus',
     );
     windowManager.waitUntilReadyToShow(windowOptions, () async {
-      // window_manager controls desktop visibility to avoid startup flicker.
+      // 桌面端窗口可见性交给 window_manager 控制，避免启动闪烁。
       await windowManager.show();
       await windowManager.focus();
     });

@@ -106,20 +106,20 @@ class ImageSaver {
       return true;
     }
 
-    // JPEG: FF D8 FF
+    // JPEG 魔数：FF D8 FF
     if (startsWith(const [0xFF, 0xD8, 0xFF])) return 'jpg';
-    // PNG: 89 50 4E 47 0D 0A 1A 0A
+    // PNG 魔数：89 50 4E 47 0D 0A 1A 0A
     if (startsWith(const [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])) {
       return 'png';
     }
-    // GIF: GIF87a / GIF89a
+    // GIF 魔数：GIF87a / GIF89a
     if (startsWith(const [0x47, 0x49, 0x46, 0x38])) return 'gif';
-    // WebP: RIFF....WEBP
+    // WebP 魔数：RIFF....WEBP
     if (startsWith(const [0x52, 0x49, 0x46, 0x46]) &&
         startsWith(const [0x57, 0x45, 0x42, 0x50], 8)) {
       return 'webp';
     }
-    // BMP: BM
+    // BMP 魔数：BM
     if (startsWith(const [0x42, 0x4D])) return 'bmp';
     return 'jpg';
   }

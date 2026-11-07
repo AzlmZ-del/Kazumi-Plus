@@ -94,7 +94,7 @@ class CaptchaWebviewLinuxImpl extends CaptchaWebviewController<Webview> {
 
   Future<void> _onNavigationCompletion() async {
     if (webviewController?.isNavigating.value == false) {
-      // Type-1: captcha image was seen; check if it has disappeared.
+      // Type-1：之前见到过验证码图片，这里检查它是否已经消失。
       if (captchaWasFound) {
         final present = await _isCaptchaPresent();
         if (!present && !captchaDisappearedController.isClosed) {
@@ -104,7 +104,7 @@ class CaptchaWebviewLinuxImpl extends CaptchaWebviewController<Webview> {
           captchaDisappearedController.add(null);
         }
       }
-      // Automated verification marked a click; page navigation confirms success.
+      // 自动化验证已标记为点击过，页面跳转即可确认成功。
       if (buttonWasClicked && !captchaDisappearedController.isClosed) {
         logEventController.add(
             '[Captcha WebView] Button click and page navigated, verification done');

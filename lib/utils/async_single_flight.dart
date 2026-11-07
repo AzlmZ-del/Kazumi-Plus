@@ -1,4 +1,4 @@
-/// Shares one in-flight operation and clears it after success or failure.
+/// 共用一个在途操作，成功或失败之后清空，供下次重新发起。
 class AsyncSingleFlight<T> {
   Future<T>? _active;
 

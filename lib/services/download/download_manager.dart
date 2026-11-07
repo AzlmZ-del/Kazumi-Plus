@@ -63,7 +63,7 @@ Future<int> calculateM3u8VideoBytes(String episodeDir) async {
     try {
       totalBytes += await entity.length();
     } on FileSystemException {
-      // Ignore transient filesystem failures while reporting display size.
+      // 上报显示用的大小时，忽略掉文件系统偶发失败。
     }
   }
   return totalBytes;
@@ -160,7 +160,7 @@ class DownloadManager implements IDownloadManager {
         GStorage.getSetting(SettingsKeys.downloadParallelSegments);
   }
 
-  /// Returns available bytes, or -1 if unable to determine
+  /// 返回可用字节数，无法确定时返回 -1。
   Future<int> _getAvailableStorage(String path) async {
     try {
       final result = await _storageChannel.invokeMethod<int>(
@@ -188,15 +188,15 @@ class DownloadManager implements IDownloadManager {
   }
 
   String _getStorageErrorMessage(FileSystemException e) {
-    // POSIX error code 28 = ENOSPC (No space left on device)
+    // POSIX 错误码 28 = ENOSPC（设备空间不足）
     if (e.osError?.errorCode == 28) {
       return '存储空间不足，请清理后重试';
     }
-    // POSIX error code 13 = EACCES (Permission denied)
+    // POSIX 错误码 13 = EACCES（权限不足）
     if (e.osError?.errorCode == 13) {
       return '存储权限被拒绝';
     }
-    // POSIX error code 30 = EROFS (Read-only file system)
+    // POSIX 错误码 30 = EROFS（只读文件系统）
     if (e.osError?.errorCode == 30) {
       return '存储为只读，无法写入';
     }
@@ -222,8 +222,8 @@ class DownloadManager implements IDownloadManager {
         downloadBase, '${bangumiId}_$pluginName', '$episodeNumber');
   }
 
-  /// Resolves the episode directory (kept from a previous attempt if any),
-  /// verifies it is writable, and persists it on the episode.
+  /// 解析出剧集目录（有上次尝试留下的就沿用），校验可写，
+  /// 再写回该剧集记录。
   Future<String> _prepareEpisodeDir(
     DownloadEpisode episode,
     int bangumiId,
@@ -241,8 +241,7 @@ class DownloadManager implements IDownloadManager {
     return episodeDir;
   }
 
-  /// Directory to remove for an episode: the recorded one, or the default
-  /// location for episodes that never started downloading.
+  /// 该剧集要删除的目录：记下来的那个；从未开始下载的剧集则取默认位置。
   Future<String> _episodeDirForDeletion(
     DownloadEpisode? episode,
     int bangumiId,
@@ -300,7 +299,7 @@ class DownloadManager implements IDownloadManager {
       episodeNumber: request.episodeNumber,
     );
 
-    // Start immediately, bypassing the parallel limit (priority download)
+    // 立即开始，绕过并行数上限（优先下载）。
     _runningCount++;
     _activeTasks[key] = task;
     _runEpisodeDownload(
@@ -356,7 +355,7 @@ class DownloadManager implements IDownloadManager {
     final key = _taskKey(recordKey, episodeNumber);
     final task = _activeTasks[key];
     if (task != null) {
-      // The unwinding worker then leaves its episode paused, never active.
+      // 退出中的 worker 随后会把该剧集留在暂停态，而不会让它处于活动态。
       task.isPaused = true;
       task.cancelToken.cancel('cancelled');
       _activeTasks.remove(key);
@@ -736,7 +735,7 @@ class DownloadManager implements IDownloadManager {
           received += chunk.length;
           episode.totalBytes = received;
           episode.progressPercent = totalSize > 0 ? received / totalSize : 0;
-          // Update speed tracker
+          // 更新速度统计。
           _speedTrackers[key]?.update(received);
           _notifyProgress(task, episode);
         }
@@ -798,7 +797,7 @@ class DownloadManager implements IDownloadManager {
 
   void _onTaskComplete(DownloadTask task) {
     final key = _taskKey(task.recordKey, task.episodeNumber);
-    // A retry may already own this key while the cancelled task is unwinding.
+    // 被取消的任务还在退出途中时，重试可能已经占用了这个键。
     if (_activeTasks[key] == null || identical(_activeTasks[key], task)) {
       _activeTasks.remove(key);
       _speedTrackers.remove(key);
@@ -809,7 +808,7 @@ class DownloadManager implements IDownloadManager {
 
   void _notifyProgress(DownloadTask task, DownloadEpisode episode) {
     final key = _taskKey(task.recordKey, task.episodeNumber);
-    // Cancelled or superseded tasks no longer own the episode.
+    // 已取消或被顶替的任务不再拥有该剧集。
     if (!identical(_activeTasks[key], task)) return;
     final speed = _speedTrackers[key]?.currentSpeed ?? 0.0;
     onProgress?.call(task.recordKey, task.episodeNumber, episode, speed);
@@ -924,8 +923,7 @@ class DownloadManager implements IDownloadManager {
       return;
     }
 
-    // Episodes may live under different base directories, so delete each
-    // episode directory individually.
+    // 各剧集可能位于不同的根目录下，所以只能逐个删除各自目录。
     final parentDirs = <String>{};
     for (final entry in record.episodes.entries) {
       final episodeDir = await _episodeDirForDeletion(
@@ -941,7 +939,7 @@ class DownloadManager implements IDownloadManager {
       try {
         await Directory(parentDir).delete();
       } on FileSystemException {
-        // Parent is missing or still holds other files; leave it.
+        // 父目录已不存在，或里面还有别的文件，就不动它。
       }
     }
   }

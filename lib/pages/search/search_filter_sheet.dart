@@ -167,7 +167,7 @@ class _SearchFilterSheetState extends State<_SearchFilterSheet> {
         labelText: label,
         filled: true,
         fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
-        // Keep labels inside the fill to avoid ExpansionTile clipping.
+        // 标签要落在填充区域内，否则会被 ExpansionTile 裁掉。
         border: UnderlineInputBorder(
             borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide.none),
@@ -252,7 +252,7 @@ class _SearchFilterSheetState extends State<_SearchFilterSheet> {
                       ])),
                   const SizedBox(height: 12),
                   TextField(
-                    // Separate scroll offsets from the expansion's boolean state.
+                    // 让滚动偏移与展开状态分开存，互不干扰。
                     key: const PageStorageKey('custom-tag-input'),
                     controller: _tagController,
                     textInputAction: TextInputAction.done,

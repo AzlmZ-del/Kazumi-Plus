@@ -151,9 +151,8 @@ class _PlayerAdjustmentHudState extends State<PlayerAdjustmentHud> {
             curve: Curves.easeOutBack,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(30),
-              // Avoid BackdropFilter/ImageFilter.blur: it can trigger Impeller
-              // native aborts when HUD saveLayers are drawn over video output.
-              // See flutter/flutter#185506.
+              // 不要用 BackdropFilter / ImageFilter.blur：HUD 的 saveLayer 叠在
+              // 视频输出上时会触发 Impeller 原生崩溃。见 flutter/flutter#185506。
               child: AnimatedContainer(
                 duration: duration,
                 curve: Curves.easeOutCubic,
@@ -652,9 +651,8 @@ class _PlayerSeekHudState extends State<PlayerSeekHud> {
             curve: Curves.easeOutBack,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(30),
-              // Avoid BackdropFilter/ImageFilter.blur: it can trigger Impeller
-              // native aborts when HUD saveLayers are drawn over video output.
-              // See flutter/flutter#185506.
+              // 不要用 BackdropFilter / ImageFilter.blur：HUD 的 saveLayer 叠在
+              // 视频输出上时会触发 Impeller 原生崩溃。见 flutter/flutter#185506。
               child: AnimatedContainer(
                 duration: duration,
                 curve: Curves.easeOutCubic,
@@ -868,9 +866,8 @@ class _PlayerSpeedHudState extends State<PlayerSpeedHud> {
             curve: Curves.easeOutCubic,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(18),
-              // Avoid BackdropFilter/ImageFilter.blur: it can trigger Impeller
-              // native aborts when HUD saveLayers are drawn over video output.
-              // See flutter/flutter#185506.
+              // 不要用 BackdropFilter / ImageFilter.blur：HUD 的 saveLayer 叠在
+              // 视频输出上时会触发 Impeller 原生崩溃。见 flutter/flutter#185506。
               child: AnimatedContainer(
                 duration: duration,
                 curve: Curves.easeOutCubic,
