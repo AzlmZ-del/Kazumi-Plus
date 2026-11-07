@@ -255,7 +255,6 @@ void main() {
       expect(collection.nameCn, '中文名');
       expect(collection.shortSummary, '这是一部动画');
       expect(collection.score, 8.5);
-      expect(collection.eps, 24);
       expect(collection.rank, 42);
       expect(collection.type, BangumiCollectionType.watched);
       expect(collection.updatedAt, DateTime.parse('2026-08-30T14:00:00Z'));
@@ -277,7 +276,6 @@ void main() {
       expect(collection.bangumiId, 999);
       expect(collection.score, 7.0);
       expect(collection.shortSummary, '');
-      expect(collection.eps, 0);
       expect(collection.rank, 0);
       expect(collection.updatedAt, DateTime.parse('2026-08-30T14:00:00Z'));
       expect(collection.images['large'], '');
@@ -389,7 +387,6 @@ BangumiCollection _remote(
     '条目 $id',
     '',
     0,
-    12,
     0,
     const {
       'large': '',

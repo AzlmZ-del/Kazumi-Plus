@@ -38,7 +38,8 @@ void main() {
       expect(tagged.author, item.author);
       expect(tagged.lastUpdate, item.lastUpdate);
       expect(tagged.useNativePlayer, item.useNativePlayer);
-      expect(tagged.antiCrawlerEnabled, item.antiCrawlerEnabled);
+      expect(tagged.type, item.type);
+      expect(tagged.directConnection, item.directConnection);
     });
 
     test('withRepository leaves the original item untouched', () {
