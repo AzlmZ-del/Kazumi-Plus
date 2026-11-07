@@ -41,6 +41,14 @@ class Plugin {
 
   /// 开启后该规则的所有请求（搜索/详情/选集/播放 API）不走代理直连。
   bool directConnection;
+
+  /// 用户在编辑器里动过直连开关。动过 → 更新源时本地赢；
+  /// 没动过 → 跟随源内 directConnection 参数。持久化。
+  bool directConnectionUserOverridden;
+
+  /// 源 JSON 未写 directConnection 键时为 true（缺省态）。
+  /// 非 fromJson 构造（编辑器新建等）恒为 false，序列化时不写出。
+  bool directConnectionUnspecified;
   String userAgent;
   String baseUrl;
   String searchURL;
@@ -89,6 +97,8 @@ class Plugin {
     required this.useLegacyParser,
     required this.adBlocker,
     required this.directConnection,
+    this.directConnectionUserOverridden = false,
+    this.directConnectionUnspecified = false,
     required this.userAgent,
     required this.baseUrl,
     required this.searchURL,
@@ -121,6 +131,9 @@ class Plugin {
       usePost: json['usePost'] ?? false,
       useLegacyParser: json['useLegacyParser'] ?? false,
       directConnection: json['directConnection'] ?? false,
+      directConnectionUserOverridden:
+          json['directConnectionUserOverridden'] ?? false,
+      directConnectionUnspecified: !json.containsKey('directConnection'),
       adBlocker: json['adBlocker'] ?? false,
       userAgent: json['userAgent'] as String? ?? '',
       baseUrl: json['baseURL'] as String? ?? '',
@@ -200,6 +213,7 @@ class Plugin {
       'usePost': usePost,
       'useLegacyParser': useLegacyParser,
       'directConnection': directConnection,
+      'directConnectionUserOverridden': directConnectionUserOverridden,
       'adBlocker': adBlocker,
       'userAgent': userAgent,
       'baseURL': baseUrl,

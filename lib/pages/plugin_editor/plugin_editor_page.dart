@@ -301,6 +301,10 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
   bool adBlocker = false;
   bool directConnection = false;
 
+  /// 用户在本编辑器里动过直连开关。保存时写回 Plugin，
+  /// 更新源合并时据此决定本地赢还是跟随源。
+  bool directConnectionUserOverridden = false;
+
   final TextEditingController captchaImageController = TextEditingController();
   final TextEditingController captchaInputController = TextEditingController();
   final TextEditingController captchaButtonController = TextEditingController();
@@ -1015,8 +1019,10 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
             title: const Text(_RuleEditorText.directConnection),
             subtitle: const Text(_RuleEditorText.directConnectionDesc),
             value: directConnection,
-            onChanged: (value) =>
-                setState(() => directConnection = value),
+            onChanged: (value) => setState(() {
+              directConnection = value;
+              directConnectionUserOverridden = true;
+            }),
           ),
           const SizedBox(height: 8),
           EditorTextField(
@@ -1403,6 +1409,7 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
       useLegacyParser: useLegacyParser,
       adBlocker: adBlocker,
       directConnection: directConnection,
+      directConnectionUserOverridden: directConnectionUserOverridden,
       userAgent: userAgentController.text,
       baseUrl: baseURLController.text,
       searchURL: searchURLController.text,
