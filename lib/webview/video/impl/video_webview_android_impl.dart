@@ -4,6 +4,7 @@ import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/services/network/proxy_utils.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/webview/video/video_webview_controller.dart';
+import 'package:kazumi/request/clients/direct_http_client.dart';
 import 'package:flutter_inappwebview_platform_interface/flutter_inappwebview_platform_interface.dart';
 import 'package:flutter_inappwebview_android/flutter_inappwebview_android.dart'
     as android_webview;
@@ -377,6 +378,55 @@ class VideoWebviewAndroidImpl
       KazumiLogger().i('WebView: 代理设置成功 $formattedProxy');
     } catch (e) {
       KazumiLogger().e('WebView: 设置代理失败 $e');
+    }
+  }
+
+  @override
+  Future<void> applyProxy({required bool directConnection}) async {
+    if (!directConnection) {
+      // 非直连源：清掉上个源残留的隧道规则，再按全局代理恢复。
+      try {
+        await android_webview.AndroidProxyController.instance()
+            .clearProxyOverride();
+      } catch (_) {}
+      await _setupProxy();
+      return;
+    }
+
+    // 直连源：起本地 CONNECT 隧道，让 WebView 流量经非 VPN 网卡出网。
+    try {
+      final proxyAvailable =
+          await android_webview.AndroidWebViewFeature.instance()
+              .isFeatureSupported(WebViewFeature.PROXY_OVERRIDE);
+      if (!proxyAvailable) {
+        KazumiLogger().w('WebView: 当前 Android 版本不支持代理，直连无法生效');
+        return;
+      }
+      if (!await DirectHttpClient.isVpnActive()) {
+        // 没有 VPN 接管，WebView 默认就直连，无需隧道。
+        try {
+          await android_webview.AndroidProxyController.instance()
+              .clearProxyOverride();
+        } catch (_) {}
+        return;
+      }
+      final port = await DirectHttpClient.startLocalProxy();
+      final proxyController = android_webview.AndroidProxyController.instance();
+      await proxyController.clearProxyOverride();
+      await proxyController.setProxyOverride(
+        settings: ProxySettings(
+          proxyRules: [
+            ProxyRule(url: 'http://127.0.0.1:$port'),
+          ],
+        ),
+      );
+      KazumiLogger().i('WebView: 直连隧道代理已设置 127.0.0.1:$port');
+    } catch (e) {
+      KazumiLogger().w('WebView: 直连代理设置失败，回落系统网络 $e');
+      try {
+        await android_webview.AndroidProxyController.instance()
+            .clearProxyOverride();
+      } catch (_) {}
     }
   }
 }

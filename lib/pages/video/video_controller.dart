@@ -708,6 +708,7 @@ abstract class _VideoPageController with Store implements Disposable {
         useLegacyParser: currentPlugin.useLegacyParser,
         offset: offset,
         userAgent: currentPlugin.userAgent,
+        directConnection: currentPlugin.directConnection,
       );
 
       if (session.isStale) {
