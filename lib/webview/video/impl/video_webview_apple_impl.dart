@@ -124,6 +124,9 @@ class VideoWebviewAppleImpl
   }
 
   @override
+  Future<void> applyProxy({required bool directConnection}) async {}
+
+  @override
   Future<void> loadUrl(String url, bool useLegacyParser,
       {int offset = 0}) async {
     await unloadPage();

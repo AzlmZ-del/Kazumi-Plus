@@ -28,6 +28,7 @@ class WebViewVideoSourceService implements IVideoSourceService {
     int offset = 0,
     Duration timeout = const Duration(seconds: 15),
     String userAgent = '',
+    bool directConnection = false,
   }) async {
     final resolveTail = _resolveTail;
     if (resolveTail == null) {
@@ -46,6 +47,7 @@ class WebViewVideoSourceService implements IVideoSourceService {
         offset: offset,
         timeout: timeout,
         userAgent: userAgent,
+        directConnection: directConnection,
       ),
     );
 
@@ -60,6 +62,7 @@ class WebViewVideoSourceService implements IVideoSourceService {
     required int offset,
     required Duration timeout,
     required String userAgent,
+    required bool directConnection,
   }) async {
     request.throwIfNotCurrent(_activeRequest);
 
@@ -76,6 +79,8 @@ class WebViewVideoSourceService implements IVideoSourceService {
 
     var didStartLoad = false;
     try {
+      request.throwIfNotCurrent(_activeRequest);
+      await _webview!.applyProxy(directConnection: directConnection);
       request.throwIfNotCurrent(_activeRequest);
       didStartLoad = true;
       await _webview!.loadUrl(

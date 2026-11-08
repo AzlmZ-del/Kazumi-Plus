@@ -94,6 +94,7 @@ abstract class IVideoSourceService {
     int offset = 0,
     Duration timeout = const Duration(seconds: 30),
     String userAgent = '',
+    bool directConnection = false,
   });
 
   /// 取消当前正在进行的解析

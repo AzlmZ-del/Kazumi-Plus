@@ -77,6 +77,11 @@ class VideoWebviewImpl
   }
 
   @override
+  Future<void> applyProxy({required bool directConnection}) async {
+    // 兜底实现无隧道能力，代理仍由 init 时的全局设置决定。
+  }
+
+  @override
   Future<void> loadUrl(String url, bool useLegacyParser,
       {int offset = 0}) async {
     await unloadPage();

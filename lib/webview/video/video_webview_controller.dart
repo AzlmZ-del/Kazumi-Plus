@@ -83,6 +83,13 @@ abstract class VideoWebviewController<T> {
     }
   }
 
+  /// 每次加载页面前按规则开关重设 WebView 代理。
+  ///
+  /// Android 的 WebView 代理是进程级，无法 per-WebView 隔离，只能逐次设置；
+  /// [directConnection] 为 true 时走本地 CONNECT 隧道（绕 VPN），否则按全局
+  /// 代理设置恢复。非 Android 平台无隧道能力，空实现即可。
+  Future<void> applyProxy({required bool directConnection});
+
   /// 让 WebView 加载指定 URL。
   Future<void> loadUrl(String url, bool useLegacyParser, {int offset = 0});
 
