@@ -48,6 +48,7 @@ class PluginSearchService {
       );
       infoController.pluginSearchStatus[pluginName] =
           PluginSearchStatus.success;
+      infoController.pluginSearchElapsedMs.remove(pluginName);
       pluginsController.validityTracker.markSearchValid(pluginName);
       infoController.pluginSearchResponseList.add(result);
       return true;
@@ -58,6 +59,7 @@ class PluginSearchService {
   Future<void> queryAllSource(String keyword) async {
     infoController.pluginSearchResponseList.clear();
     infoController.pluginSearchStatus.clear();
+    infoController.pluginSearchElapsedMs.clear();
 
     final plugins = List<Plugin>.of(pluginsController.pluginList);
     for (final plugin in plugins) {
@@ -74,6 +76,7 @@ class PluginSearchService {
     final session = _querySessions
         .putIfAbsent(plugin.name, AsyncSessionOwner.new)
         .begin();
+    final stopwatch = Stopwatch()..start();
     try {
       final result = await plugin.queryBangumi(
         keyword,
@@ -83,12 +86,16 @@ class PluginSearchService {
       if (_isCancelled || session.isStale) return;
       infoController.pluginSearchStatus[plugin.name] =
           PluginSearchStatus.success;
+      infoController.pluginSearchElapsedMs[plugin.name] =
+          stopwatch.elapsedMilliseconds;
       if (result.data.isNotEmpty) {
         pluginsController.validityTracker.markSearchValid(plugin.name);
       }
       infoController.pluginSearchResponseList.add(result);
     } catch (error) {
       if (_isCancelled || session.isStale) return;
+      infoController.pluginSearchElapsedMs[plugin.name] =
+          stopwatch.elapsedMilliseconds;
       _handleSearchError(plugin, error);
     }
   }
