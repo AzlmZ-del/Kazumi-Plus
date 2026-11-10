@@ -32,6 +32,10 @@ abstract class _InfoController with Store {
   @observable
   var pluginSearchStatus = ObservableMap<String, PluginSearchStatus>();
 
+  /// 各源本次搜索耗时（毫秒），与 [pluginSearchStatus] 平行。
+  @observable
+  var pluginSearchElapsedMs = ObservableMap<String, int>();
+
   @observable
   var commentsList = ObservableList<CommentItem>();
 

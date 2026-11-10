@@ -6,12 +6,16 @@ class _SourceSearchGroup {
     required this.keyword,
     required this.status,
     required this.results,
+    this.elapsedMs,
   });
 
   final String name;
   final String keyword;
   final PluginSearchStatus status;
   final List<SearchItem> results;
+
+  /// 本次搜索耗时；未开始或已取消时为 null。
+  final int? elapsedMs;
 
   bool get isSearching => status == PluginSearchStatus.pending;
   bool get hasResults =>
@@ -25,6 +29,15 @@ class _SourceSearchGroup {
         PluginSearchStatus.error => '检索失败',
         PluginSearchStatus.captcha => '需要验证',
       };
+
+  /// 状态标签 + 耗时，供列表右侧展示。耗时未就绪时只显示状态。
+  String get statusLabelWithElapsed =>
+      elapsedMs == null ? statusLabel : '$statusLabel · ${elapsedMs}ms';
+
+  /// 耗时分级；阈值与配色统一由 [speedTierOf] / [speedTierColor] 定义。
+  ///
+  /// 只在有结果时着色——无结果 / 失败 / 需要验证的源，速度没有参考意义。
+  SpeedTier? get speedTier => hasResults ? speedTierOf(elapsedMs) : null;
 }
 
 enum _SourceDisplay { preview, expanded, collapsed }
@@ -220,9 +233,12 @@ class _SourceSheetViewState extends State<_SourceSheetView> {
                               )),
                               const SizedBox(width: 8),
                               Text(
-                                group.statusLabel,
+                                group.statusLabelWithElapsed,
                                 style: theme.textTheme.labelMedium?.copyWith(
-                                  color: colors.onSurfaceVariant,
+                                  color: speedTierColor(
+                                    group.speedTier,
+                                    colors.onSurfaceVariant,
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 8),

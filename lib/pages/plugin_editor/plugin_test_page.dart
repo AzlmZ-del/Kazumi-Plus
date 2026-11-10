@@ -17,13 +17,16 @@ import 'package:kazumi/plugins/api_rule_config.dart';
 import 'package:kazumi/plugins/plugins.dart';
 import 'package:kazumi/request/apis/bangumi_api.dart';
 import 'package:kazumi/services/logging/logger.dart';
+import 'package:kazumi/utils/speed_tier.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 const _h8 = SizedBox(height: 8.0);
 const _h12 = SizedBox(height: 12.0);
 
 /// 结果卡片里链接文字固定用绿色，不跟主题色走（用户 2026-10-22 指定）。
-const _linkGreen = Color(0xFF2E7D32);
+///
+/// 与耗时快档同色，直接复用，避免两处硬编码各自漂移。
+const _linkGreen = kSpeedTierFastColor;
 
 class PluginTestPage extends StatefulWidget {
   const PluginTestPage({
@@ -52,6 +55,8 @@ class _PluginTestPageState extends State<PluginTestPage>
   bool isTesting = false;
   bool _hasRun = false;
   int _runId = 0;
+  int? _searchElapsedMs;
+  int? _chapterElapsedMs;
   String errorMsg = "";
   List<String> searchDiagnostics = [];
   List<String> chapterDiagnostics = [];
@@ -107,6 +112,8 @@ class _PluginTestPageState extends State<PluginTestPage>
         searchRes = null;
         chapters = null;
         errorMsg = "";
+        _searchElapsedMs = null;
+        _chapterElapsedMs = null;
         searchDiagnostics = [];
         chapterDiagnostics = [];
         _itemFragmentMap.clear();
@@ -134,11 +141,13 @@ class _PluginTestPageState extends State<PluginTestPage>
       isTesting = true;
       _hasRun = true;
     });
+    final stopwatch = Stopwatch()..start();
     try {
       final searchTrace =
           await plugin.traceSearch(keyword, cancelToken: cancelToken);
       if (!mounted || runId != _runId) return;
       setState(() {
+        _searchElapsedMs = stopwatch.elapsedMilliseconds;
         searchRaw = searchTrace.rawResponse;
         searchRes = searchTrace.response;
         searchDiagnostics = searchTrace.diagnostics;
@@ -152,7 +161,10 @@ class _PluginTestPageState extends State<PluginTestPage>
       if (!mounted || runId != _runId) return;
       KazumiLogger()
           .e('PluginTest: test failed', error: error, stackTrace: stack);
-      setState(() => errorMsg = error.toString());
+      setState(() {
+        _searchElapsedMs ??= stopwatch.elapsedMilliseconds;
+        errorMsg = error.toString();
+      });
     } finally {
       if (mounted && runId == _runId) setState(() => isTesting = false);
     }
@@ -176,14 +188,17 @@ class _PluginTestPageState extends State<PluginTestPage>
       chapterRaw = "";
       chapters = null;
       chapterDiagnostics = [];
+      _chapterElapsedMs = null;
       _chapterLoading = item.src.isNotEmpty;
     });
     if (item.src.isEmpty) return;
+    final stopwatch = Stopwatch()..start();
     try {
       final chapterTrace =
           await plugin.traceChapters(item.src, cancelToken: cancelToken);
       if (!mounted || chapterRunId != _chapterRunId) return;
       setState(() {
+        _chapterElapsedMs = stopwatch.elapsedMilliseconds;
         chapterRaw = chapterTrace.rawResponse;
         chapters = chapterTrace.roads;
         chapterDiagnostics = chapterTrace.diagnostics;
@@ -191,7 +206,10 @@ class _PluginTestPageState extends State<PluginTestPage>
       });
     } catch (error, stack) {
       if (!mounted || chapterRunId != _chapterRunId) return;
-      setState(() => _chapterLoading = false);
+      setState(() {
+        _chapterElapsedMs = stopwatch.elapsedMilliseconds;
+        _chapterLoading = false;
+      });
       if (throwOnError) rethrow;
       KazumiLogger().e('PluginTest: chapter fetch failed',
           error: error, stackTrace: stack);
@@ -274,7 +292,8 @@ class _PluginTestPageState extends State<PluginTestPage>
                       theme: theme,
                       number: 1,
                       title: '搜索请求',
-                      subtitle: _getSearchSubtitle(),
+                      subtitleWidget: _buildSubtitleWithElapsed(
+                          _getSearchSubtitle(), _searchElapsedMs, theme),
                       completed: _hasSearchRaw,
                       expanded: false,
                       child: _buildSearchContent(theme)),
@@ -292,7 +311,6 @@ class _PluginTestPageState extends State<PluginTestPage>
                       theme: theme,
                       number: 3,
                       title: _getResponseTitle(),
-                      subtitle: '',
                       subtitleWidget: _buildChapterRawSubtitle(theme),
                       completed: _needChapterParse && chapterRaw.isNotEmpty,
                       expanded: false,
@@ -309,21 +327,15 @@ class _PluginTestPageState extends State<PluginTestPage>
                             theme: theme,
                             number: 4 + i,
                             title: '播放线路 ${i + 1}',
-                            subtitle: '',
                             completed: true,
                             expanded: false,
                             failedOverride: false,
-                            subtitleWidget: Padding(
-                              padding: const EdgeInsets.only(top: 2),
-                              child: Text(
+                            subtitleWidget: _buildSubtitleWithElapsed(
                                 roadName.isEmpty
                                     ? '章节数量：${road.data.length}'
                                     : '$roadName · 章节数量：${road.data.length}',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                    color:
-                                        theme.colorScheme.onSurfaceVariant),
-                              ),
-                            ),
+                                null,
+                                theme),
                             child: _buildRoadChapterList(road, theme)),
                         _h12,
                       ];
@@ -353,7 +365,7 @@ class _PluginTestPageState extends State<PluginTestPage>
     required ThemeData theme,
     required int number,
     required String title,
-    required String subtitle,
+    String subtitle = '',
     required bool completed,
     required bool expanded,
     required Widget child,
@@ -484,6 +496,37 @@ class _PluginTestPageState extends State<PluginTestPage>
     if (isTesting && !_hasSearchRaw) return '正在请求站点…';
     if (!_hasSearchRaw) return _hasRun ? '没有收到响应' : '等待开始';
     return '${plugin.searchMode == RuleMode.api ? 'JSON' : 'HTML'}长度：${searchRaw.length} 字符';
+  }
+
+  /// 请求耗时分级：< 500ms 绿、500–1000ms 橙、≥ 1000ms 红；
+  /// 没有耗时（未开始 / 出错 / 被取消）时回落到副标题默认色。
+  Color _elapsedColor(int? ms, Color fallback) =>
+      speedTierColor(speedTierOf(ms), fallback);
+
+  /// 副标题 + 下一行「返回时间：xxxx ms」。
+  ///
+  /// 耗时行沿用副标题的 bodySmall 字号与字重，只把颜色换成分级色；
+  /// [ms] 为空时（未开始 / 出错 / 被取消）不占位，直接返回单行文本。
+  Widget _buildSubtitleWithElapsed(
+    String text,
+    int? ms,
+    ThemeData theme,
+  ) {
+    final baseStyle = theme.textTheme.bodySmall
+        ?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+    if (ms == null) return Text(text, style: baseStyle);
+    return Text.rich(
+      TextSpan(children: [
+        TextSpan(text: '$text\n'),
+        TextSpan(
+          text: '返回时间：$ms ms',
+          style: TextStyle(
+            color: _elapsedColor(ms, theme.colorScheme.onSurfaceVariant),
+          ),
+        ),
+      ]),
+      style: baseStyle,
+    );
   }
 
   /// 结果卡片底部那行：API 模式显示条目 ID，XPath 模式显示可点击复制的链接。
@@ -788,8 +831,6 @@ class _PluginTestPageState extends State<PluginTestPage>
 
   /// 「响应内容」卡的副标题：数据类型与长度（标题已显示番剧名，不再写第几条）。
   Widget _buildChapterRawSubtitle(ThemeData theme) {
-    final style = theme.textTheme.bodySmall
-        ?.copyWith(color: theme.colorScheme.onSurfaceVariant);
     final kind = plugin.chapterMode == RuleMode.api ? 'JSON' : 'HTML';
     final String text;
     if (!_hasRun) {
@@ -807,10 +848,7 @@ class _PluginTestPageState extends State<PluginTestPage>
     } else {
       text = '$kind长度：${chapterRaw.length} 字符';
     }
-    return Padding(
-      padding: const EdgeInsets.only(top: 2),
-      child: Text(text, style: style),
-    );
+    return _buildSubtitleWithElapsed(text, _chapterElapsedMs, theme);
   }
 
   Widget _buildChapterRawContent(ThemeData theme) {
