@@ -58,7 +58,7 @@
 
 ## 构建
 
-需要 Flutter 3.47.7（stable）与 Dart `>=3.10.0 <4.0.0`，工具链准备见
+需要 Flutter 3.50.0（stable）与 Dart `>=3.10.0 <4.0.0`，工具链准备见
 [Flutter 官方文档](https://docs.flutter.dev/get-started/install)。中国大陆可能需要配 MavenCentral /
 GitHub / SourceForge 镜像。
 
