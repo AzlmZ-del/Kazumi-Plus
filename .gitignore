@@ -48,6 +48,8 @@ app.*.map.json
 # Added after flutter 3.29
 /android/app/.cxx/
 android/build/reports/problems/
+# Kotlin daemon 会话/错误日志（Gradle 编译时生成，勿提交）
+/android/.kotlin/
 
 # Local-only build credentials (never commit: these mirror CI secrets)
 /tools/local-credentials.json
