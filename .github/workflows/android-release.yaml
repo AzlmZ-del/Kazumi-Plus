@@ -47,22 +47,33 @@
         steps:
           - name: Resolve tag
             id: tag
+            env:
+              INPUT_TAG: ${{ inputs.tag }}
             run: |
-              if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-                echo "tag=${{ inputs.tag }}" >> $GITHUB_OUTPUT
+              if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+                tag="$INPUT_TAG"
               else
-                echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+                tag="${GITHUB_REF#refs/tags/}"
               fi
+              if [[ ! "$tag" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]?)\.[0-9]$ ]]; then
+                echo "::error::Invalid release tag"
+                exit 1
+              fi
+              printf 'tag=%s\n' "$tag" >> "$GITHUB_OUTPUT"
             shell: bash
 
           - name: Clone repository
             uses: actions/checkout@v4
+            with:
+              ref: refs/tags/${{ steps.tag.outputs.tag }}
 
           - name: Verify tag matches pubspec version
+            env:
+              RELEASE_TAG: ${{ steps.tag.outputs.tag }}
             run: |
               pub_version=$(grep -E '^version:' pubspec.yaml | sed -E 's/^version:[[:space:]]*//' | cut -d+ -f1)
-              if [ "$pub_version" != "${{ steps.tag.outputs.tag }}" ]; then
-                echo "tag ${{ steps.tag.outputs.tag }} != pubspec version $pub_version"
+              if [ "$pub_version" != "$RELEASE_TAG" ]; then
+                echo "::error::Tag and pubspec version differ"
                 exit 1
               fi
             shell: bash
