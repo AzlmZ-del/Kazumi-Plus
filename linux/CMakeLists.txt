@@ -82,6 +82,10 @@ target_link_libraries(${BINARY_NAME} PRIVATE flutter)
 target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::GTK)
 target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::GIO_UNIX)
 
+# Flutter 3.50's LLVM unwinder can shadow libstdc++ exception unwinding.
+target_link_options(${BINARY_NAME} PRIVATE
+  "LINKER:--push-state,--no-as-needed,-lgcc_s,--pop-state")
+
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)
 
