@@ -9,11 +9,11 @@ list(APPEND FLUTTER_PLUGIN_LIST
   dynamic_color
   file_selector_windows
   flutter_volume_controller
-  media_kit_video
   screen_retriever_windows
-  share_plus
   tray_manager
   url_launcher_windows
+  share_plus
+  media_kit_video
   webview_windows
   window_manager
 )

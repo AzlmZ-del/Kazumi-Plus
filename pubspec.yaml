@@ -5,7 +5,7 @@ version: 2.6.1+20601
 
 environment:
   sdk: ">=3.10.0 <4.0.0"
-  flutter: 3.47.7
+  flutter: 3.50.0
 
 dependencies:
   flutter:
@@ -33,7 +33,7 @@ dependencies:
   image: ^4.8.0
   file_picker: ^10.3.7
 
-  flutter_volume_controller: ^2.0.1
+  flutter_volume_controller: ^2.0.2
   audio_service: ^0.18.15
   audio_service_mpris:
     git:
@@ -45,7 +45,7 @@ dependencies:
       ref: 8ad650c6eb487208b9861d44755c8e58db061c88
   audio_session: ^0.2.2
   dynamic_color: ^1.9.0
-  flutter_displaymode: ^0.6.0
+  flutter_displaymode: ^0.7.0
 
   url_launcher: ^6.3.0
   window_manager: ^0.5.1
@@ -107,7 +107,7 @@ dependencies:
   share_plus: ^12.0.2
   fluttertoast: ^10.0.2
   # 必须放在 dependencies，不能放 dev_dependencies。
-  # Flutter 3.47.7 的 release 构建会跳过 dev 依赖插件（Gradle 侧
+  # Flutter 3.50.0 的 release 构建会跳过 dev 依赖插件（Gradle 侧
   # PluginHandler.kt:220），但 GeneratedPluginRegistrant.java 仍会注册它，
   # 于是 javac 报「程序包 net.jonhanson.flutter_native_splash 不存在」。
   flutter_native_splash: ^2.4.3
