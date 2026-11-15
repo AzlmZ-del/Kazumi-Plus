@@ -28,7 +28,7 @@ dependencies:
   hive_ce_flutter: ^2.3.3
   cached_network_image: ^3.4.1
   flutter_cache_manager: ^3.4.1
-  ech_http: ^0.2.3
+  ech_http: ^0.2.4
   http: ^1.6.0
   image: ^4.8.0
   file_picker: ^10.3.7
@@ -112,14 +112,7 @@ dependencies:
   # 于是 javac 报「程序包 net.jonhanson.flutter_native_splash 不存在」。
   flutter_native_splash: ^2.4.3
 
-# Local vendored copy of ech_http 0.2.3 with only the CA-bundle generation
-# reverted to the 0.2.2 chunked implementation. Upstream 0.2.3 emits the whole
-# ~200 KB cacert.pem as one raw string literal via ca_bundle.h.in, which trips
-# MSVC C2026 ("string too big") and breaks every Windows build.
-# Remove this override once upstream ships the fix. See third_party/ech_http/PATCHES.md.
 dependency_overrides:
-  ech_http:
-    path: third_party/ech_http
   # media_kit@cd75bcf ships a Windows 7z bundle, while system bsdtar may lack LZMA.
   media_kit:
     path: third_party/media_kit

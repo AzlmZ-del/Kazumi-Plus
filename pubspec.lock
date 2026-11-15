@@ -415,10 +415,11 @@ packages:
   ech_http:
     dependency: "direct main"
     description:
-      path: "third_party/ech_http"
-      relative: true
-    source: path
-    version: "0.2.3"
+      name: ech_http
+      sha256: "5f6cb0e9bbad24ed2b2a62ac5db40307b1f603464d6ee35d0a4a59a5f6494d63"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.4"
   equatable:
     dependency: transitive
     description:
