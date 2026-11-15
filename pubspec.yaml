@@ -120,6 +120,9 @@ dependencies:
 dependency_overrides:
   ech_http:
     path: third_party/ech_http
+  # media_kit@cd75bcf ships a Windows 7z bundle, while system bsdtar may lack LZMA.
+  media_kit:
+    path: third_party/media_kit
 
 dev_dependencies:
   path_provider_platform_interface: ^2.1.2
