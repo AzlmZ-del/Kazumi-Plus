@@ -11,9 +11,7 @@ import 'package:kazumi/pages/player/controller/player_super_resolution.dart';
 import 'package:kazumi/services/shaders/shader_asset_service.dart';
 import 'package:kazumi/utils/constants.dart';
 import 'package:kazumi/services/logging/logger.dart';
-import 'package:kazumi/services/network/proxy_utils.dart';
-import 'package:kazumi/request/clients/direct_http_client.dart';
-import 'package:kazumi/services/network/system_proxy_service.dart';
+import 'package:kazumi/services/network/source_network_service.dart';
 import 'package:kazumi/services/player/playback_cache_policy.dart';
 import 'package:kazumi/services/player/player_error_mapper.dart';
 import 'package:kazumi/services/storage/storage.dart';
@@ -175,8 +173,10 @@ abstract class _PlayerPlaybackController with Store {
       await player.play();
       startOffset = 0;
     } catch (e) {
-      KazumiLogger()
-          .w('PlayerController: failed to restart from beginning', error: e);
+      KazumiLogger().w(
+        'PlayerController: failed to restart from beginning',
+        error: e,
+      );
     }
   }
 
@@ -265,8 +265,9 @@ abstract class _PlayerPlaybackController with Store {
       GStorage.getSetting(SettingsKeys.defaultSuperResolutionMode),
     );
     hAenable = GStorage.getSetting(SettingsKeys.hAenable);
-    androidEnableOpenSLES =
-        GStorage.getSetting(SettingsKeys.androidEnableOpenSLES);
+    androidEnableOpenSLES = GStorage.getSetting(
+      SettingsKeys.androidEnableOpenSLES,
+    );
     hardwareDecoder = GStorage.getSetting(SettingsKeys.hardwareDecoder);
     autoPlay = GStorage.getSetting(SettingsKeys.autoPlay);
     playerDebugMode = GStorage.getSetting(SettingsKeys.playerDebugMode);
@@ -334,52 +335,36 @@ abstract class _PlayerPlaybackController with Store {
         }
       }
 
-      final bool proxyEnable = GStorage.getSetting(SettingsKeys.proxyEnable);
-      // 规则声明直连时不挂 http-proxy：mpv 默认走系统网络，不设即直连。
-      if (directConnection) {
-        KazumiLogger().i('Player: 规则直连，跳过代理设置');
-        // PoC：VPN 活跃时启动本地 CONNECT 隧道，让 mpv 经非 VPN 网卡取流。
-        if (Platform.isAndroid && await DirectHttpClient.isVpnActive()) {
-          try {
-            final port = await DirectHttpClient.startLocalProxy();
-            await pp.setProperty("http-proxy", 'http://127.0.0.1:$port');
-            KazumiLogger().i('Player: 本地直连隧道已就绪 127.0.0.1:$port');
-          } catch (e) {
-            KazumiLogger().w('Player: 本地直连隧道启动失败，回落普通直连 $e');
-          }
+      if (!isLocalPlayback()) {
+        final route = await SourceNetworkService.resolver.resolve(
+          directConnection: directConnection,
+          target: Uri.tryParse(videoUrl()),
+        );
+        if (!isCurrentPlayer(player)) {
+          return await _discardIfNotCurrent(candidate);
         }
-      } else if (proxyEnable) {
-        final String proxyUrl = GStorage.getSetting(SettingsKeys.proxyUrl);
-        final formattedProxy = ProxyUtils.getFormattedProxyUrl(proxyUrl);
-        if (formattedProxy != null) {
-          await pp.setProperty("http-proxy", formattedProxy);
+        if (route.usesProxy || route.isDirect) {
+          await pp.setProperty('http-proxy', route.proxyUrl ?? '');
           if (!isCurrentPlayer(player)) {
             return await _discardIfNotCurrent(candidate);
           }
-          KazumiLogger().i('Player: HTTP 代理设置成功 $formattedProxy');
         }
-      } else if (SystemProxyService.isActive) {
-        final proxy = SystemProxyService.proxyFor('https');
-        if (proxy != null) {
-          await pp.setProperty("http-proxy", 'http://${proxy.$1}:${proxy.$2}');
-          if (!isCurrentPlayer(player)) {
-            return await _discardIfNotCurrent(candidate);
-          }
-          KazumiLogger().i('Player: 跟随系统代理 http://${proxy.$1}:${proxy.$2}');
-        }
+        KazumiLogger().i(
+          'Player: 网络出口 ${route.mode.name}'
+          '${route.proxyUrl == null ? '' : ' ${route.proxyUrl}'}',
+        );
       }
 
-      await player.setAudioTrack(
-        AudioTrack.auto(),
-      );
+      await player.setAudioTrack(AudioTrack.auto());
       if (!isCurrentPlayer(player)) {
         return await _discardIfNotCurrent(candidate);
       }
 
       String? videoRenderer;
       if (Platform.isAndroid) {
-        final String androidVideoRenderer =
-            GStorage.getSetting(SettingsKeys.androidVideoRenderer);
+        final String androidVideoRenderer = GStorage.getSetting(
+          SettingsKeys.androidVideoRenderer,
+        );
 
         if (androidVideoRenderer == 'auto') {
           // Android 14 及以上使用基于 Vulkan 的 MPV GPU-NEXT 视频输出，着色器性能更好
@@ -430,16 +415,21 @@ abstract class _PlayerPlaybackController with Store {
           );
           if (actionableMessage != null) {
             KazumiDialog.showToast(
-                message: actionableMessage, showActionButton: true);
+              message: actionableMessage,
+              showActionButton: true,
+            );
           } else if (showPlayerError) {
             KazumiDialog.showToast(
-                message: '播放器内部错误 ${event.toString()} ${videoUrl()}',
-                duration: const Duration(seconds: 5),
-                showActionButton: true);
+              message: '播放器内部错误 ${event.toString()} ${videoUrl()}',
+              duration: const Duration(seconds: 5),
+              showActionButton: true,
+            );
           }
         }
-        KazumiLogger().e('PlayerController: Player intent error ${videoUrl()}',
-            error: event);
+        KazumiLogger().e(
+          'PlayerController: Player intent error ${videoUrl()}',
+          error: event,
+        );
       });
 
       if (superResolutionMode != SuperResolutionMode.off) {
@@ -457,8 +447,11 @@ abstract class _PlayerPlaybackController with Store {
       }
 
       await player.open(
-        Media(videoUrl(),
-            start: Duration(seconds: offset), httpHeaders: httpHeaders),
+        Media(
+          videoUrl(),
+          start: Duration(seconds: offset),
+          httpHeaders: httpHeaders,
+        ),
         play: autoPlay,
       );
       if (!isCurrentPlayer(player)) {
@@ -529,8 +522,10 @@ abstract class _PlayerPlaybackController with Store {
     try {
       mediaPlayer!.setRate(playerSpeed);
     } catch (e) {
-      KazumiLogger()
-          .e('PlayerController: failed to set playback speed', error: e);
+      KazumiLogger().e(
+        'PlayerController: failed to set playback speed',
+        error: e,
+      );
     }
   }
 

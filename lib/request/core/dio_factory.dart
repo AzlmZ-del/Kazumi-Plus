@@ -3,6 +3,7 @@ import 'package:kazumi/request/core/bangumi_transport.dart';
 import 'package:kazumi/request/core/dio_logger_interceptor.dart';
 import 'package:kazumi/request/core/network_config.dart';
 import 'package:kazumi/services/logging/logger.dart';
+import 'package:kazumi/services/network/source_network_route.dart';
 import 'package:kazumi/services/network/rules_mirror.dart';
 import 'package:kazumi/utils/http_headers.dart';
 
@@ -13,8 +14,26 @@ class DioFactory {
   static Dio? _bangumiDio;
   static Dio? _rulesRepoDio;
   static Dio? _pluginDio;
-  static Dio? _pluginDirectDio;
   static Dio? _downloadDio;
+  static final Map<SourceNetworkRoute, Dio> _sourceDios = {};
+
+  static Dio pluginForRoute(SourceNetworkRoute route) {
+    return _sourceDios.putIfAbsent(
+      route,
+      () => _create(
+        NetworkConfig(
+          forceDirect: route.mode == SourceNetworkMode.direct,
+          proxyHost: route.proxy?.host,
+          proxyPort: route.proxy?.port,
+          allowBadCertificates: route.allowBadCertificates,
+        ),
+        defaultHeaders: {
+          'user-agent': getRandomHttpUA(),
+          'accept-language': getRandomAcceptedLanguage(),
+        },
+      ),
+    );
+  }
 
   static Dio get apiDio => _apiDio ??= _create(
     NetworkConfig.fromSettings(),
@@ -52,17 +71,6 @@ class DioFactory {
     },
   );
 
-  /// 规则级直连专用：不挂任何代理回调，HttpClient 默认 DIRECT。
-  /// 与 [pluginDio] 的唯一差异是代理行为，UA/超时保持一致。
-  static Dio get pluginDirectDio => _pluginDirectDio ??= _create(
-    // 直连版：forceDirect 令系统代理回调（Windows findProxy）也不挂。
-    const NetworkConfig(forceDirect: true),
-    defaultHeaders: {
-      'user-agent': getRandomHttpUA(),
-      'accept-language': getRandomAcceptedLanguage(),
-    },
-  );
-
   static Dio get downloadDio => _downloadDio ??= _create(
     NetworkConfig.fromSettings(
       connectTimeout: const Duration(seconds: 15),
@@ -81,6 +89,10 @@ class DioFactory {
     _bangumiDio?.close();
     _rulesRepoDio?.close();
     _pluginDio?.close();
+    for (final dio in _sourceDios.values) {
+      dio.close();
+    }
+    _sourceDios.clear();
     _downloadDio?.close();
     _apiDio = null;
     _bangumiDio = null;

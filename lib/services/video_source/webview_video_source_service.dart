@@ -1,24 +1,40 @@
 import 'dart:async';
 
-import 'package:kazumi/webview/video/video_webview_controller.dart';
+import 'package:kazumi/services/logging/logger.dart';
+import 'package:kazumi/services/network/source_network_service.dart';
+import 'package:kazumi/services/network/source_proxy_lease.dart';
+import 'package:kazumi/services/network/source_webview_network.dart';
 import 'package:kazumi/services/video_source/video_source_service.dart';
+import 'package:kazumi/webview/video/video_webview_controller.dart';
 
-/// WebView 视频源解析服务
-///
-/// 使用 WebView 解析视频页面，提取视频源 URL。
-/// WebView 实例在服务生命周期内复用，切换集数时调用 unloadPage 释放页面资源，
-/// 仅在 [dispose] 时才真正销毁 WebView。
 class WebViewVideoSourceService implements IVideoSourceService {
+  WebViewVideoSourceService({
+    SourceNetworkResolver? resolver,
+    VideoWebviewController Function()? webviewFactory,
+    Future<SourceProxyLease> Function(
+      SourceNetworkRoute, {
+      Future<void>? cancelled,
+    })?
+    acquireLease,
+  }) : _resolver = resolver ?? SourceNetworkService.resolver,
+       _factory = webviewFactory ?? VideoWebviewControllerFactory.getController,
+       _acquireLease = acquireLease ?? SourceWebviewNetwork.acquire;
+
+  final SourceNetworkResolver _resolver;
+  final VideoWebviewController Function() _factory;
+  final Future<SourceProxyLease> Function(
+    SourceNetworkRoute, {
+    Future<void>? cancelled,
+  })
+  _acquireLease;
   VideoWebviewController? _webview;
-  StreamSubscription? _logSubscription;
-
-  // 单个服务实例持有一个 WebView，因此解析任务按实例串行执行。
-  // 下载并行通过多个服务实例实现。
-  Future<void>? _resolveTail = Future<void>.value();
+  SourceNetworkRoute? _route;
+  String _userAgent = '';
+  bool? _legacyParser;
+  StreamSubscription<String>? _logSubscription;
+  Future<void>? _resolveTail = Future.value();
   _ResolveRequest? _activeRequest;
-
-  final StreamController<String> _logController =
-      StreamController<String>.broadcast();
+  final _logController = StreamController<String>.broadcast();
   Stream<String> get onLog => _logController.stream;
 
   @override
@@ -29,17 +45,15 @@ class WebViewVideoSourceService implements IVideoSourceService {
     Duration timeout = const Duration(seconds: 15),
     String userAgent = '',
     bool directConnection = false,
-  }) async {
-    final resolveTail = _resolveTail;
-    if (resolveTail == null) {
-      throw const VideoSourceCancelledException();
+  }) {
+    final previous = _resolveTail;
+    if (previous == null) {
+      return Future.error(const VideoSourceCancelledException());
     }
-
     _activeRequest?.cancel();
     final request = _ResolveRequest();
     _activeRequest = request;
-
-    final resolveFuture = resolveTail.then(
+    final resolving = previous.then(
       (_) => _runResolve(
         request,
         episodeUrl,
@@ -50,9 +64,11 @@ class WebViewVideoSourceService implements IVideoSourceService {
         directConnection: directConnection,
       ),
     );
-
-    _resolveTail = resolveFuture.then<void>((_) {}, onError: (_) {});
-    return resolveFuture;
+    _resolveTail = resolving.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    return resolving;
   }
 
   Future<VideoSource> _runResolve(
@@ -64,100 +80,150 @@ class WebViewVideoSourceService implements IVideoSourceService {
     required String userAgent,
     required bool directConnection,
   }) async {
-    request.throwIfNotCurrent(_activeRequest);
-
-    if (_webview == null) {
-      _webview = VideoWebviewControllerFactory.getController();
-      await _webview!.init(userAgent: userAgent);
-
-      _logSubscription = _webview!.onLog.listen((log) {
-        if (!_logController.isClosed) {
-          _logController.add(log);
-        }
-      });
-    }
-
+    SourceProxyLease? lease;
+    StreamSubscription<VideoParserEvent>? parserSubscription;
     var didStartLoad = false;
+    var navigationSettled = false;
     try {
       request.throwIfNotCurrent(_activeRequest);
-      await _webview!.applyProxy(directConnection: directConnection);
-      request.throwIfNotCurrent(_activeRequest);
-      didStartLoad = true;
-      await _webview!.loadUrl(
-        episodeUrl,
-        useLegacyParser,
-        offset: offset,
+      // WebView 未必能强制直连，先折算成本平台能兑现的出口；
+      // 同一份结果既给租约也给 WebView 初始化，避免两边出口不一致。
+      final route = SourceWebviewNetwork.adaptRoute(
+        await Future.any<SourceNetworkRoute>([
+          // 不传目标：WebView 自己跟随系统代理，不能把系统代理固化成启动参数。
+          _resolver.resolve(directConnection: directConnection),
+          request.cancelled.then<SourceNetworkRoute>(
+            (_) => throw const VideoSourceCancelledException(),
+          ),
+        ]),
       );
-
       request.throwIfNotCurrent(_activeRequest);
-
-      final parserFuture = _webview!.onVideoURLParser.first.timeout(
-        timeout,
-        onTimeout: () {
-          request.throwIfNotCurrent(_activeRequest);
-          throw VideoSourceTimeoutException(timeout);
+      lease = await _acquireLease(route, cancelled: request.cancelled);
+      request.throwIfNotCurrent(_activeRequest);
+      if (_webview == null ||
+          _route != route ||
+          _userAgent != userAgent ||
+          _legacyParser != useLegacyParser) {
+        await _disposeWebview();
+        request.throwIfNotCurrent(_activeRequest);
+        final view = _factory();
+        _webview = view;
+        _logSubscription = view.onLog.listen((log) {
+          if (!_logController.isClosed) _logController.add(log);
+        });
+        try {
+          await view
+              .init(userAgent: userAgent, route: route)
+              .timeout(const Duration(seconds: 10));
+        } catch (_) {
+          await _disposeWebview();
+          rethrow;
+        }
+        _route = route;
+        _userAgent = userAgent;
+        _legacyParser = useLegacyParser;
+      }
+      request.throwIfNotCurrent(_activeRequest);
+      final view = _webview!;
+      final parsed = Completer<VideoParserEvent>();
+      parserSubscription = view.onVideoURLParser.listen(
+        (event) {
+          if (!parsed.isCompleted) parsed.complete(event);
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          if (!parsed.isCompleted) parsed.completeError(error, stackTrace);
         },
       );
-      final cancelFuture = request.cancelled.then<VideoParserEvent>((_) {
-        throw const VideoSourceCancelledException();
-      });
-      final event = await Future.any([parserFuture, cancelFuture]);
-
+      // 先订阅再导航，快速命中的媒体事件不能丢失。
+      didStartLoad = true;
+      final navigation =
+          Future.sync(
+            () => view.loadUrl(episodeUrl, useLegacyParser, offset: offset),
+          ).whenComplete(() {
+            navigationSettled = true;
+          });
+      final loadedAndParsed = Future.wait<Object?>([
+        navigation.then<Object?>((_) => null),
+        parsed.future,
+      ], eagerError: true).then((values) => values.last as VideoParserEvent);
+      final event =
+          await Future.any<VideoParserEvent>([
+            loadedAndParsed,
+            request.cancelled.then<VideoParserEvent>(
+              (_) => throw const VideoSourceCancelledException(),
+            ),
+          ]).timeout(
+            timeout,
+            onTimeout: () {
+              request.throwIfNotCurrent(_activeRequest);
+              throw VideoSourceTimeoutException(timeout);
+            },
+          );
       request.throwIfNotCurrent(_activeRequest);
-
       return VideoSource(
         url: event.url,
         offset: event.offset,
         type: VideoSourceType.online,
         format: event.format,
       );
-    } catch (e) {
-      if (e is VideoSourceCancelledException) {
-        rethrow;
-      }
+    } on SourceProxyLeaseCancelled {
+      throw const VideoSourceCancelledException();
+    } catch (_) {
       request.throwIfNotCurrent(_activeRequest);
       rethrow;
     } finally {
-      if (didStartLoad) {
-        await _webview?.unloadPage();
-      }
-      if (identical(_activeRequest, request)) {
-        _activeRequest = null;
+      try {
+        await parserSubscription?.cancel();
+        if (didStartLoad && !navigationSettled) {
+          await _disposeWebview();
+        } else if (didStartLoad) {
+          try {
+            await _webview?.unloadPage();
+          } catch (error) {
+            KazumiLogger().w('WebView: 页面卸载失败，销毁实例 $error');
+            await _disposeWebview();
+          }
+        }
+      } finally {
+        try {
+          await lease?.release();
+        } finally {
+          if (identical(_activeRequest, request)) _activeRequest = null;
+        }
       }
     }
   }
 
-  @override
-  void cancel() {
-    _activeRequest?.cancel();
+  Future<void> _disposeWebview() async {
+    await _logSubscription?.cancel();
+    _logSubscription = null;
+    final view = _webview;
+    _webview = null;
+    _route = null;
+    await view?.dispose();
   }
+
+  @override
+  void cancel() => _activeRequest?.cancel();
 
   @override
   Future<void> dispose() async {
-    final resolveTail = _resolveTail;
+    final previous = _resolveTail;
     _resolveTail = null;
     cancel();
-    await resolveTail;
+    await previous;
     _activeRequest = null;
-    await _logSubscription?.cancel();
-    _logSubscription = null;
-    if (!_logController.isClosed) {
-      await _logController.close();
-    }
-    await _webview?.dispose();
-    _webview = null;
+    await _disposeWebview();
+    await _logController.close();
   }
 }
 
 class _ResolveRequest {
-  final Completer<void> _cancelled = Completer<void>();
-
+  final _cancelled = Completer<void>();
   Future<void> get cancelled => _cancelled.future;
 
   void cancel() {
-    if (!_cancelled.isCompleted) {
-      _cancelled.complete();
-    }
+    if (!_cancelled.isCompleted) _cancelled.complete();
   }
 
   void throwIfNotCurrent(_ResolveRequest? current) {

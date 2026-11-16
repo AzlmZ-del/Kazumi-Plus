@@ -10,95 +10,107 @@ class _SourceCaptchaFlow {
   void dispose() => _dialogs.dispose();
 
   void showSuccess(String pluginName, {required VoidCallback onComplete}) {
-    unawaited(_dialogs.run((task) async {
-      await task.show<bool>(
-        clickMaskDismiss: false,
-        builder: (_) => _VerificationCompleteDialog(pluginName: pluginName),
-      );
-      onComplete();
-    }));
+    unawaited(
+      _dialogs.run((task) async {
+        await task.show<bool>(
+          clickMaskDismiss: false,
+          builder: (_) => _VerificationCompleteDialog(pluginName: pluginName),
+        );
+        onComplete();
+      }),
+    );
   }
 
   void start(Plugin plugin, String keyword) {
-    unawaited(_dialogs.run((task) async {
-      final service = CaptchaVerificationService();
-      // 让验证 WebView 与后续 dio 请求共用规则 UA，clearance cookie 才不会
-      // 因 UA 不一致而作废（规则未配 UA 时内部回落到浏览器 UA 池）。
-      service.applyRuleUserAgent(plugin.userAgent);
-      final verified = Completer<String>();
-      final config = plugin.antiCrawlerConfig;
-      final searchUrl = plugin.searchURL
-          .replaceAll('@keyword', Uri.encodeQueryComponent(keyword));
-      Timer? timeout;
-      bool finalizing = false;
+    unawaited(
+      _dialogs.run(
+        (task) async {
+          final service = CaptchaVerificationService();
+          // 让验证 WebView 与后续 dio 请求共用规则 UA，clearance cookie 才不会
+          // 因 UA 不一致而作废（规则未配 UA 时内部回落到浏览器 UA 池）。
+          service.applyRuleUserAgent(plugin.userAgent);
+          service.applyRuleNetwork(plugin.directConnection);
+          final verified = Completer<String>();
+          final config = plugin.antiCrawlerConfig;
+          final searchUrl = plugin.searchURL.replaceAll(
+            '@keyword',
+            Uri.encodeQueryComponent(keyword),
+          );
+          Timer? timeout;
+          bool finalizing = false;
 
-      Future<void> submitCaptcha(String code) async {
-        await task.wait(service.submitCaptcha(
-          captchaCode: code,
-          inputXpath: config.captchaInput,
-          buttonXpath: config.captchaButton,
-          pluginName: plugin.name,
-          onFinalizing: () {
-            finalizing = true;
-            timeout?.cancel();
-          },
-          onVerified: verified.complete,
-        ));
-        // 提交在 JS 点击后就返回了，此时验证还没真正完成。
-        if (!finalizing) {
-          timeout?.cancel();
-          timeout = Timer(const Duration(seconds: 8), task.cancel);
-        }
-      }
-
-      final String pageHtml;
-      try {
-        pageHtml = await task.loading(
-          barrierDismissible: true,
-          onCancel: () => service.cancelAndSave(plugin.name),
-          builder: (_) => switch (config.captchaType) {
-            CaptchaType.customJavaScript ||
-            CaptchaType.autoClickButton =>
-              _AutomatedVerifyDialog(pluginName: plugin.name),
-            _ => _CaptchaDialog(
+          Future<void> submitCaptcha(String code) async {
+            await task.wait(
+              service.submitCaptcha(
+                captchaCode: code,
+                inputXpath: config.captchaInput,
+                buttonXpath: config.captchaButton,
                 pluginName: plugin.name,
-                captchaImageStream: service.onCaptchaImageUrl,
-                onReload: () => service.loadForCaptcha(
-                  searchUrl,
-                  config.captchaImage,
-                  inputXpath: config.captchaInput,
-                ),
-                onSubmit: submitCaptcha,
+                onFinalizing: () {
+                  finalizing = true;
+                  timeout?.cancel();
+                },
+                onVerified: verified.complete,
               ),
-          },
-          action: () async {
-            switch (config.captchaType) {
-              case CaptchaType.customJavaScript:
-                await service.loadForCustomScript(
-                  url: searchUrl,
-                  script: config.captchaScript,
-                  pluginName: plugin.name,
-                  onVerified: verified.complete,
-                );
-              case CaptchaType.autoClickButton:
-                await service.loadForButtonClick(
-                  url: searchUrl,
-                  buttonXpath: config.captchaButton,
-                  pluginName: plugin.name,
-                  onVerified: verified.complete,
-                );
-              default:
-                break;
+            );
+            // 提交在 JS 点击后就返回了，此时验证还没真正完成。
+            if (!finalizing) {
+              timeout?.cancel();
+              timeout = Timer(const Duration(seconds: 8), task.cancel);
             }
-            return verified.future;
-          },
-        );
-      } finally {
-        timeout?.cancel();
-        service.dispose();
-      }
-      onVerified(plugin, pageHtml);
-    }, onCancelled: () => onCancelled(plugin), errorMessage: '验证失败，请稍后重试'));
+          }
+
+          final String pageHtml;
+          try {
+            pageHtml = await task.loading(
+              barrierDismissible: true,
+              onCancel: () => service.cancelAndSave(plugin.name),
+              builder: (_) => switch (config.captchaType) {
+                CaptchaType.customJavaScript || CaptchaType.autoClickButton =>
+                  _AutomatedVerifyDialog(pluginName: plugin.name),
+                _ => _CaptchaDialog(
+                  pluginName: plugin.name,
+                  captchaImageStream: service.onCaptchaImageUrl,
+                  onReload: () => service.loadForCaptcha(
+                    searchUrl,
+                    config.captchaImage,
+                    inputXpath: config.captchaInput,
+                  ),
+                  onSubmit: submitCaptcha,
+                ),
+              },
+              action: () async {
+                switch (config.captchaType) {
+                  case CaptchaType.customJavaScript:
+                    await service.loadForCustomScript(
+                      url: searchUrl,
+                      script: config.captchaScript,
+                      pluginName: plugin.name,
+                      onVerified: verified.complete,
+                    );
+                  case CaptchaType.autoClickButton:
+                    await service.loadForButtonClick(
+                      url: searchUrl,
+                      buttonXpath: config.captchaButton,
+                      pluginName: plugin.name,
+                      onVerified: verified.complete,
+                    );
+                  default:
+                    break;
+                }
+                return verified.future;
+              },
+            );
+          } finally {
+            timeout?.cancel();
+            await service.dispose();
+          }
+          onVerified(plugin, pageHtml);
+        },
+        onCancelled: () => onCancelled(plugin),
+        errorMessage: '验证失败，请稍后重试',
+      ),
+    );
   }
 }
 
@@ -136,14 +148,18 @@ class _VerifyDialogFrame extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.verified_user_outlined,
-                  size: 20, color: colors.onSurfaceVariant),
+              Icon(
+                Icons.verified_user_outlined,
+                size: 20,
+                color: colors.onSurfaceVariant,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   pluginName,
-                  style: theme.textTheme.labelLarge
-                      ?.copyWith(color: colors.onSurfaceVariant),
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
                 ),
               ),
             ],
@@ -157,9 +173,12 @@ class _VerifyDialogFrame extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(description,
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: colors.onSurfaceVariant)),
+            Text(
+              description,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colors.onSurfaceVariant,
+              ),
+            ),
             const SizedBox(height: 24),
             child,
             if (actions.isEmpty) const SizedBox(height: 24),
@@ -336,8 +355,9 @@ class _CaptchaDialogState extends State<_CaptchaDialog> {
                 floatingLabelBehavior: FloatingLabelBehavior.always,
                 errorText: _inputError,
                 errorMaxLines: 2,
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ],
@@ -351,8 +371,10 @@ class _CaptchaDialogState extends State<_CaptchaDialog> {
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.broken_image_outlined,
-              color: Theme.of(context).colorScheme.onSurfaceVariant),
+          Icon(
+            Icons.broken_image_outlined,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
           const SizedBox(height: 8),
           Text(_imageError!, textAlign: TextAlign.center),
           TextButton.icon(
@@ -370,10 +392,14 @@ class _CaptchaDialogState extends State<_CaptchaDialog> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           LoadingIndicator(
-              size: 40, semanticsLabel: _submitting ? '正在验证' : '正在加载验证码'),
+            size: 40,
+            semanticsLabel: _submitting ? '正在验证' : '正在加载验证码',
+          ),
           const SizedBox(height: 12),
-          Text(_submitting ? '正在等待验证结果…' : '正在加载验证码…',
-              textAlign: TextAlign.center),
+          Text(
+            _submitting ? '正在等待验证结果…' : '正在加载验证码…',
+            textAlign: TextAlign.center,
+          ),
         ],
       );
     }
@@ -402,28 +428,25 @@ class _AutomatedVerifyDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _VerifyDialogFrame(
-        pluginName: pluginName,
-        title: '正在验证',
-        description: '正在等待网站响应，通过后会自动继续检索。',
-        actions: [
-          TextButton(
-            style: TextButton.styleFrom(minimumSize: const Size(72, 48)),
-            onPressed: () => KazumiDialog.dismiss(context: context),
-            child: const Text('返回来源'),
-          ),
-        ],
-        child: const Padding(
-          padding: EdgeInsets.symmetric(vertical: 16),
-          child:
-              Center(child: LoadingIndicator(size: 72, semanticsLabel: '正在验证')),
-        ),
-      );
+    pluginName: pluginName,
+    title: '正在验证',
+    description: '正在等待网站响应，通过后会自动继续检索。',
+    actions: [
+      TextButton(
+        style: TextButton.styleFrom(minimumSize: const Size(72, 48)),
+        onPressed: () => KazumiDialog.dismiss(context: context),
+        child: const Text('返回来源'),
+      ),
+    ],
+    child: const Padding(
+      padding: EdgeInsets.symmetric(vertical: 16),
+      child: Center(child: LoadingIndicator(size: 72, semanticsLabel: '正在验证')),
+    ),
+  );
 }
 
 class _VerificationCompleteDialog extends StatefulWidget {
-  const _VerificationCompleteDialog({
-    required this.pluginName,
-  });
+  const _VerificationCompleteDialog({required this.pluginName});
 
   final String pluginName;
 
@@ -467,8 +490,11 @@ class _VerificationCompleteDialogState
               color: colors.primaryContainer,
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.check_rounded,
-                color: colors.onPrimaryContainer, size: 32),
+            child: Icon(
+              Icons.check_rounded,
+              color: colors.onPrimaryContainer,
+              size: 32,
+            ),
           ),
         ),
       ),

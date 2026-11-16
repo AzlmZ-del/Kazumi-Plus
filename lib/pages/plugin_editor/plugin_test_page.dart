@@ -581,7 +581,7 @@ class _PluginTestPageState extends State<PluginTestPage>
     );
   }
 
-  /// 在应用内打开一个网页。
+  /// 在应用内打开一个网页，沿用该源设定的 UA 与直连策略。
   void _openUrlInternal(String url, String title) {
     Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute(
@@ -589,6 +589,7 @@ class _PluginTestPageState extends State<PluginTestPage>
           url: url,
           title: title,
           userAgent: plugin.userAgent,
+          directConnection: plugin.directConnection,
         ),
       ),
     );

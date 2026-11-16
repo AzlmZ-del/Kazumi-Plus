@@ -1,13 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:kazumi/services/storage/storage.dart';
-import 'package:kazumi/services/network/proxy_utils.dart';
-import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/webview/video/video_webview_controller.dart';
-import 'package:kazumi/request/clients/direct_http_client.dart';
 import 'package:flutter_inappwebview_platform_interface/flutter_inappwebview_platform_interface.dart';
-import 'package:flutter_inappwebview_android/flutter_inappwebview_android.dart'
-    as android_webview;
 import 'package:kazumi/utils/media.dart';
 import 'package:kazumi/utils/http_headers.dart';
 
@@ -19,8 +13,10 @@ class VideoWebviewAndroidImpl
   bool useLegacyParser = false;
 
   @override
-  Future<void> init({String userAgent = ''}) async {
-    await _setupProxy();
+  Future<void> init({
+    String userAgent = '',
+    SourceNetworkRoute route = const SourceNetworkRoute.system(),
+  }) async {
     headlessWebView ??= PlatformHeadlessInAppWebView(
       PlatformHeadlessInAppWebViewCreationParams(
         initialSettings: InAppWebViewSettings(
@@ -69,8 +65,11 @@ class VideoWebviewAndroidImpl
   }
 
   @override
-  Future<void> loadUrl(String url, bool useLegacyParser,
-      {int offset = 0}) async {
+  Future<void> loadUrl(
+    String url,
+    bool useLegacyParser, {
+    int offset = 0,
+  }) async {
     await unloadPage();
     this.useLegacyParser = useLegacyParser;
     if (!hasInjectedScripts) {
@@ -91,60 +90,65 @@ class VideoWebviewAndroidImpl
   void addJavaScriptHandlers(bool useLegacyParser) {
     logEventController.add('Adding LogBridge handler');
     webviewController?.addJavaScriptHandler(
-        handlerName: 'LogBridge',
-        callback: (args) {
-          String message = args[0].toString();
-          if (message.contains('about:blank')) {
-            return;
-          }
-          logEventController.add(message);
-        });
+      handlerName: 'LogBridge',
+      callback: (args) {
+        String message = args[0].toString();
+        if (message.contains('about:blank')) {
+          return;
+        }
+        logEventController.add(message);
+      },
+    );
 
     if (useLegacyParser) {
       logEventController.add('Adding JSBridgeDebug handler');
       webviewController?.addJavaScriptHandler(
-          handlerName: 'JSBridgeDebug',
-          callback: (args) {
-            String message = args[0].toString();
-            logEventController.add('Callback received: $message');
-            logEventController.add(
-                'If there is audio but no video, please report it to the rule developer.');
-            if ((message.contains('http') || message.startsWith('//')) &&
-                !message.contains('googleads') &&
-                !message.contains('googlesyndication.com') &&
-                !message.contains('prestrain.html') &&
-                !message.contains('prestrain%2Ehtml') &&
-                !message.contains('adtrafficquality')) {
-              logEventController.add('Parsing video source $message');
-              String encodedUrl = Uri.encodeFull(message);
-              if (decodeVideoSource(encodedUrl) != encodedUrl) {
-                isIframeLoaded = true;
-                isVideoSourceLoaded = true;
-                videoLoadingEventController.add(false);
-                logEventController.add(
-                    'Loading video source ${decodeVideoSource(encodedUrl)}');
-                unloadPage();
-                final videoUrl = decodeVideoSource(encodedUrl);
-                notifyVideoSourceResolved(videoUrl);
-              }
-            }
-          });
-    } else {
-      logEventController.add('Adding VideoBridgeDebug handler');
-      webviewController?.addJavaScriptHandler(
-          handlerName: 'VideoBridgeDebug',
-          callback: (args) {
-            String message = args[0].toString();
-            logEventController.add('Callback received: $message');
-            if (message.contains('http') && !isVideoSourceLoaded) {
-              logEventController.add('Loading video source: $message');
+        handlerName: 'JSBridgeDebug',
+        callback: (args) {
+          String message = args[0].toString();
+          logEventController.add('Callback received: $message');
+          logEventController.add(
+            'If there is audio but no video, please report it to the rule developer.',
+          );
+          if ((message.contains('http') || message.startsWith('//')) &&
+              !message.contains('googleads') &&
+              !message.contains('googlesyndication.com') &&
+              !message.contains('prestrain.html') &&
+              !message.contains('prestrain%2Ehtml') &&
+              !message.contains('adtrafficquality')) {
+            logEventController.add('Parsing video source $message');
+            String encodedUrl = Uri.encodeFull(message);
+            if (decodeVideoSource(encodedUrl) != encodedUrl) {
               isIframeLoaded = true;
               isVideoSourceLoaded = true;
               videoLoadingEventController.add(false);
+              logEventController.add(
+                'Loading video source ${decodeVideoSource(encodedUrl)}',
+              );
               unloadPage();
-              notifyVideoSourceResolved(message);
+              final videoUrl = decodeVideoSource(encodedUrl);
+              notifyVideoSourceResolved(videoUrl);
             }
-          });
+          }
+        },
+      );
+    } else {
+      logEventController.add('Adding VideoBridgeDebug handler');
+      webviewController?.addJavaScriptHandler(
+        handlerName: 'VideoBridgeDebug',
+        callback: (args) {
+          String message = args[0].toString();
+          logEventController.add('Callback received: $message');
+          if (message.contains('http') && !isVideoSourceLoaded) {
+            logEventController.add('Loading video source: $message');
+            isIframeLoaded = true;
+            isVideoSourceLoaded = true;
+            videoLoadingEventController.add(false);
+            unloadPage();
+            notifyVideoSourceResolved(message);
+          }
+        },
+      );
     }
   }
 
@@ -186,10 +190,12 @@ class VideoWebviewAndroidImpl
           attributeFilter: ['src']
         });
       """;
-      scripts.add(UserScript(
-        source: jsBridgeDebugScript,
-        injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
-      ));
+      scripts.add(
+        UserScript(
+          source: jsBridgeDebugScript,
+          injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+        ),
+      );
     } else {
       logEventController.add('Adding VideoBridgeDebug UserScripts');
       const String blobParserScript = """
@@ -281,25 +287,28 @@ class VideoWebviewAndroidImpl
           setupVideoProcessing();
         }
     """;
-      scripts.add(UserScript(
-        source: blobParserScript,
-        injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
-      ));
-      scripts.add(UserScript(
-        source: videoTagParserScript,
-        injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
-      ));
+      scripts.add(
+        UserScript(
+          source: blobParserScript,
+          injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+        ),
+      );
+      scripts.add(
+        UserScript(
+          source: videoTagParserScript,
+          injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+        ),
+      );
     }
 
-    await webviewController?.addUserScripts(
-      userScripts: scripts,
-    );
+    await webviewController?.addUserScripts(userScripts: scripts);
   }
 
   @override
   Future<void> unloadPage() async {
-    await webviewController!
-        .loadUrl(urlRequest: URLRequest(url: WebUri("about:blank")));
+    await webviewController!.loadUrl(
+      urlRequest: URLRequest(url: WebUri("about:blank")),
+    );
   }
 
   @override
@@ -343,90 +352,5 @@ class VideoWebviewAndroidImpl
         lower.contains('googlesyndication') ||
         lower.contains('adtrafficquality') ||
         lower.contains('doubleclick');
-  }
-
-  Future<void> _setupProxy() async {
-    final bool proxyEnable = GStorage.getSetting(SettingsKeys.proxyEnable);
-    if (!proxyEnable) {
-      return;
-    }
-
-    final String proxyUrl = GStorage.getSetting(SettingsKeys.proxyUrl);
-    final formattedProxy = ProxyUtils.getFormattedProxyUrl(proxyUrl);
-    if (formattedProxy == null) {
-      return;
-    }
-
-    try {
-      final proxyAvailable =
-          await android_webview.AndroidWebViewFeature.instance()
-              .isFeatureSupported(WebViewFeature.PROXY_OVERRIDE);
-      if (!proxyAvailable) {
-        KazumiLogger().w('WebView: 当前 Android 版本不支持代理');
-        return;
-      }
-
-      final proxyController = android_webview.AndroidProxyController.instance();
-      await proxyController.clearProxyOverride();
-      await proxyController.setProxyOverride(
-        settings: ProxySettings(
-          proxyRules: [
-            ProxyRule(url: formattedProxy),
-          ],
-        ),
-      );
-      KazumiLogger().i('WebView: 代理设置成功 $formattedProxy');
-    } catch (e) {
-      KazumiLogger().e('WebView: 设置代理失败 $e');
-    }
-  }
-
-  @override
-  Future<void> applyProxy({required bool directConnection}) async {
-    if (!directConnection) {
-      // 非直连源：清掉上个源残留的隧道规则，再按全局代理恢复。
-      try {
-        await android_webview.AndroidProxyController.instance()
-            .clearProxyOverride();
-      } catch (_) {}
-      await _setupProxy();
-      return;
-    }
-
-    // 直连源：起本地 CONNECT 隧道，让 WebView 流量经非 VPN 网卡出网。
-    try {
-      final proxyAvailable =
-          await android_webview.AndroidWebViewFeature.instance()
-              .isFeatureSupported(WebViewFeature.PROXY_OVERRIDE);
-      if (!proxyAvailable) {
-        KazumiLogger().w('WebView: 当前 Android 版本不支持代理，直连无法生效');
-        return;
-      }
-      if (!await DirectHttpClient.isVpnActive()) {
-        // 没有 VPN 接管，WebView 默认就直连，无需隧道。
-        try {
-          await android_webview.AndroidProxyController.instance()
-              .clearProxyOverride();
-        } catch (_) {}
-        return;
-      }
-      final port = await DirectHttpClient.startLocalProxy();
-      final proxyController = android_webview.AndroidProxyController.instance();
-      await proxyController.clearProxyOverride();
-      await proxyController.setProxyOverride(
-        settings: ProxySettings(
-          proxyRules: [
-            ProxyRule(url: 'http://127.0.0.1:$port'),
-          ],
-        ),
-      );
-      KazumiLogger().i('WebView: 直连隧道代理已设置 127.0.0.1:$port');
-    } catch (e) {
-      KazumiLogger().w('WebView: 直连代理设置失败，回落系统网络 $e');
-      try {
-        await android_webview.AndroidProxyController.instance()
-            .clearProxyOverride();
-      } catch (_) {}
-    }
   }
 }

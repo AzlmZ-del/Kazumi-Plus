@@ -1,15 +1,20 @@
-import 'dart:io';
-
 import 'package:dio/dio.dart';
-import 'package:kazumi/request/clients/direct_http_client.dart';
 import 'package:kazumi/request/core/dio_factory.dart';
 import 'package:kazumi/request/core/network_error_mapper.dart';
+import 'package:kazumi/services/network/source_network_service.dart';
 import 'package:kazumi/utils/http_headers.dart';
 
 class PluginSiteClient {
-  PluginSiteClient._();
+  PluginSiteClient({
+    SourceNetworkResolver? resolver,
+    Dio Function(SourceNetworkRoute route)? dioForRoute,
+  }) : _resolver = resolver ?? SourceNetworkService.resolver,
+       _dioForRoute = dioForRoute ?? DioFactory.pluginForRoute;
 
-  static final PluginSiteClient instance = PluginSiteClient._();
+  static final PluginSiteClient instance = PluginSiteClient();
+
+  final SourceNetworkResolver _resolver;
+  final Dio Function(SourceNetworkRoute route) _dioForRoute;
 
   Future<String> requestText(
     String url, {
@@ -21,32 +26,46 @@ class PluginSiteClient {
     bool directConnection = false,
     String bodyType = 'json',
   }) async {
-    // Android + 直连：系统可能是 TUN 型 VPN（Clash 之类），内核按 uid 分流，
-    // Dio 的 findProxy 管不着。这时改走原生 requestNetwork(NOT_VPN) 通道，
-    // 才能真正绕开隧道。没有 VPN 时仍用 Dio，保留 keep-alive 与超时配置。
-    if (directConnection && Platform.isAndroid) {
-      if (await DirectHttpClient.isVpnActive()) {
-        return DirectHttpClient.request(
-          url: _withQuery(url, queryParameters),
-          method: method,
-          headers: _headers(headers),
-          body: data,
-          bodyType: bodyType,
-        );
-      }
-    }
     try {
-      final dio = directConnection
-          ? DioFactory.pluginDirectDio
-          : DioFactory.pluginDio;
-      final response = await dio.request<String>(
+      if (cancelToken?.isCancelled == true) throw cancelToken!.cancelError!;
+      final resolving = _resolver.resolve(
+        directConnection: directConnection,
+        target: Uri.parse(url),
+      );
+      final route = cancelToken == null
+          ? await resolving
+          : await Future.any<SourceNetworkRoute>([
+              resolving,
+              cancelToken.whenCancel.then<SourceNetworkRoute>(
+                (error) => throw error,
+              ),
+            ]);
+      if (cancelToken?.isCancelled == true) throw cancelToken!.cancelError!;
+      final requestHeaders = _headers(headers);
+      if (data != null) {
+        switch (bodyType) {
+          case 'json':
+            requestHeaders.putIfAbsent(
+              'content-type',
+              () => 'application/json',
+            );
+            break;
+          case 'form':
+            requestHeaders.putIfAbsent(
+              'content-type',
+              () => Headers.formUrlEncodedContentType,
+            );
+            break;
+        }
+      }
+      final response = await _dioForRoute(route).request<String>(
         url,
         queryParameters: queryParameters,
         data: data,
         options: Options(
           method: method,
           responseType: ResponseType.plain,
-          headers: _headers(headers),
+          headers: requestHeaders,
         ),
         cancelToken: cancelToken,
       );
@@ -56,25 +75,12 @@ class PluginSiteClient {
     }
   }
 
-  /// 原生通道没有 queryParameters 参数，这里把查询串拼进 URL。
-  String _withQuery(String url, Map<String, dynamic> queryParameters) {
-    if (queryParameters.isEmpty) return url;
-    final uri = Uri.parse(url);
-    final merged = <String, dynamic>{
-      ...uri.queryParameters,
-      ...queryParameters.map((key, value) => MapEntry(key, '$value')),
-    };
-    return uri.replace(queryParameters: merged).toString();
-  }
-
   Map<String, dynamic> _headers(Map<String, dynamic> headers) {
     return {
-      // 原生 HTTP 请求用非浏览器 UA：浏览器 UA 配 BoringSSL 指纹会被
-      // Cloudflare 判为伪装并直接 403。规则显式配了 UA 时由 headers 覆盖。
       'user-agent': getRandomHttpUA(),
-      'Accept-Language': getRandomAcceptedLanguage(),
-      'Connection': 'keep-alive',
-      ...headers,
+      'accept-language': getRandomAcceptedLanguage(),
+      'connection': 'keep-alive',
+      for (final entry in headers.entries) entry.key.toLowerCase(): entry.value,
     };
   }
 }

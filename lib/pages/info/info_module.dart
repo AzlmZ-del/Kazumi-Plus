@@ -52,6 +52,7 @@ final infoModule = createModule(
             url: args.url,
             title: args.title,
             userAgent: args.userAgent,
+            directConnection: args.directConnection,
           );
         },
       );

@@ -1,6 +1,9 @@
 import 'dart:io';
 import 'dart:async';
 
+import 'package:kazumi/services/network/source_network_route.dart';
+
+export 'package:kazumi/services/network/source_network_route.dart';
 import 'package:flutter/foundation.dart';
 import 'package:kazumi/webview/video/impl/video_webview_android_impl.dart';
 import 'package:kazumi/webview/video/impl/video_webview_impl.dart';
@@ -10,11 +13,7 @@ import 'package:kazumi/webview/video/impl/video_webview_apple_impl.dart';
 import 'package:kazumi/services/platform/webview_feature_service.dart';
 import 'package:kazumi/services/video_source/video_source_format.dart';
 
-typedef VideoParserEvent = ({
-  String url,
-  int offset,
-  VideoSourceFormat format,
-});
+typedef VideoParserEvent = ({String url, int offset, VideoSourceFormat format});
 
 abstract class VideoWebviewController<T> {
   // WebView 控制器。
@@ -32,7 +31,10 @@ abstract class VideoWebviewController<T> {
   /// [userAgent] 规则自带的 UA。非空时 WebView 必须用它，让页面内拿到的
   /// 资源与后续媒体请求保持同一个 UA，避免站点按 UA 做防盗链时对不上。
   /// 为空时各平台自行回落到浏览器 UA 池。
-  Future<void> init({String userAgent = ''});
+  Future<void> init({
+    String userAgent = '',
+    SourceNetworkRoute route = const SourceNetworkRoute.system(),
+  });
 
   final StreamController<bool> initEventController =
       StreamController<bool>.broadcast();
@@ -61,11 +63,7 @@ abstract class VideoWebviewController<T> {
     String url, {
     VideoSourceFormat format = VideoSourceFormat.auto,
   }) {
-    _videoParserEventController.add((
-      url: url,
-      offset: offset,
-      format: format,
-    ));
+    _videoParserEventController.add((url: url, offset: offset, format: format));
   }
 
   void disposeEventControllers() {
@@ -82,13 +80,6 @@ abstract class VideoWebviewController<T> {
       _videoParserEventController.close();
     }
   }
-
-  /// 每次加载页面前按规则开关重设 WebView 代理。
-  ///
-  /// Android 的 WebView 代理是进程级，无法 per-WebView 隔离，只能逐次设置；
-  /// [directConnection] 为 true 时走本地 CONNECT 隧道（绕 VPN），否则按全局
-  /// 代理设置恢复。非 Android 平台无隧道能力，空实现即可。
-  Future<void> applyProxy({required bool directConnection});
 
   /// 让 WebView 加载指定 URL。
   Future<void> loadUrl(String url, bool useLegacyParser, {int offset = 0});
