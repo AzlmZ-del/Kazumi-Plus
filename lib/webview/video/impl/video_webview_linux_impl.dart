@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:kazumi/webview/video/video_webview_controller.dart';
-import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/services/network/proxy_utils.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:desktop_webview_window/desktop_webview_window.dart';
@@ -10,29 +9,35 @@ class VideoWebviewLinuxImpl extends VideoWebviewController<Webview> {
   bool bridgeInited = false;
 
   @override
-  Future<void> init({String userAgent = ''}) async {
+  Future<void> init({
+    String userAgent = '',
+    SourceNetworkRoute route = const SourceNetworkRoute.system(),
+  }) async {
     // desktop_webview_window 只暴露 setApplicationNameForUserAgent（在默认 UA
     // 后追加一段），无法整体替换 UA。用 userScript 覆盖 navigator.userAgent
     // 只能骗过页面 JS，HTTP 请求头仍是 WebKit 默认值，对按请求头校验的 WAF
     // 无效，反而制造「已对齐」的假象。故 Linux 保持默认 UA。
-    final proxyConfig = _getProxyConfiguration();
+    final proxyConfig = _getProxyConfiguration(route.proxyUrl);
     webviewController ??= await WebviewWindow.create(
       configuration: CreateConfiguration(
         headless: true,
         proxy: proxyConfig,
         userScripts: const [
           UserScript(
-              source: blobScript,
-              injectionTime: UserScriptInjectionTime.documentStart,
-              forAllFrames: true),
+            source: blobScript,
+            injectionTime: UserScriptInjectionTime.documentStart,
+            forAllFrames: true,
+          ),
           UserScript(
-              source: iframeScript,
-              injectionTime: UserScriptInjectionTime.documentEnd,
-              forAllFrames: true),
+            source: iframeScript,
+            injectionTime: UserScriptInjectionTime.documentEnd,
+            forAllFrames: true,
+          ),
           UserScript(
-              source: videoScript,
-              injectionTime: UserScriptInjectionTime.documentEnd,
-              forAllFrames: true)
+            source: videoScript,
+            injectionTime: UserScriptInjectionTime.documentEnd,
+            forAllFrames: true,
+          ),
         ],
       ),
     );
@@ -40,13 +45,10 @@ class VideoWebviewLinuxImpl extends VideoWebviewController<Webview> {
     initEventController.add(true);
   }
 
-  ProxyConfiguration? _getProxyConfiguration() {
-    final bool proxyEnable = GStorage.getSetting(SettingsKeys.proxyEnable);
-    if (!proxyEnable) {
+  ProxyConfiguration? _getProxyConfiguration(String? proxyUrl) {
+    if (proxyUrl == null) {
       return null;
     }
-
-    final String proxyUrl = GStorage.getSetting(SettingsKeys.proxyUrl);
     final parsed = ProxyUtils.parseProxyUrl(proxyUrl);
     if (parsed == null) {
       return null;
@@ -63,11 +65,11 @@ class VideoWebviewLinuxImpl extends VideoWebviewController<Webview> {
   }
 
   @override
-  Future<void> applyProxy({required bool directConnection}) async {}
-
-  @override
-  Future<void> loadUrl(String url, bool useLegacyParser,
-      {int offset = 0}) async {
+  Future<void> loadUrl(
+    String url,
+    bool useLegacyParser, {
+    int offset = 0,
+  }) async {
     await unloadPage();
     if (!bridgeInited) {
       await initBridge(useLegacyParser);
@@ -96,10 +98,12 @@ class VideoWebviewLinuxImpl extends VideoWebviewController<Webview> {
   Future<void> initJSBridge(bool useLegacyParser) async {
     webviewController!.addOnWebMessageReceivedCallback((message) async {
       if (message.contains('iframeMessage:')) {
-        String messageItem =
-            Uri.encodeFull(message.replaceFirst('iframeMessage:', ''));
-        logEventController
-            .add('Callback received: [iframe] ${Uri.decodeFull(messageItem)}');
+        String messageItem = Uri.encodeFull(
+          message.replaceFirst('iframeMessage:', ''),
+        );
+        logEventController.add(
+          'Callback received: [iframe] ${Uri.decodeFull(messageItem)}',
+        );
         if ((messageItem.contains('http') || messageItem.startsWith('//')) &&
             !messageItem.contains('googleads') &&
             !messageItem.contains('googlesyndication.com') &&
@@ -112,8 +116,9 @@ class VideoWebviewLinuxImpl extends VideoWebviewController<Webview> {
             isIframeLoaded = true;
             isVideoSourceLoaded = true;
             videoLoadingEventController.add(false);
-            logEventController
-                .add('Loading video source ${decodeVideoSource(messageItem)}');
+            logEventController.add(
+              'Loading video source ${decodeVideoSource(messageItem)}',
+            );
             unloadPage();
             final videoUrl = decodeVideoSource(messageItem);
             notifyVideoSourceResolved(videoUrl);
@@ -121,10 +126,12 @@ class VideoWebviewLinuxImpl extends VideoWebviewController<Webview> {
         }
       }
       if (message.contains('videoMessage:')) {
-        String messageItem =
-            Uri.encodeFull(message.replaceFirst('videoMessage:', ''));
-        logEventController
-            .add('Callback received: [video] ${Uri.decodeFull(messageItem)}');
+        String messageItem = Uri.encodeFull(
+          message.replaceFirst('videoMessage:', ''),
+        );
+        logEventController.add(
+          'Callback received: [video] ${Uri.decodeFull(messageItem)}',
+        );
         if (messageItem.contains('http')) {
           String videoUrl = Uri.decodeFull(messageItem);
           logEventController.add('Loading video source: $videoUrl');

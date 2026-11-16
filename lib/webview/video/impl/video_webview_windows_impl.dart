@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'package:webview_windows/webview_windows.dart';
 import 'package:kazumi/webview/video/video_webview_controller.dart';
-import 'package:kazumi/services/storage/storage.dart';
-import 'package:kazumi/services/network/proxy_utils.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/services/video_source/video_source_format.dart';
 import 'package:kazumi/utils/http_headers.dart';
@@ -14,8 +12,11 @@ class VideoWebviewWindowsImpl
   HeadlessWebview? headlessWebview;
 
   @override
-  Future<void> init({String userAgent = ''}) async {
-    await _setupProxy();
+  Future<void> init({
+    String userAgent = '',
+    SourceNetworkRoute route = const SourceNetworkRoute.system(),
+  }) async {
+    await _setupProxy(route);
     headlessWebview ??= HeadlessWebview();
     await headlessWebview!.run();
     await headlessWebview!.setPopupWindowPolicy(WebviewPopupWindowPolicy.deny);
@@ -34,69 +35,68 @@ class VideoWebviewWindowsImpl
     }
   }
 
-  Future<void> _setupProxy() async {
-    final bool proxyEnable = GStorage.getSetting(SettingsKeys.proxyEnable);
-    if (!proxyEnable) {
-      return;
-    }
-
-    final String proxyUrl = GStorage.getSetting(SettingsKeys.proxyUrl);
-    final formattedProxy = ProxyUtils.getFormattedProxyUrl(proxyUrl);
-    if (formattedProxy == null) {
+  /// WebView2 的 environment 是进程级一次性创建，代理参数只能首次给。
+  /// 直连时用 `--no-proxy-server` 强制 DIRECT；否则按规则给的代理设置。
+  Future<void> _setupProxy(SourceNetworkRoute route) async {
+    final arguments = route.isDirect
+        ? '--no-proxy-server'
+        : (route.proxyUrl == null ? null : '--proxy-server=${route.proxyUrl}');
+    if (arguments == null) {
       return;
     }
 
     try {
       await WebviewController.initializeEnvironment(
-        additionalArguments: '--proxy-server=$formattedProxy',
+        additionalArguments: arguments,
       );
-      KazumiLogger().i('WebView: 代理设置成功 $formattedProxy');
+      KazumiLogger().i('WebView: 网络参数 $arguments');
     } catch (e) {
-      KazumiLogger().e('WebView: 设置代理失败 $e');
+      KazumiLogger().e('WebView: 设置网络参数失败 $e');
     }
   }
 
   @override
-  Future<void> applyProxy({required bool directConnection}) async {}
-
-  @override
-  Future<void> loadUrl(String url, bool useLegacyParser,
-      {int offset = 0}) async {
+  Future<void> loadUrl(
+    String url,
+    bool useLegacyParser, {
+    int offset = 0,
+  }) async {
     await unloadPage();
     count = 0;
     this.offset = offset;
     isIframeLoaded = false;
     isVideoSourceLoaded = false;
     videoLoadingEventController.add(true);
-    subscriptions.add(headlessWebview!.onM3USourceLoaded.listen((data) {
-      if (headlessWebview == null) return;
-      String url = data['url'] ?? '';
-      if (url.isEmpty) {
-        return;
-      }
-      unloadPage();
-      isIframeLoaded = true;
-      isVideoSourceLoaded = true;
-      videoLoadingEventController.add(false);
-      logEventController.add('Loading m3u8 source: $url');
-      notifyVideoSourceResolved(
-        url,
-        format: VideoSourceFormat.hls,
-      );
-    }));
-    subscriptions.add(headlessWebview!.onVideoSourceLoaded.listen((data) {
-      if (headlessWebview == null) return;
-      String url = data['url'] ?? '';
-      if (url.isEmpty) {
-        return;
-      }
-      unloadPage();
-      isIframeLoaded = true;
-      isVideoSourceLoaded = true;
-      videoLoadingEventController.add(false);
-      logEventController.add('Loading video source: $url');
-      notifyVideoSourceResolved(url);
-    }));
+    subscriptions.add(
+      headlessWebview!.onM3USourceLoaded.listen((data) {
+        if (headlessWebview == null) return;
+        String url = data['url'] ?? '';
+        if (url.isEmpty) {
+          return;
+        }
+        unloadPage();
+        isIframeLoaded = true;
+        isVideoSourceLoaded = true;
+        videoLoadingEventController.add(false);
+        logEventController.add('Loading m3u8 source: $url');
+        notifyVideoSourceResolved(url, format: VideoSourceFormat.hls);
+      }),
+    );
+    subscriptions.add(
+      headlessWebview!.onVideoSourceLoaded.listen((data) {
+        if (headlessWebview == null) return;
+        String url = data['url'] ?? '';
+        if (url.isEmpty) {
+          return;
+        }
+        unloadPage();
+        isIframeLoaded = true;
+        isVideoSourceLoaded = true;
+        videoLoadingEventController.add(false);
+        logEventController.add('Loading video source: $url');
+        notifyVideoSourceResolved(url);
+      }),
+    );
     await headlessWebview!.loadUrl(url);
   }
 

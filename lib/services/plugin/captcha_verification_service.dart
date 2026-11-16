@@ -1,5 +1,8 @@
 import 'dart:async';
 
+import 'package:kazumi/services/network/source_network_service.dart';
+import 'package:kazumi/services/network/source_proxy_lease.dart';
+import 'package:kazumi/services/network/source_webview_network.dart';
 import 'package:kazumi/services/plugin/plugin_cookie_manager.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/utils/async_single_flight.dart';
@@ -21,6 +24,36 @@ import 'package:kazumi/webview/captcha/captcha_webview_controller.dart';
 /// [PluginCookieManager]，再将 HTML 交给 onVerified。UI 能解析该 HTML 时直接
 /// 展示结果，否则回落到重新检索。
 class CaptchaVerificationService {
+  CaptchaVerificationService({
+    SourceNetworkResolver? resolver,
+    CaptchaWebviewController Function()? webviewFactory,
+    Future<SourceProxyLease> Function(
+      SourceNetworkRoute, {
+      Future<void>? cancelled,
+    })?
+    acquireLease,
+  }) : _resolver = resolver ?? SourceNetworkService.resolver,
+       _factory =
+           webviewFactory ?? CaptchaWebviewControllerFactory.getController,
+       _acquireLease = acquireLease ?? SourceWebviewNetwork.acquire;
+
+  final SourceNetworkResolver _resolver;
+  final CaptchaWebviewController Function() _factory;
+  final Future<SourceProxyLease> Function(
+    SourceNetworkRoute, {
+    Future<void>? cancelled,
+  })
+  _acquireLease;
+  final _cancelled = Completer<void>();
+  Future<void>? _initializing;
+  Future<void>? _disposing;
+  SourceProxyLease? _lease;
+  bool _directConnection = false;
+
+  void applyRuleNetwork(bool directConnection) {
+    _directConnection = directConnection;
+  }
+
   CaptchaWebviewController? _controller;
 
   /// 规则自带的 UA。WebView 必须与后续 dio 请求用同一个 UA，
@@ -83,8 +116,9 @@ class CaptchaVerificationService {
       final current = _controller;
       if (current == null) return;
       onFinalizing?.call();
-      final pageHtml = await _finalize.run(() =>
-          _saveCookiesAndUnload(current, pluginName, logPrefix: logPrefix));
+      final pageHtml = await _finalize.run(
+        () => _saveCookiesAndUnload(current, pluginName, logPrefix: logPrefix),
+      );
       if (_disposed || !_claimOutcome()) return;
       onVerified(pageHtml);
     }
@@ -95,22 +129,44 @@ class CaptchaVerificationService {
     });
   }
 
-  Future<void> _ensureInitialized() async {
-    if (_isInitialized || _disposed) return;
-    _controller = CaptchaWebviewControllerFactory.getController();
-    final initializedFuture = _controller!.onInitialized.first
-        .timeout(const Duration(seconds: 10), onTimeout: () => false);
+  Future<void> _ensureInitialized() {
+    if (_isInitialized || _disposed) return Future.value();
+    return _initializing ??= _initialize();
+  }
 
-    await _controller!.init(userAgent: _ruleUserAgent);
-    if (_disposed) return;
-    await initializedFuture;
-    if (_disposed) return;
-
-    _logSub?.cancel();
-    _logSub = _controller!.onLog.listen((msg) => KazumiLogger().d(msg));
-
-    _isInitialized = true;
-    KazumiLogger().i('[CaptchaVerificationService] WebView initialized');
+  Future<void> _initialize() async {
+    try {
+      final route = SourceWebviewNetwork.adaptRoute(
+        await Future.any<SourceNetworkRoute>([
+          _resolver.resolve(directConnection: _directConnection),
+          _cancelled.future.then<SourceNetworkRoute>(
+            (_) => throw const SourceProxyLeaseCancelled(),
+          ),
+        ]),
+      );
+      _lease = await _acquireLease(route, cancelled: _cancelled.future);
+      if (_disposed || _cancelled.isCompleted) {
+        throw const SourceProxyLeaseCancelled();
+      }
+      final controller = _factory();
+      _controller = controller;
+      final initialized = controller.onInitialized.first;
+      _logSub = controller.onLog.listen((message) => KazumiLogger().d(message));
+      final ready = await Future.wait<bool>([
+        Future.sync(
+          () => controller.init(userAgent: _ruleUserAgent, route: route),
+        ).then((_) => true),
+        initialized,
+      ], eagerError: true).timeout(const Duration(seconds: 10));
+      if (!ready.last) throw StateError('验证码 WebView 初始化失败');
+      if (_disposed || _cancelled.isCompleted) {
+        throw const SourceProxyLeaseCancelled();
+      }
+      _isInitialized = true;
+    } catch (_) {
+      await _disposeViewAndRelease();
+      rethrow;
+    }
   }
 
   /// 加载指定页面并开始监听验证码图片
@@ -118,16 +174,20 @@ class CaptchaVerificationService {
   /// [url] 要加载的页面地址
   /// [captchaXpath] 验证码图片元素的 XPath
   /// [inputXpath] 可选，验证码输入框的 XPath。如果提供，会在检测验证码前先触发输入框的 focus 事件
-  Future<void> loadForCaptcha(String url, String captchaXpath,
-      {String? inputXpath}) async {
+  Future<void> loadForCaptcha(
+    String url,
+    String captchaXpath, {
+    String? inputXpath,
+  }) async {
     _pageUrl = url;
     await _ensureInitialized();
-    if (_disposed || _controller == null) return;
+    if (_disposed || _cancelled.isCompleted || _controller == null) return;
 
     _imageFoundSub?.cancel();
     _imageFoundSub = _controller!.onCaptchaImageFound.listen((src) {
-      KazumiLogger()
-          .i('[CaptchaVerificationService] Captcha image found: $src');
+      KazumiLogger().i(
+        '[CaptchaVerificationService] Captcha image found: $src',
+      );
       if (!_captchaImageStreamController.isClosed) {
         _captchaImageStreamController.add(src);
       }
@@ -149,17 +209,22 @@ class CaptchaVerificationService {
     void Function()? onFinalizing,
   }) async {
     if (_controller == null) {
-      KazumiLogger()
-          .w('[CaptchaVerificationService] submitCaptcha called before init');
+      KazumiLogger().w(
+        '[CaptchaVerificationService] submitCaptcha called before init',
+      );
       return;
     }
 
-    KazumiLogger()
-        .i('[CaptchaVerificationService] Submitting captcha code via interact');
+    KazumiLogger().i(
+      '[CaptchaVerificationService] Submitting captcha code via interact',
+    );
 
     _listenForVerification(pluginName, onVerified, onFinalizing: onFinalizing);
-    await _controller!
-        .submitCaptchaInteract(captchaCode, inputXpath, buttonXpath);
+    await _controller!.submitCaptchaInteract(
+      captchaCode,
+      inputXpath,
+      buttonXpath,
+    );
   }
 
   /// 加载 [url] 并在检测到 [buttonXpath] 后自动点击
@@ -171,12 +236,13 @@ class CaptchaVerificationService {
   }) async {
     _pageUrl = url;
     await _ensureInitialized();
-    if (_disposed || _controller == null) return;
+    if (_disposed || _cancelled.isCompleted || _controller == null) return;
 
     _listenForVerification(pluginName, onVerified, logPrefix: '(type2) ');
     await _controller!.loadPageForButtonClick(url, buttonXpath);
     KazumiLogger().i(
-        '[CaptchaVerificationService] (type2) Page loading for button click: $url');
+      '[CaptchaVerificationService] (type2) Page loading for button click: $url',
+    );
   }
 
   /// 加载 [url] 并注入规则提供的验证脚本 [script]
@@ -188,12 +254,13 @@ class CaptchaVerificationService {
   }) async {
     _pageUrl = url;
     await _ensureInitialized();
-    if (_disposed || _controller == null) return;
+    if (_disposed || _cancelled.isCompleted || _controller == null) return;
 
     _listenForVerification(pluginName, onVerified, logPrefix: '(type3) ');
     await _controller!.loadPageForCustomScript(url, script);
     KazumiLogger().i(
-        '[CaptchaVerificationService] (type3) Page loading for custom script: $url');
+      '[CaptchaVerificationService] (type3) Page loading for custom script: $url',
+    );
   }
 
   /// 用户取消验证：认领结果提交权并保存已有 Cookie。
@@ -202,18 +269,24 @@ class CaptchaVerificationService {
   /// 其 onVerified 也不会再提交结果，由调用方按取消语义收尾。
   Future<void> cancelAndSave(String pluginName) async {
     _claimOutcome();
+    if (!_cancelled.isCompleted) _cancelled.complete();
+    try {
+      await _initializing;
+    } catch (_) {}
     _disappearedSub?.cancel();
     _disappearedSub = null;
     // 先取到本地：dispose 可能在两次 await 之间把 _controller 置空。
     final controller = _controller;
     if (controller == null || _pageUrl.isEmpty) return;
     // 若验证成功路径已在收尾，这里会汇合到那一次并等它把 Cookie 存完。
-    await _finalize.run(() => _saveCookiesAndUnload(
-          controller,
-          pluginName,
-          logPrefix: 'on cancel ',
-          harvestHtml: false,
-        ));
+    await _finalize.run(
+      () => _saveCookiesAndUnload(
+        controller,
+        pluginName,
+        logPrefix: 'on cancel ',
+        harvestHtml: false,
+      ),
+    );
   }
 
   /// 保存 Cookie 与 User-Agent 并卸载页面。
@@ -236,18 +309,24 @@ class CaptchaVerificationService {
       if (harvestHtml) {
         pageHtml = await _waitForPageHtml(controller);
         KazumiLogger().i(
-            '[CaptchaVerificationService] ${logPrefix}Harvested page html length: ${pageHtml.length}');
+          '[CaptchaVerificationService] ${logPrefix}Harvested page html length: ${pageHtml.length}',
+        );
       }
       final cookieString = await controller.getCookieString(_pageUrl);
       final userAgent = await controller.getUserAgent();
       KazumiLogger().i(
-          '[CaptchaVerificationService] ${logPrefix}Captured cookies: $cookieString');
+        '[CaptchaVerificationService] ${logPrefix}Captured cookies: $cookieString',
+      );
       if (cookieString.isNotEmpty) {
         await PluginCookieManager.instance.saveFromWebView(
-            pluginName, _pageUrl, cookieString,
-            userAgent: userAgent);
+          pluginName,
+          _pageUrl,
+          cookieString,
+          userAgent: userAgent,
+        );
         KazumiLogger().i(
-            '[CaptchaVerificationService] ${logPrefix}Cookies saved for plugin: $pluginName');
+          '[CaptchaVerificationService] ${logPrefix}Cookies saved for plugin: $pluginName',
+        );
       }
       await controller.unloadPage();
     } catch (error, stackTrace) {
@@ -275,18 +354,45 @@ class CaptchaVerificationService {
     return '';
   }
 
-  void dispose() {
-    if (_disposed) return;
-    _disposed = true;
-    _imageFoundSub?.cancel();
-    _disappearedSub?.cancel();
-    _logSub?.cancel();
-    if (!_captchaImageStreamController.isClosed) {
-      _captchaImageStreamController.close();
-    }
-    _controller?.dispose();
+  Future<void> _disposeViewAndRelease() async {
+    final controller = _controller;
     _controller = null;
+    final lease = _lease;
+    _lease = null;
     _isInitialized = false;
-    KazumiLogger().i('[CaptchaVerificationService] Disposed');
+    try {
+      await _logSub?.cancel();
+      _logSub = null;
+      if (controller != null) {
+        try {
+          await controller.unloadPage();
+        } catch (_) {}
+        await controller.dispose();
+      }
+    } finally {
+      await lease?.release();
+    }
+  }
+
+  Future<void> dispose() => _disposing ??= _dispose();
+
+  Future<void> _dispose() async {
+    _disposed = true;
+    if (!_cancelled.isCompleted) _cancelled.complete();
+    await _imageFoundSub?.cancel();
+    await _disappearedSub?.cancel();
+    try {
+      await _initializing;
+    } catch (_) {}
+    if (_finalize.isRunning) {
+      try {
+        await _finalize.run(() async => '');
+      } catch (_) {}
+    }
+    try {
+      await _disposeViewAndRelease();
+    } finally {
+      await _captchaImageStreamController.close();
+    }
   }
 }

@@ -1,6 +1,10 @@
 import 'dart:io';
 import 'dart:async';
 
+import 'package:kazumi/services/network/source_network_route.dart';
+
+export 'package:kazumi/services/network/source_network_route.dart';
+
 import 'package:kazumi/webview/captcha/impl/captcha_webview_inappwebview_impl.dart';
 import 'package:kazumi/webview/captcha/impl/captcha_webview_windows_impl.dart';
 import 'package:kazumi/webview/captcha/impl/captcha_webview_linux_impl.dart';
@@ -43,7 +47,10 @@ abstract class CaptchaWebviewController<T> {
   /// [userAgent] 规则自带的 UA。非空时 WebView 必须用它，否则通过验证后
   /// 记录下来的 clearance cookie 会与后续 dio 请求的 UA 不一致而立即失效。
   /// 为空时各平台自行回落到浏览器 UA 池。
-  Future<void> init({String userAgent = ''});
+  Future<void> init({
+    String userAgent = '',
+    SourceNetworkRoute route = const SourceNetworkRoute.system(),
+  });
 
   /// 加载指定 URL，并注入监听验证码图片的 JS 脚本（类型1：图片验证码）
   ///
@@ -70,7 +77,10 @@ abstract class CaptchaWebviewController<T> {
   /// [inputXpath]  验证码输入框元素的 XPath
   /// [buttonXpath] 提交按钮元素的 XPath
   Future<void> submitCaptchaInteract(
-      String captchaCode, String inputXpath, String buttonXpath);
+    String captchaCode,
+    String inputXpath,
+    String buttonXpath,
+  );
 
   /// 获取当前页面的 Cookie 字符串（"key1=val1; key2=val2"）
   ///
@@ -90,7 +100,7 @@ abstract class CaptchaWebviewController<T> {
   Future<void> unloadPage();
 
   /// 释放 WebView 资源
-  void dispose();
+  Future<void> dispose();
 }
 
 class CaptchaWebviewControllerFactory {
