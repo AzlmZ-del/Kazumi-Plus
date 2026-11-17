@@ -405,6 +405,12 @@ class SettingsKeys {
     false,
     group: SettingGroup.sync,
   );
+  /// 整箱备份「应用设置」。不跟随 WebDAV：云端没有对应内容。
+  static const localBackupEnableSettings = SettingKey<bool>(
+    'localBackupEnableSettings',
+    false,
+    group: SettingGroup.sync,
+  );
   static const danmakuShieldSyncDeviceId = SettingKey<String>(
     'danmakuShieldSyncDeviceId',
     '',
@@ -879,6 +885,7 @@ class SettingsKeys {
     localBackupEnableCollect,
     localBackupEnableDanmakuShield,
     localBackupEnableCredentials,
+    localBackupEnableSettings,
     playerControllerLayerDisappearTime,
     defaultVolume,
     playerMuted,

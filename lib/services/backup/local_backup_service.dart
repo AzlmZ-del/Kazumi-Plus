@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:kazumi/modules/collect/collect_change_module.dart';
 import 'package:kazumi/modules/danmaku/danmaku_shield_rule.dart';
 import 'package:kazumi/repositories/danmaku_shield_repository.dart';
+import 'package:kazumi/services/backup/local_backup_items.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/services/security/credential_cipher.dart';
 import 'package:kazumi/services/storage/storage.dart';
@@ -15,13 +16,6 @@ import 'package:kazumi/utils/async_serial_queue.dart';
 import 'package:kazumi/utils/file_system.dart';
 import 'package:macos_secure_bookmarks/macos_secure_bookmarks.dart';
 import 'package:path/path.dart' as path;
-
-/// 本地备份的四个内容分区。
-///
-/// 一次备份可以只写其中几项：收藏变了只写收藏，屏蔽词变了只写屏蔽词。
-/// 「收藏列表」这一项固定包含 `collectibles` + `collectchanges` 两个文件，
-/// **不可再拆** —— 恢复时靠 `collectchanges` 做增量合并，缺一个就会丢变更。
-enum LocalBackupSection { history, collect, shield, credentials }
 
 /// 本地备份失败的原因，直接拿来当提示文案。
 class LocalBackupException implements Exception {
@@ -38,19 +32,28 @@ class LocalBackupException implements Exception {
 /// 两者分开返回，页面才能把「已恢复：X」和「未找到：Y」分别说清楚，
 /// 而不是只报一句干巴巴的成功。
 class LocalBackupRestoreResult {
-  const LocalBackupRestoreResult({required this.done, required this.missing});
+  const LocalBackupRestoreResult({
+    required this.done,
+    required this.missing,
+    this.requiresRestart = false,
+  });
 
   final List<String> done;
   final List<String> missing;
 
+  /// 恢复里含「应用设置」时为真：主题、语言、字号等已写入，但要重启才全量生效。
+  final bool requiresRestart;
+
   bool get hasMissing => missing.isNotEmpty;
 
   /// 结果描述（不含「已恢复」前缀，前缀由调用方拼）。
-  /// 形如 `观看记录（未找到：收藏列表）`。
+  /// 形如 `观看记录（未找到：收藏列表）`，含设置时再追加重启提示。
   String get detail {
     final restored = done.join('、');
-    if (missing.isEmpty) return restored;
-    return '$restored（未找到：${missing.join('、')}）';
+    final base = missing.isEmpty
+        ? restored
+        : '$restored（未找到：${missing.join('、')}）';
+    return requiresRestart ? '$base。设置已还原，重启应用后全部生效' : base;
   }
 }
 
@@ -69,11 +72,10 @@ class LocalBackupService {
   /// 恢复出来的规则不会被云端旧的删除记录压掉。
   final IDanmakuShieldRepository _shieldRepository;
 
-  static const String _historyFileName = 'kazumi-history.hive';
-  static const String _collectiblesFileName = 'kazumi-collectibles.hive';
-  static const String _collectChangesFileName = 'kazumi-collectchanges.hive';
-  static const String _shieldFileName = 'kazumi-danmaku-shield.json';
-  static const String _credentialsFileName = 'kazumi-credentials.json';
+  /// 凭据那一项的声明，供「保存后自动备份」判断开关用。
+  static final LocalBackupItem _credentialsItem = localBackupItems.firstWhere(
+    (item) => item.section == LocalBackupSection.credentials,
+  );
 
   /// 与「下载设置」共用同一个原生通道：Android 上直接拿文件路径要先有
   /// 全盘访问权限，这套 `requestStorageAccess` + `pickDirectory` 已经在
@@ -175,11 +177,14 @@ class LocalBackupService {
     });
   }
 
-  /// 自动备份的公共前置条件：开关开着、目录选好、至少选了一项内容。
+  /// 不能只看 [hasSelection]：只勾「应用设置」时它会为真，自动备份会白跑一趟。
   ///
   /// 不含 `_accessLost`：那次失败可能只是 macOS 重启后授权没恢复，
   /// `restoreAccess()` 有机会修好它，所以判定留给 `autoBackup` 内部。
-  bool get _autoBackupReady => enabled && configured && hasSelection;
+  bool get _autoBackupReady => enabled && configured && hasAutoBackupSelection;
+
+  bool get hasAutoBackupSelection =>
+      localBackupItems.any((item) => item.autoBackup && isSelected(item));
 
   /// 自动备份入口：静默执行，失败只记日志不打扰用户。
   ///
@@ -191,6 +196,17 @@ class LocalBackupService {
   Future<void> autoBackup({Set<LocalBackupSection>? only}) {
     return _autoBackupQueue.run(() async {
       if (!_autoBackupReady) return;
+      // 这次触发的分区里若没有任何勾选项，就没必要进写盘流程（连目录都不碰）。
+      final sections = only;
+      if (sections != null &&
+          !localBackupItems.any(
+            (item) =>
+                item.autoBackup &&
+                sections.contains(item.section) &&
+                isSelected(item),
+          )) {
+        return;
+      }
       try {
         await restoreAccess();
         // 授权恢复失败就别写了，`_writeBackup` 也会抛，这里提前挡一下。
@@ -221,36 +237,25 @@ class LocalBackupService {
   /// 且本地一个凭据都没有时静默跳过——刚配好服务器还没登录账号属于
   /// 正常状态。调用方一律 fire-and-forget。
   Future<void> autoBackupCredentialsAfterSave() async {
-    if (!enabled || !credentialsSelected || !configured) return;
+    if (!enabled || !configured) return;
+    if (!isSelected(_credentialsItem)) return;
     if (!WebDav().hasAnyCredential) return;
     await autoBackup(only: _credentialsOnly);
   }
 
-  /// 「跟随同步」是否开启：开启时四项内容跟着【启用 WebDAV】走。
+  /// 「跟随同步」是否开启：开启时受它管辖的内容项改读【启用 WebDAV】的开关。
   bool get followWebDav =>
       GStorage.getSetting(SettingsKeys.localBackupFollowWebDav);
 
-  bool get historySelected => followWebDav
-      ? GStorage.getSetting(SettingsKeys.webDavEnableHistory)
-      : GStorage.getSetting(SettingsKeys.localBackupEnableHistory);
+  /// 声明表里 `webDavKey` 为 null 的项（目前只有「应用设置」）永远只看本地开关。
+  bool isSelected(LocalBackupItem item) {
+    final key = followWebDav && item.webDavKey != null
+        ? item.webDavKey!
+        : item.localKey;
+    return GStorage.getSetting(key);
+  }
 
-  bool get collectSelected => followWebDav
-      ? GStorage.getSetting(SettingsKeys.webDavEnableCollect)
-      : GStorage.getSetting(SettingsKeys.localBackupEnableCollect);
-
-  bool get shieldSelected => followWebDav
-      ? GStorage.getSetting(SettingsKeys.webDavEnableDanmakuShield)
-      : GStorage.getSetting(SettingsKeys.localBackupEnableDanmakuShield);
-
-  bool get credentialsSelected => followWebDav
-      ? GStorage.getSetting(SettingsKeys.webDavEnableCredentials)
-      : GStorage.getSetting(SettingsKeys.localBackupEnableCredentials);
-
-  bool get hasSelection =>
-      historySelected ||
-      collectSelected ||
-      shieldSelected ||
-      credentialsSelected;
+  bool get hasSelection => localBackupItems.any(isSelected);
 
   /// 让用户挑一个目录。取消返回 null，选中的目录写完权限后落盘。
   Future<String?> selectDirectory() async {
@@ -452,85 +457,95 @@ class LocalBackupService {
     Set<LocalBackupSection>? only,
   }) async {
     final target = _requireDirectory();
-    final sections = only ?? LocalBackupSection.values.toSet();
-    final wantsHistory =
-        historySelected && sections.contains(LocalBackupSection.history);
-    final wantsCollect =
-        collectSelected && sections.contains(LocalBackupSection.collect);
-    final wantsShield =
-        shieldSelected && sections.contains(LocalBackupSection.shield);
-    final wantsCredentials =
-        credentialsSelected &&
-        sections.contains(LocalBackupSection.credentials);
+    final items = [
+      for (final item in localBackupItems)
+        if (isSelected(item) &&
+            (only == null || only.contains(item.section)) &&
+            (!skipEmptyBoxes || item.autoBackup))
+          item,
+    ];
     // 先校验凭据，避免其它几项写完才在最后一步失败。
-    if (wantsCredentials && !WebDav().hasAnyCredential) {
+    if (items.any((item) => item.section == LocalBackupSection.credentials) &&
+        !WebDav().hasAnyCredential) {
       throw const LocalBackupException('本地还没有可备份的账号信息');
     }
     await Directory(target).create(recursive: true);
     final done = <String>[];
 
-    if (wantsHistory) {
-      await GStorage.histories.flush();
-      if (skipEmptyBoxes &&
-          GStorage.histories.isEmpty &&
-          await File(path.join(target, _historyFileName)).exists()) {
-        KazumiLogger().i('LocalBackup: skip empty histories backup');
-      } else {
-        await GStorage.backupBox(
-          'histories',
-          path.join(target, _historyFileName),
-        );
-        done.add('观看记录');
-      }
+    for (final item in items) {
+      final wrote = await _writeItem(
+        item,
+        target,
+        skipEmptyBoxes: skipEmptyBoxes,
+      );
+      if (wrote) done.add(item.title);
     }
-    if (wantsCollect) {
-      await GStorage.collectibles.flush();
-      await GStorage.collectChanges.flush();
-      if (skipEmptyBoxes &&
-          GStorage.collectibles.isEmpty &&
-          await File(path.join(target, _collectiblesFileName)).exists()) {
-        KazumiLogger().i('LocalBackup: skip empty collectibles backup');
-      } else {
-        await GStorage.backupBox(
-          'collectibles',
-          path.join(target, _collectiblesFileName),
-        );
+    return done;
+  }
+
+  /// 写单项内容，返回是否真的写了（空箱跳过时为 false）。
+  Future<bool> _writeItem(
+    LocalBackupItem item,
+    String target, {
+    required bool skipEmptyBoxes,
+  }) async {
+    switch (item.section) {
+      case LocalBackupSection.history:
+        await GStorage.histories.flush();
+        final historyPath = path.join(target, item.fileNames.first);
+        if (skipEmptyBoxes &&
+            GStorage.histories.isEmpty &&
+            await File(historyPath).exists()) {
+          KazumiLogger().i('LocalBackup: skip empty histories backup');
+          return false;
+        }
+        await GStorage.backupBox('histories', historyPath);
+        return true;
+
+      case LocalBackupSection.collect:
+        await GStorage.collectibles.flush();
+        await GStorage.collectChanges.flush();
+        final collectiblesPath = path.join(target, item.fileNames.first);
+        if (skipEmptyBoxes &&
+            GStorage.collectibles.isEmpty &&
+            await File(collectiblesPath).exists()) {
+          KazumiLogger().i('LocalBackup: skip empty collectibles backup');
+          return false;
+        }
+        await GStorage.backupBox('collectibles', collectiblesPath);
         await GStorage.backupBox(
           'collectchanges',
-          path.join(target, _collectChangesFileName),
+          path.join(target, item.fileNames.last),
         );
-        done.add('收藏列表');
-      }
-    }
-    if (wantsShield) {
-      final payload = <String, Object?>{
-        'version': 1,
-        'backupAt': DateTime.now().toIso8601String(),
-        'rules': _shieldRepository.getRules(),
-      };
-      await File(
-        path.join(target, _shieldFileName),
-      ).writeAsString(jsonEncode(payload), flush: true);
-      done.add('弹幕屏蔽词');
-    }
-    if (wantsCredentials) {
-      await _writeCredentials(path.join(target, _credentialsFileName));
-      done.add('用户凭据');
-    }
+        return true;
 
-    return done;
+      case LocalBackupSection.shield:
+        final payload = <String, Object?>{
+          'version': 1,
+          'backupAt': DateTime.now().toIso8601String(),
+          'rules': _shieldRepository.getRules(),
+        };
+        await File(
+          path.join(target, item.fileNames.first),
+        ).writeAsString(jsonEncode(payload), flush: true);
+        return true;
+
+      case LocalBackupSection.credentials:
+        await _writeCredentials(path.join(target, item.fileNames.first));
+        return true;
+
+      case LocalBackupSection.settings:
+        await GStorage.exportSettingsBox(path.join(target, item.fileNames.first));
+        return true;
+    }
   }
 
   /// 从备份目录把选中的内容合并回本地，返回实际恢复的条目名与缺失项。
   ///
-  /// 某个条目在目录里没有对应文件时跳过并记下来；全都没有就报错，
-  /// 免得用户以为「恢复成功」其实什么都没发生。
+  /// 某个条目在目录里没有对应文件时跳过并记下来；全都没有就报错。
   ///
-  /// [sourceDirectory] 指定一次性恢复目录（不改写「本地备份路径」）；
-  /// 为 null 时走已保存的目录，行为与原来一致。
-  ///
-  /// [ignoreSelection] 忽略内容开关、四项全部尝试恢复。总开关关着时
-  /// 五个子开关在界面上是隐藏的，用户没法再挑内容，只能按全量来。
+  /// [sourceDirectory] 一次性恢复目录，不改写「本地备份路径」。
+  /// [ignoreSelection] 总开关关着时子开关是隐藏的，只能按全量恢复。
   Future<LocalBackupRestoreResult> restore({
     String? sourceDirectory,
     bool ignoreSelection = false,
@@ -546,54 +561,21 @@ class LocalBackupService {
     if (!ignoreSelection && !hasSelection) {
       throw const LocalBackupException('请先选择要恢复的内容');
     }
-    final wantsHistory = ignoreSelection || historySelected;
-    final wantsCollect = ignoreSelection || collectSelected;
-    final wantsShield = ignoreSelection || shieldSelected;
-    final wantsCredentials = ignoreSelection || credentialsSelected;
+    final items = [
+      for (final item in localBackupItems)
+        if (ignoreSelection || isSelected(item)) item,
+    ];
     final done = <String>[];
     final missing = <String>[];
+    var requiresRestart = false;
 
-    if (wantsHistory) {
-      final file = path.join(target, _historyFileName);
-      if (await File(file).exists()) {
-        await GStorage.patchHistory(file);
-        done.add('观看记录');
+    for (final item in items) {
+      final restored = await _restoreItem(item, target);
+      if (restored) {
+        done.add(item.title);
+        if (item.restoreNeedsRestart) requiresRestart = true;
       } else {
-        missing.add('观看记录');
-      }
-    }
-    if (wantsCollect) {
-      final collectiblesFile = path.join(target, _collectiblesFileName);
-      if (await File(collectiblesFile).exists()) {
-        final changesFile = path.join(target, _collectChangesFileName);
-        final remoteCollectibles = await GStorage.getCollectiblesFromFile(
-          collectiblesFile,
-        );
-        final remoteChanges = await File(changesFile).exists()
-            ? await GStorage.getCollectChangesFromFile(changesFile)
-            : <CollectedBangumiChange>[];
-        await GStorage.patchCollectibles(remoteCollectibles, remoteChanges);
-        done.add('收藏列表');
-      } else {
-        missing.add('收藏列表');
-      }
-    }
-    if (wantsShield) {
-      final file = path.join(target, _shieldFileName);
-      if (await File(file).exists()) {
-        await _restoreShieldRules(file);
-        done.add('弹幕屏蔽词');
-      } else {
-        missing.add('弹幕屏蔽词');
-      }
-    }
-    if (wantsCredentials) {
-      final file = path.join(target, _credentialsFileName);
-      if (await File(file).exists()) {
-        await _restoreCredentials(file);
-        done.add('用户凭据');
-      } else {
-        missing.add('用户凭据');
+        missing.add(item.title);
       }
     }
 
@@ -603,7 +585,53 @@ class LocalBackupService {
     KazumiLogger().i(
       'LocalBackup: restored from $target. items=$done missing=$missing',
     );
-    return LocalBackupRestoreResult(done: done, missing: missing);
+    return LocalBackupRestoreResult(
+      done: done,
+      missing: missing,
+      requiresRestart: requiresRestart,
+    );
+  }
+
+  /// 恢复单项内容，返回该目录里是否有对应备份并已恢复。
+  Future<bool> _restoreItem(LocalBackupItem item, String target) async {
+    switch (item.section) {
+      case LocalBackupSection.history:
+        final file = path.join(target, item.fileNames.first);
+        if (!await File(file).exists()) return false;
+        await GStorage.patchHistory(file);
+        return true;
+
+      case LocalBackupSection.collect:
+        final collectiblesFile = path.join(target, item.fileNames.first);
+        if (!await File(collectiblesFile).exists()) return false;
+        final changesFile = path.join(target, item.fileNames.last);
+        final remoteCollectibles = await GStorage.getCollectiblesFromFile(
+          collectiblesFile,
+        );
+        final remoteChanges = await File(changesFile).exists()
+            ? await GStorage.getCollectChangesFromFile(changesFile)
+            : <CollectedBangumiChange>[];
+        await GStorage.patchCollectibles(remoteCollectibles, remoteChanges);
+        return true;
+
+      case LocalBackupSection.shield:
+        final file = path.join(target, item.fileNames.first);
+        if (!await File(file).exists()) return false;
+        await _restoreShieldRules(file);
+        return true;
+
+      case LocalBackupSection.credentials:
+        final file = path.join(target, item.fileNames.first);
+        if (!await File(file).exists()) return false;
+        await _restoreCredentials(file);
+        return true;
+
+      case LocalBackupSection.settings:
+        final file = path.join(target, item.fileNames.first);
+        if (!await File(file).exists()) return false;
+        await GStorage.restoreSettingsBox(file);
+        return true;
+    }
   }
 
   Future<void> _writeCredentials(String filePath) async {

@@ -366,6 +366,142 @@ class GStorage {
     await resetSettings(SettingsKeys.byGroup(SettingGroup.player));
   }
 
+  /// 不参与「设置备份」的键：账号密码、令牌与 WebDAV 口令。
+  ///
+  /// 设置箱是明文 Hive，整箱导出会把口令原样写进备份文件；这些键另走
+  /// `LocalBackupSection.credentials` 的 AES 通道。
+  static const Set<String> settingBackupExcludedKeys = {
+    'bangumiAccessToken',
+    'bangumiWebCookie',
+    'bangumiWebEmail',
+    'bangumiWebPassword',
+    'webDavURL',
+    'webDavUsername',
+    'webDavPasswd',
+  };
+
+  /// Hive 用「小写箱名.hive」做文件名，见 [_boxFilePath]。
+  static const String _settingsExportBoxName = 'kazumiSettingsExport';
+
+  static const String _settingsRestoreBoxName = 'kazumiSettingsRestore';
+
+  static String _boxFilePath(String dirPath, String boxName) =>
+      '$dirPath/${boxName.toLowerCase()}.hive';
+
+  /// 把设置箱整箱导出到 [filePath]。
+  ///
+  /// 不能直接复制 `.hive`：主箱运行期一直打开、只追加写，未压缩的内容还不在
+  /// 磁盘上，所以走「临时箱 + putAll」再拷文件。
+  static Future<void> exportSettingsBox(
+    String filePath, {
+    Set<String> excludedKeys = settingBackupExcludedKeys,
+  }) async {
+    await _setting.flush();
+    final entries = <dynamic, dynamic>{
+      for (final entry in _setting.toMap().entries)
+        if (!excludedKeys.contains(entry.key)) entry.key: entry.value,
+    };
+    final tempDir = await _settingsTempDir();
+    try {
+      final tempBox = await Hive.openBox(
+        _settingsExportBoxName,
+        path: tempDir.path,
+      );
+      try {
+        await tempBox.putAll(entries);
+        await tempBox.flush();
+      } finally {
+        await tempBox.close();
+      }
+      await File(
+        _boxFilePath(tempDir.path, _settingsExportBoxName),
+      ).copy(filePath);
+    } finally {
+      await _deleteQuietly(tempDir);
+    }
+    KazumiLogger().i(
+      'GStorage: settings exported. keys=${entries.length} -> $filePath',
+    );
+  }
+
+  /// 用 [filePath] 里的备份整箱覆盖设置，返回备份里的键数。
+  ///
+  /// 备份里没有的键会被清掉；[excludedKeys] 例外，既不会从备份写回也不会被清空
+  /// —— 否则恢复一次「应用设置」会把刚恢复的凭据一起抹掉。先读完再清空。
+  static Future<int> restoreSettingsBox(
+    String filePath, {
+    Set<String> excludedKeys = settingBackupExcludedKeys,
+  }) async {
+    final backupFile = File(filePath);
+    if (!await backupFile.exists()) {
+      throw const FileSystemException('设置备份文件不存在');
+    }
+    final tempDir = await _settingsTempDir();
+    final Map<dynamic, dynamic> entries;
+    try {
+      // Hive 按目录开箱、文件名取小写箱名，所以备份必须落到这个固定名字上。
+      await backupFile.copy(
+        _boxFilePath(tempDir.path, _settingsRestoreBoxName),
+      );
+      final tempBox = await Hive.openBox(
+        _settingsRestoreBoxName,
+        path: tempDir.path,
+      );
+      try {
+        entries = {
+          for (final entry in tempBox.toMap().entries)
+            if (!excludedKeys.contains(entry.key)) entry.key: entry.value,
+        };
+      } finally {
+        await tempBox.close();
+      }
+    } finally {
+      await _deleteQuietly(tempDir);
+    }
+    final merged = mergeSettingsForRestore(
+      current: _setting.toMap(),
+      backup: entries,
+      excludedKeys: excludedKeys,
+    );
+    await _setting.clear();
+    if (merged.isNotEmpty) {
+      await _setting.putAll(merged);
+    }
+    await _setting.flush();
+    KazumiLogger().i(
+      'GStorage: settings restored. keys=${entries.length} total=${merged.length}',
+    );
+    return entries.length;
+  }
+
+  /// 算出整箱覆盖后的键值：备份里的非凭据键全量替换，凭据键保留本机当前值。
+  ///
+  /// 抽成纯函数是为了可测 —— `_setting` 只有 App 启动后才存在。
+  static Map<dynamic, dynamic> mergeSettingsForRestore({
+    required Map<dynamic, dynamic> current,
+    required Map<dynamic, dynamic> backup,
+    Set<String> excludedKeys = settingBackupExcludedKeys,
+  }) {
+    return <dynamic, dynamic>{
+      for (final key in excludedKeys)
+        if (current.containsKey(key)) key: current[key],
+      for (final entry in backup.entries)
+        if (!excludedKeys.contains(entry.key)) entry.key: entry.value,
+    };
+  }
+
+  /// Hive 按目录开箱，临时箱必须与主箱分处不同目录；系统临时区还能避开沙盒限制。
+  static Future<Directory> _settingsTempDir() =>
+      Directory.systemTemp.createTemp('kazumi-settings-');
+
+  /// 临时目录清理失败不该影响备份结果，只记日志。
+  static Future<void> _deleteQuietly(Directory dir) async {
+    try {
+      if (await dir.exists()) await dir.delete(recursive: true);
+    } catch (e) {
+      KazumiLogger().w('GStorage: failed to remove temp dir', error: e);
+    }
+  }
   static Future<void> resetDanmakuSettings() async {
     await resetSettings(SettingsKeys.byGroup(SettingGroup.danmaku));
   }
