@@ -532,6 +532,7 @@ class _LocalBackupSettingsCardState extends State<LocalBackupSettingsCard> {
             Switch(
               value: enabled,
               onChanged: configured && !_busy ? _toggleEnabled : null,
+              padding: EdgeInsets.zero,
             ),
             SyncExpandChevron(expanded: _expanded, color: subtitleColor),
           ],

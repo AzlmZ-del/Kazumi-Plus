@@ -411,6 +411,8 @@ class SettingsTile<T> extends StatelessWidget {
                 Switch(
                   value: initialValue ?? false,
                   onChanged: enabled ? onToggle : null,
+                  // 默认左右各 4dp 透明内边距，会让开关轨道比卡头里的开关偏左。
+                  padding: EdgeInsets.zero,
                 ),
               ],
               if (_kind == _TileKind.radio) ...[

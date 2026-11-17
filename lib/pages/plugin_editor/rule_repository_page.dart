@@ -349,6 +349,7 @@ class _RepositoryTile extends StatelessWidget {
             Switch(
               value: repository.enabled,
               onChanged: busy ? null : onToggle,
+              padding: EdgeInsets.zero,
             ),
             KazumiMenuButton(
               enabled: !busy,
