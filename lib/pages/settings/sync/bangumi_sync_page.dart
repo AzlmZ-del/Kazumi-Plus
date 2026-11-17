@@ -352,6 +352,7 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
             onChanged: configured && !_busy
                 ? (value) => _connect(() => _bangumi.setEnabled(value))
                 : null,
+            padding: EdgeInsets.zero,
           ),
           SyncExpandChevron(expanded: _autoExpanded),
         ],

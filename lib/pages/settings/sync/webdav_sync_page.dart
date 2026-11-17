@@ -298,6 +298,8 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
             Switch(
               value: enabled,
               onChanged: configured && !_busy ? _toggleEnabled : null,
+              // 默认左右各 4dp 透明内边距会把控件撑到 60dp，收掉后正好是轨道宽度。
+              padding: EdgeInsets.zero,
             ),
             SyncExpandChevron(expanded: _expanded, color: secondary),
           ],
