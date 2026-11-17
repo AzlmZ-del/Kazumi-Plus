@@ -381,7 +381,8 @@ class SettingsTile<T> extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 32),
+          // 42 = 标题 + 一行描述，让行高稳定在 66dp；开关等行内控件不再决定行高。
+          constraints: const BoxConstraints(minHeight: 42),
           child: Row(
             children: [
               Expanded(
@@ -413,6 +414,8 @@ class SettingsTile<T> extends StatelessWidget {
                   onChanged: enabled ? onToggle : null,
                   // 默认左右各 4dp 透明内边距，会让开关轨道比卡头里的开关偏左。
                   padding: EdgeInsets.zero,
+                  // padded 触摸目标会把盒子撑到 48dp、比文本块高 6dp；整行可点，收掉不损点击。
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
               ],
               if (_kind == _TileKind.radio) ...[
