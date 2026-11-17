@@ -88,6 +88,9 @@ android {
         }
     }
 
+    // 这一段看着像「旧机型兼容开关」，实际决定 jniLibs 是否压缩进 APK。
+    // 删掉后 AGP 9 按新默认不压缩 libapp/libflutter/libmpv，APK 由 31.6MB 涨到 61.1MB
+    // （2026-11-16 实测）。所以必须保留，不是历史包袱。
     packaging {
         jniLibs {
             useLegacyPackaging = true
