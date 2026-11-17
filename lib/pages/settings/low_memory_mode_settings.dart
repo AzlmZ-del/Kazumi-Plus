@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_modular/flutter_modular.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
+import 'package:kazumi/bean/settings/settings_detail_scaffold.dart';
 import 'package:kazumi/bean/settings/settings_list.dart';
-import 'package:kazumi/bean/widget/split_list_row.dart';
 import 'package:kazumi/services/network/metered_network_service.dart';
 import 'package:kazumi/services/player/low_memory_mode.dart';
 
@@ -17,22 +18,21 @@ class LowMemoryModeSettingsTile extends StatelessWidget {
         description: Text(mode.statusDescription(isMetered)),
         value: Text(mode.label),
         trailing: const Icon(Icons.chevron_right_rounded),
-        onPressed: (_) => KazumiDialog.show<void>(
-          builder: (_) => const _LowMemoryModeDialog(),
-        ),
+        onPressed: (_) => context.pushNamed('/settings/player/low-memory'),
       );
     });
   }
 }
 
-class _LowMemoryModeDialog extends StatefulWidget {
-  const _LowMemoryModeDialog();
+class LowMemoryModeSettingsPage extends StatefulWidget {
+  const LowMemoryModeSettingsPage({super.key});
 
   @override
-  State<_LowMemoryModeDialog> createState() => _LowMemoryModeDialogState();
+  State<LowMemoryModeSettingsPage> createState() =>
+      _LowMemoryModeSettingsPageState();
 }
 
-class _LowMemoryModeDialogState extends State<_LowMemoryModeDialog> {
+class _LowMemoryModeSettingsPageState extends State<LowMemoryModeSettingsPage> {
   bool _saving = false;
 
   Future<void> _selectMode(LowMemoryMode? mode) async {
@@ -41,7 +41,7 @@ class _LowMemoryModeDialogState extends State<_LowMemoryModeDialog> {
     try {
       await mode.save();
       if (!mounted) return;
-      KazumiDialog.dismiss(context: context);
+      setState(() => _saving = false);
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
@@ -51,86 +51,39 @@ class _LowMemoryModeDialogState extends State<_LowMemoryModeDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return AlertDialog(
+    return SettingsDetailScaffold(
       title: const Text('低内存模式'),
-      scrollable: true,
-      content: SizedBox(
-        width: 440,
-        child: _ModeBuilder(builder: (context, mode, isMetered) {
-          final enabled = mode.isEnabled(isMetered: isMetered);
-          final foreground =
-              enabled ? colors.onSecondaryContainer : colors.onSurfaceVariant;
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Semantics(
-                liveRegion: true,
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: enabled
-                        ? colors.secondaryContainer
-                        : colors.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        enabled
-                            ? Icons.data_saver_on_rounded
-                            : Icons.data_usage_rounded,
-                        color: foreground,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          mode.statusDescription(isMetered),
-                          style: textTheme.bodyMedium?.copyWith(
-                            color: foreground,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+      body: _ModeBuilder(builder: (context, mode, isMetered) {
+        return SettingsList(
+          sections: [
+            RadioGroup<LowMemoryMode>(
+              groupValue: mode,
+              onChanged: _selectMode,
+              child: SettingsSection(
+                title: Semantics(
+                  liveRegion: true,
+                  child: Text(mode.statusDescription(isMetered)),
+                ),
+                tiles: [
+                  for (final option in LowMemoryMode.values)
+                    SettingsTile<LowMemoryMode>.radioTile(
+                      title: Text(option == LowMemoryMode.auto
+                          ? '${option.label}（默认）'
+                          : option.label),
+                      description: Text(option.description),
+                      radioValue: option,
+                      enabled: !_saving,
+                    ),
+                ],
+                bottomInfo: Text(
+                  '减少缓存可降低内存占用和额外流量，网络不稳定时可能更容易缓冲。'
+                  '\n选择后立即生效并记住选择；跟随网络仅影响在线播放。',
                 ),
               ),
-              const SizedBox(height: 16),
-              RadioGroup<LowMemoryMode>(
-                groupValue: mode,
-                onChanged: _selectMode,
-                child: SplitListGroup(
-                  children: [
-                    for (final option in LowMemoryMode.values)
-                      SettingsTile<LowMemoryMode>.radioTile(
-                        title: Text(option == LowMemoryMode.auto
-                            ? '${option.label}（默认）'
-                            : option.label),
-                        description: Text(option.description),
-                        radioValue: option,
-                        enabled: !_saving,
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                '减少缓存可降低内存占用和额外流量，网络不稳定时可能更容易缓冲。'
-                '\n选择后立即生效并记住选择；跟随网络仅影响在线播放。',
-                style: textTheme.bodySmall
-                    ?.copyWith(color: colors.onSurfaceVariant),
-              ),
-            ],
-          );
-        }),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => KazumiDialog.dismiss(context: context),
-          child: const Text('取消'),
-        ),
-      ],
+            ),
+          ],
+        );
+      }),
     );
   }
 }

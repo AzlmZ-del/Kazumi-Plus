@@ -11,6 +11,7 @@ import 'package:kazumi/pages/settings/displaymode_settings.dart';
 import 'package:kazumi/pages/settings/download_settings.dart';
 import 'package:kazumi/pages/settings/interface_settings.dart';
 import 'package:kazumi/pages/settings/keyboard_settings.dart';
+import 'package:kazumi/pages/settings/low_memory_mode_settings.dart';
 import 'package:kazumi/pages/settings/player_settings.dart';
 import 'package:kazumi/pages/settings/proxy/proxy_module.dart';
 import 'package:kazumi/pages/settings/renderer_settings.dart';
@@ -76,6 +77,10 @@ final settingsModule = createModule(
           ..route(
             '/player/super',
             child: (context, state) => const SuperResolutionSettings(),
+          )
+          ..route(
+            '/player/low-memory',
+            child: (context, state) => const LowMemoryModeSettingsPage(),
           )
           ..module(aboutModule)
           ..module(pluginModule)
