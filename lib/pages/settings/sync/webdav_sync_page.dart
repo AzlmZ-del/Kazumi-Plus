@@ -246,7 +246,9 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
             LocalBackupDirectoryCard(
               onDirectoryChanged: _onLocalBackupDirectoryChanged,
             ),
-            const LocalBackupSettingsCard(),
+            LocalBackupSettingsCard(
+              onDirectoryChanged: _onLocalBackupDirectoryChanged,
+            ),
           ],
         ),
       ),

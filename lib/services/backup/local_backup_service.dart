@@ -33,6 +33,27 @@ class LocalBackupException implements Exception {
   String toString() => message;
 }
 
+/// 一次恢复的结果：成功恢复的条目与目录里没找到备份文件的条目。
+///
+/// 两者分开返回，页面才能把「已恢复：X」和「未找到：Y」分别说清楚，
+/// 而不是只报一句干巴巴的成功。
+class LocalBackupRestoreResult {
+  const LocalBackupRestoreResult({required this.done, required this.missing});
+
+  final List<String> done;
+  final List<String> missing;
+
+  bool get hasMissing => missing.isNotEmpty;
+
+  /// 结果描述（不含「已恢复」前缀，前缀由调用方拼）。
+  /// 形如 `观看记录（未找到：收藏列表）`。
+  String get detail {
+    final restored = done.join('、');
+    if (missing.isEmpty) return restored;
+    return '$restored（未找到：${missing.join('、')}）';
+  }
+}
+
 /// 把「多设备同步」页里的几类数据备份到本机目录，或从该目录恢复。
 ///
 /// 与 WebDAV 的分工：那边走网络、靠远端文件做合并；这边只碰本地文件系统，
@@ -241,6 +262,18 @@ class LocalBackupService {
     if (selected == null || selected.isEmpty) return null;
     await _applyDirectory(selected);
     return selected;
+  }
+
+  /// 一次性选目录：只开系统选择器，不改写设置、不留持久授权。
+  ///
+  /// 给「还没设备份路径，但想直接从某个目录恢复一次」用：用户挑完就用这一次，
+  /// 不希望因此把「本地备份路径」改掉。取消返回 null。
+  Future<String?> pickDirectoryOnce() async {
+    if (!supportsCustomDirectory) {
+      throw const LocalBackupException('当前平台不支持手动选择目录');
+    }
+    final current = directory;
+    return _pickDirectory(current.isEmpty ? null : current);
   }
 
   /// 手动填写的目录路径。返回落盘后的路径。
@@ -488,20 +521,39 @@ class LocalBackupService {
     return done;
   }
 
-  /// 从备份目录把选中的内容合并回本地，返回实际恢复的条目名。
+  /// 从备份目录把选中的内容合并回本地，返回实际恢复的条目名与缺失项。
   ///
   /// 某个条目在目录里没有对应文件时跳过并记下来；全都没有就报错，
   /// 免得用户以为「恢复成功」其实什么都没发生。
-  Future<String> restore() async {
-    await restoreAccess();
-    final target = _requireDirectory();
-    if (!hasSelection) {
+  ///
+  /// [sourceDirectory] 指定一次性恢复目录（不改写「本地备份路径」）；
+  /// 为 null 时走已保存的目录，行为与原来一致。
+  ///
+  /// [ignoreSelection] 忽略内容开关、四项全部尝试恢复。总开关关着时
+  /// 五个子开关在界面上是隐藏的，用户没法再挑内容，只能按全量来。
+  Future<LocalBackupRestoreResult> restore({
+    String? sourceDirectory,
+    bool ignoreSelection = false,
+  }) async {
+    final String target;
+    final once = sourceDirectory?.trim() ?? '';
+    if (once.isNotEmpty) {
+      target = once;
+    } else {
+      await restoreAccess();
+      target = _requireDirectory();
+    }
+    if (!ignoreSelection && !hasSelection) {
       throw const LocalBackupException('请先选择要恢复的内容');
     }
+    final wantsHistory = ignoreSelection || historySelected;
+    final wantsCollect = ignoreSelection || collectSelected;
+    final wantsShield = ignoreSelection || shieldSelected;
+    final wantsCredentials = ignoreSelection || credentialsSelected;
     final done = <String>[];
     final missing = <String>[];
 
-    if (historySelected) {
+    if (wantsHistory) {
       final file = path.join(target, _historyFileName);
       if (await File(file).exists()) {
         await GStorage.patchHistory(file);
@@ -510,7 +562,7 @@ class LocalBackupService {
         missing.add('观看记录');
       }
     }
-    if (collectSelected) {
+    if (wantsCollect) {
       final collectiblesFile = path.join(target, _collectiblesFileName);
       if (await File(collectiblesFile).exists()) {
         final changesFile = path.join(target, _collectChangesFileName);
@@ -526,7 +578,7 @@ class LocalBackupService {
         missing.add('收藏列表');
       }
     }
-    if (shieldSelected) {
+    if (wantsShield) {
       final file = path.join(target, _shieldFileName);
       if (await File(file).exists()) {
         await _restoreShieldRules(file);
@@ -535,7 +587,7 @@ class LocalBackupService {
         missing.add('弹幕屏蔽词');
       }
     }
-    if (credentialsSelected) {
+    if (wantsCredentials) {
       final file = path.join(target, _credentialsFileName);
       if (await File(file).exists()) {
         await _restoreCredentials(file);
@@ -551,7 +603,7 @@ class LocalBackupService {
     KazumiLogger().i(
       'LocalBackup: restored from $target. items=$done missing=$missing',
     );
-    return done.join('、');
+    return LocalBackupRestoreResult(done: done, missing: missing);
   }
 
   Future<void> _writeCredentials(String filePath) async {
