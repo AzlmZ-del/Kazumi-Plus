@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 
+import 'package:kazumi/bean/settings/settings_list.dart';
 import 'package:kazumi/bean/widget/content_section.dart';
 import 'package:kazumi/bean/widget/empty_state_widget.dart';
 import 'package:kazumi/pages/my/my_controller.dart';
@@ -82,9 +83,9 @@ class _DanmakuShieldEditorState extends State<DanmakuShieldEditor> {
             title: '已添加 · ${rules.length}',
             children: [
               for (final rule in rules)
-                ListTile(
+                SettingsTile(
                   title: Text(rule),
-                  subtitle: rule.startsWith('/') && rule.endsWith('/')
+                  description: rule.startsWith('/') && rule.endsWith('/')
                       ? const Text('正则表达式')
                       : null,
                   trailing: IconButton(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:kazumi/bean/dialog/dialog.dart';
 import 'package:kazumi/bean/settings/settings_detail_scaffold.dart';
+import 'package:kazumi/bean/settings/settings_list.dart';
 import 'package:kazumi/bean/widget/tonal_card.dart';
 import 'package:kazumi/pages/settings/sync/local_backup_cards.dart';
 import 'package:kazumi/pages/settings/sync/sync_settings_widgets.dart';
@@ -302,81 +303,61 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
         onExpansionChanged: (value) => setState(() => _expanded = value),
         children: [
           const Divider(height: 1, indent: 16, endIndent: 16),
-          SwitchListTile(
-            secondary: Icon(Icons.history_rounded, size: 24, color: secondary),
+          SettingsTile.switchTile(
+            leading: Icons.history_rounded,
             title: const Text('观看记录'),
-            subtitle: Text(
-              '自动同步播放进度与历史记录',
-              style: syncSwitchSubtitleStyle(context),
-            ),
-            value: history,
-            onChanged: enabled && !_busy
-                ? (value) async {
-                    await GStorage.putSetting(
-                      SettingsKeys.webDavEnableHistory,
-                      value,
-                    );
-                    if (mounted) setState(() {});
-                  }
-                : null,
+            description: const Text('自动同步播放进度与历史记录'),
+            initialValue: history,
+            enabled: enabled && !_busy,
+            onToggle: (value) async {
+              await GStorage.putSetting(
+                SettingsKeys.webDavEnableHistory,
+                value ?? false,
+              );
+              if (mounted) setState(() {});
+            },
           ),
-          SwitchListTile(
-            secondary: Icon(Icons.favorite_rounded, size: 24, color: secondary),
+          SettingsTile.switchTile(
+            leading: Icons.favorite_rounded,
             title: const Text('收藏列表'),
-            subtitle: Text(
-              '同步所有追番分类与收藏状态',
-              style: syncSwitchSubtitleStyle(context),
-            ),
-            value: collect,
-            onChanged: enabled && !_busy
-                ? (value) async {
-                    await GStorage.putSetting(
-                      SettingsKeys.webDavEnableCollect,
-                      value,
-                    );
-                    if (mounted) setState(() {});
-                  }
-                : null,
+            description: const Text('同步所有追番分类与收藏状态'),
+            initialValue: collect,
+            enabled: enabled && !_busy,
+            onToggle: (value) async {
+              await GStorage.putSetting(
+                SettingsKeys.webDavEnableCollect,
+                value ?? false,
+              );
+              if (mounted) setState(() {});
+            },
           ),
-          SwitchListTile(
-            secondary: Icon(
-              Icons.filter_alt_rounded,
-              size: 24,
-              color: secondary,
-            ),
+          SettingsTile.switchTile(
+            leading: Icons.filter_alt_rounded,
             title: const Text('弹幕屏蔽词'),
-            subtitle: Text(
-              '启动和修改规则后自动同步，包含关键词与正则表达式',
-              style: syncSwitchSubtitleStyle(context),
-            ),
-            value: shield,
-            onChanged: enabled && !_busy
-                ? (value) async {
-                    await GStorage.putSetting(
-                      SettingsKeys.webDavEnableDanmakuShield,
-                      value,
-                    );
-                    if (mounted) setState(() {});
-                  }
-                : null,
+            description: const Text('启动和修改规则后自动同步，包含关键词与正则表达式'),
+            initialValue: shield,
+            enabled: enabled && !_busy,
+            onToggle: (value) async {
+              await GStorage.putSetting(
+                SettingsKeys.webDavEnableDanmakuShield,
+                value ?? false,
+              );
+              if (mounted) setState(() {});
+            },
           ),
-          SwitchListTile(
-            secondary: Icon(Icons.key_rounded, size: 24, color: secondary),
+          SettingsTile.switchTile(
+            leading: Icons.key_rounded,
             title: const Text('用户凭据'),
-            subtitle: Text(
-              '开启后可备份/恢复 Bangumi 与服务器账号信息（AES 加密存储）',
-              style: syncSwitchSubtitleStyle(context),
-            ),
-            value: credentials,
-            onChanged: enabled && !_busy
-                ? (value) async {
-                    await GStorage.putSetting(
-                      SettingsKeys.webDavEnableCredentials,
-                      value,
-                    );
-                    if (mounted) setState(() {});
-                  }
-                : null,
+            description: const Text('开启后可备份/恢复 Bangumi 与服务器账号信息（AES 加密存储）'),
+            initialValue: credentials,
+            enabled: enabled && !_busy,
+            onToggle: (value) async {
+              await GStorage.putSetting(
+                SettingsKeys.webDavEnableCredentials,
+                value ?? false,
+              );
+              if (mounted) setState(() {});
+            },
           ),
           // 总开关关闭时不显示动作按钮区：开关都禁用了，按钮留着也没法点。
           if (enabled)
