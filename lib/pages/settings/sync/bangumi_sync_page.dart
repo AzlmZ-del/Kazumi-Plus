@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:kazumi/bean/dialog/dialog.dart';
 import 'package:kazumi/bean/dialog/kazumi_toast.dart';
 import 'package:kazumi/bean/settings/settings_detail_scaffold.dart';
+import 'package:kazumi/bean/settings/settings_list.dart';
 import 'package:kazumi/bean/widget/state_presentation.dart';
 import 'package:kazumi/bean/widget/tonal_card.dart';
 import 'package:kazumi/modules/bangumi/sync_priority.dart';
@@ -305,24 +306,18 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
                       ),
                     ),
                     const Divider(height: 1, indent: 16, endIndent: 16),
-                    SwitchListTile(
+                    SettingsTile.switchTile(
                       title: const Text('同步结果提示'),
-                      // 与卡片头部副标题同款：12sp + 置灰，
-                      // 盖掉 `ListTile` 默认的 14sp 同色。
-                      subtitle: Text(
-                        '修改追番状态后显示同步结果',
-                        style: syncSwitchSubtitleStyle(context),
-                      ),
-                      value: showToast,
-                      onChanged: _busy
-                          ? null
-                          : (value) async {
-                              await GStorage.putSetting(
-                                SettingsKeys.bangumiImmediateSyncToastEnable,
-                                value,
-                              );
-                              if (mounted) setState(() {});
-                            },
+                      description: const Text('修改追番状态后显示同步结果'),
+                      enabled: !_busy,
+                      initialValue: showToast,
+                      onToggle: (value) async {
+                        await GStorage.putSetting(
+                          SettingsKeys.bangumiImmediateSyncToastEnable,
+                          value ?? false,
+                        );
+                        if (mounted) setState(() {});
+                      },
                     ),
                   ],
                 ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 
 import 'package:kazumi/bean/dialog/dialog.dart';
+import 'package:kazumi/bean/settings/settings_list.dart';
 import 'package:kazumi/bean/widget/state_presentation.dart';
 import 'package:kazumi/bean/widget/tonal_card.dart';
 import 'package:kazumi/pages/settings/sync/sync_settings_widgets.dart';
@@ -371,85 +372,58 @@ class _LocalBackupSettingsCardState extends State<LocalBackupSettingsCard> {
           // 与【启用 WebDAV】卡同节奏：头部开关下先来一条线。
           const Divider(height: 1, indent: 16, endIndent: 16),
           // 放在分割线上方：它是选择器，不是四项内容之一。
-          SwitchListTile(
-            secondary: Icon(Icons.cloud_sync_rounded, size: 24, color: secondary),
+          SettingsTile.switchTile(
+            leading: Icons.cloud_sync_rounded,
             title: const Text('跟随同步'),
-            subtitle: Text(
-              '让备份选项跟随 WebDAV',
-              style: syncSwitchSubtitleStyle(context),
-            ),
-            value: followWebDav,
-            onChanged: enabled && !_busy
-                ? (value) => _toggle(SettingsKeys.localBackupFollowWebDav, value)
-                : null,
+            description: const Text('让备份选项跟随 WebDAV'),
+            initialValue: followWebDav,
+            enabled: enabled && !_busy,
+            onToggle: (value) =>
+                _toggle(SettingsKeys.localBackupFollowWebDav, value ?? false),
           ),
           // 跟随云端时四项由【启用 WebDAV】那边决定，这里全部藏起来：
           // 分割线也一起去掉，否则会剩一条悬空的线。
           if (!followWebDav) ...[
             const Divider(height: 1, indent: 16, endIndent: 16),
-            SwitchListTile(
-              secondary: Icon(Icons.history_rounded, size: 24, color: secondary),
+            SettingsTile.switchTile(
+              leading: Icons.history_rounded,
               title: const Text('观看记录'),
-              subtitle: Text(
-                '备份播放进度与历史记录',
-                style: syncSwitchSubtitleStyle(context),
-              ),
-              value: history,
-              onChanged: enabled && !_busy
-                  ? (value) =>
-                      _toggle(SettingsKeys.localBackupEnableHistory, value)
-                  : null,
+              description: const Text('备份播放进度与历史记录'),
+              initialValue: history,
+              enabled: enabled && !_busy,
+              onToggle: (value) =>
+                  _toggle(SettingsKeys.localBackupEnableHistory, value ?? false),
             ),
-            SwitchListTile(
-              secondary: Icon(
-                Icons.favorite_rounded,
-                size: 24,
-                color: secondary,
-              ),
+            SettingsTile.switchTile(
+              leading: Icons.favorite_rounded,
               title: const Text('收藏列表'),
-              subtitle: Text(
-                '备份所有追番分类与收藏状态',
-                style: syncSwitchSubtitleStyle(context),
-              ),
-              value: collect,
-              onChanged: enabled && !_busy
-                  ? (value) =>
-                      _toggle(SettingsKeys.localBackupEnableCollect, value)
-                  : null,
+              description: const Text('备份所有追番分类与收藏状态'),
+              initialValue: collect,
+              enabled: enabled && !_busy,
+              onToggle: (value) =>
+                  _toggle(SettingsKeys.localBackupEnableCollect, value ?? false),
             ),
-            SwitchListTile(
-              secondary: Icon(
-                Icons.filter_alt_rounded,
-                size: 24,
-                color: secondary,
-              ),
+            SettingsTile.switchTile(
+              leading: Icons.filter_alt_rounded,
               title: const Text('弹幕屏蔽词'),
-              subtitle: Text(
-                '备份关键词与正则表达式规则',
-                style: syncSwitchSubtitleStyle(context),
+              description: const Text('备份关键词与正则表达式规则'),
+              initialValue: shield,
+              enabled: enabled && !_busy,
+              onToggle: (value) => _toggle(
+                SettingsKeys.localBackupEnableDanmakuShield,
+                value ?? false,
               ),
-              value: shield,
-              onChanged: enabled && !_busy
-                  ? (value) => _toggle(
-                      SettingsKeys.localBackupEnableDanmakuShield,
-                      value,
-                    )
-                  : null,
             ),
-            SwitchListTile(
-              secondary: Icon(Icons.key_rounded, size: 24, color: secondary),
+            SettingsTile.switchTile(
+              leading: Icons.key_rounded,
               title: const Text('用户凭据'),
-              subtitle: Text(
-                '备份 Bangumi 与服务器账号信息（AES 加密存储）',
-                style: syncSwitchSubtitleStyle(context),
+              description: const Text('备份 Bangumi 与服务器账号信息（AES 加密存储）'),
+              initialValue: credentials,
+              enabled: enabled && !_busy,
+              onToggle: (value) => _toggle(
+                SettingsKeys.localBackupEnableCredentials,
+                value ?? false,
               ),
-              value: credentials,
-              onChanged: enabled && !_busy
-                  ? (value) => _toggle(
-                      SettingsKeys.localBackupEnableCredentials,
-                      value,
-                    )
-                  : null,
             ),
           ],
           // 总开关关闭时不显示按钮区：开关都禁用了，按钮留着也没法点。
