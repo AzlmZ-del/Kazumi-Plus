@@ -2,12 +2,14 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
+import 'package:kazumi/bean/dialog/image_save_sheet.dart';
 import 'package:kazumi/bean/widget/collect_button.dart';
 import 'package:kazumi/utils/constants.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/bean/card/network_img_layer.dart';
 import 'package:kazumi/bean/widget/image_preview.dart';
 import 'package:kazumi/pages/info/info_quick_actions.dart';
+import 'package:kazumi/utils/device.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
@@ -65,6 +67,20 @@ class _BangumiInfoCardVState extends State<BangumiInfoCardV> {
       imageUrls: [imageUrl],
       heroTag: widget.bangumiItem.id,
       fileBaseName: InfoQuickActions.coverFileName(widget.bangumiItem),
+    );
+  }
+
+  /// 长按封面弹保存卡片：原图 / JPG / PNG 三选一。
+  ///
+  /// 点击仍然是全屏预览——大图里也能长按保存，这里只是少走一步。
+  Future<void> _showCoverSaveSheet() async {
+    final imageUrl = InfoQuickActions.coverImageUrl(widget.bangumiItem);
+    if (imageUrl.isEmpty) return;
+    await showImageSaveSheet(
+      context,
+      imageUrl: imageUrl,
+      fileBaseName: InfoQuickActions.coverFileName(widget.bangumiItem),
+      label: '封面',
     );
   }
 
@@ -367,9 +383,11 @@ class _BangumiInfoCardVState extends State<BangumiInfoCardV> {
                       final double maxWidth = boxConstraints.maxWidth;
                       final double maxHeight = boxConstraints.maxHeight;
                       return GestureDetector(
-                        // 点封面进全屏预览，长按仍交给外层（这里不拦长按，
-                        // 避免与标题/评分区的手势抢）。
+                        // 点封面进全屏预览，长按弹保存卡片（原图 / JPG / PNG）。
+                        // 桌面端再补右键：鼠标没有长按习惯，右键才是「另存为」的直觉。
                         onTap: _openCoverPreview,
+                        onLongPress: _showCoverSaveSheet,
+                        onSecondaryTap: isDesktop() ? _showCoverSaveSheet : null,
                         child: Hero(
                           transitionOnUserGestures: true,
                           flightShuttleBuilder:
