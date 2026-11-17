@@ -151,6 +151,53 @@ class _WebDavServerCardState extends State<WebDavServerCard> {
     }
   }
 
+  /// 副标题：状态点 + 域名。绿=已连接，红=上次测试失败，灰=存了地址但本次没连过。
+  Widget _buildSubtitle(
+    BuildContext context, {
+    required String? host,
+    required bool configured,
+  }) {
+    if (!configured) {
+      return const SyncCardSubtitle('需要支持 WebDAV 的云盘或服务器');
+    }
+    if (_testing || _busy) {
+      return const SyncCardSubtitle('正在连接…');
+    }
+    final colors = Theme.of(context).colorScheme;
+    final webDav = WebDav();
+    final Color dotColor;
+    if (webDav.initialized) {
+      dotColor = Colors.green;
+    } else if (webDav.lastPingError != null) {
+      dotColor = colors.error;
+    } else {
+      dotColor = colors.outline;
+    }
+    final label = host ?? '';
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // 行盒居中会顶高圆点：12sp 中文字形墨迹中心比行盒中心低约 1.6dp，
+        // 纯绘制下移即可，不参与布局、不影响卡高。
+        Transform.translate(
+          offset: Offset(0, MediaQuery.textScalerOf(context).scale(1.6)),
+          child: Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: dotColor,
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+        if (label.isNotEmpty) ...[
+          const SizedBox(width: 6),
+          Flexible(child: SyncCardSubtitle(label)),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final configured = _configured;
@@ -184,20 +231,10 @@ class _WebDavServerCardState extends State<WebDavServerCard> {
         childrenPadding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
         leading: const Icon(Icons.dns_rounded),
         title: SyncCardTitle(configured ? '同步服务器' : '连接你的云盘'),
-        // 四态与「Bangumi 账号」卡完全同构：
-        // 连接中 → 已连接 · 主机名 → 已保存配置（未连通）→ 尚未配置。
-        // 原来这里在已配置时直接显示域名，看不出到底连没连上。
-        subtitle: SyncCardSubtitle(
-          // `_busy` 是展开区【保存并测试】在跑，`_testing` 是头部【测试连接】；
-          // 两者都在发请求，副标题统一显示「正在连接…」。
-          _testing || _busy
-              ? '正在连接…'
-              : WebDav().initialized
-              ? (host == null || host.isEmpty ? '已连接' : '已连接 · $host')
-              : configured
-              ? '已保存服务器地址'
-              : '需要支持 WebDAV 的云盘或服务器',
-        ),
+        // 副标题用状态点代替原来那句「已连接 · 主机名」：
+        // 绿点=连上了，红点=上次测试失败，灰点=存了地址但本次还没连过。
+        // 域名照旧显示，去掉的是前面几个字，信息量不减而扫一眼就能看出状态。
+        subtitle: _buildSubtitle(context, host: host, configured: configured),
         children: [
           Form(
             key: _formKey,
