@@ -6,6 +6,7 @@ import 'package:kazumi/bean/settings/settings_list.dart';
 import 'package:kazumi/bean/widget/state_presentation.dart';
 import 'package:kazumi/bean/widget/tonal_card.dart';
 import 'package:kazumi/pages/settings/sync/sync_settings_widgets.dart';
+import 'package:kazumi/services/backup/local_backup_items.dart';
 import 'package:kazumi/services/backup/local_backup_service.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/services/storage/storage.dart';
@@ -91,11 +92,7 @@ class _LocalBackupDirectoryCardState extends State<LocalBackupDirectoryCard> {
     super.dispose();
   }
 
-  /// 目录在别处被改（比如从下面的【启用本地备份】卡里选了目录）时回填输入框。
-  ///
-  /// 改 controller 放到帧后执行：build 期间通知 `EditableText` 会让它在构建中
-  /// setState。输入框有焦点时不回填，等失焦后再补（见 `_pathFocus` 的监听），
-  /// 免得打断正在手打的路径。
+  /// 改 controller 放到帧后：build 期间通知 `EditableText` 会让它中途 setState。
   void _scheduleDirectorySync() {
     final current = _service.directory;
     if (current == _syncedDirectory) return;
@@ -174,10 +171,7 @@ class _LocalBackupDirectoryCardState extends State<LocalBackupDirectoryCard> {
     }
   }
 
-  /// 清除已设置的备份路径。
-  ///
-  /// 只清路径、不动总开关：总开关是「要不要自动备份」的意图，和「备份到哪儿」
-  /// 是两件事，清路径顺手关掉开关会让人以为自己关过。备份文件本身也不删。
+  /// 只清路径、不动总开关：开关是「要不要自动备份」，与「备份到哪儿」是两件事。
   Future<void> _clearDirectory() async {
     if (_busy) return;
     FocusManager.instance.primaryFocus?.unfocus();
@@ -389,14 +383,10 @@ class _LocalBackupSettingsCardState extends State<LocalBackupSettingsCard> {
     }
   }
 
-  /// 手动备份。
+  /// 不看总开关：它只管「改动后自动备份」。
   ///
-  /// 与自动备份不同，这里不看总开关：总开关只管「改动后自动备份」，
-  /// 手动点按钮任何时候都算数。
-  ///
-  /// 顺序是**先补目录、再查内容**：没目录时总开关是禁用的、四个内容开关也
-  /// 是隐藏的，反过来的话用户会卡在「想备份却没有任何可点的开关」上。
-  /// 选中的目录同时写进「本地备份路径」，总开关随即解除置灰。
+  /// 先补目录再查内容 —— 无目录时总开关是禁用的、内容开关也隐藏，
+  /// 反过来用户会卡在「想备份却没有任何可点的开关」上。
   Future<void> _backup() async {
     if (_busy) return;
     if (_service.directory.isEmpty) {
@@ -415,12 +405,8 @@ class _LocalBackupSettingsCardState extends State<LocalBackupSettingsCard> {
     );
   }
 
-  /// 手动恢复。
-  ///
-  /// 总开关关着时四个内容开关是隐藏的，用户没法挑内容，这时按全量恢复；
-  /// 开着但一项都没选时同样退回全量 —— 恢复是按文件合并、缺的跳过，
-  /// 让按钮直接可用比报「请先选择要恢复的内容」更符合预期。
-  /// 还没设备份目录时一次性选目录，不写入设置。
+  /// 总开关关着（或一项都没选）时按全量恢复：那组开关此时是隐藏的。
+  /// 无目录时一次性选目录，不写入设置。
   Future<void> _restore() async {
     if (_busy) return;
     final ignoreSelection = !_service.enabled || !_service.hasSelection;
@@ -464,11 +450,7 @@ class _LocalBackupSettingsCardState extends State<LocalBackupSettingsCard> {
     if (mounted) setState(() {});
   }
 
-  /// 拨总开关时同步展开态：**总是展开**。
-  ///
-  /// 开启时展开是为了让人看到五个内容开关；关闭时五个开关会整块隐藏，
-  /// 卡片只剩头部和两颗手动按钮，更要保持展开 —— 否则按钮被折叠起来，
-  /// 用户还得再点一次才能手动备份。
+  /// 拨开关总是展开：关闭时不折叠，否则两颗手动按钮会被藏起来。
   ///
   /// 与【启用 WebDAV】卡同款：`_expanded` 由 `onExpansionChanged` 统一更新，
   /// 这里只驱动控制器，免得两处赋值打架。
@@ -483,6 +465,16 @@ class _LocalBackupSettingsCardState extends State<LocalBackupSettingsCard> {
     }
   }
 
+  /// 由声明表生成一行内容开关，界面与服务层读同一份清单。
+  Widget _buildItemTile(LocalBackupItem item) => SettingsTile.switchTile(
+    leading: item.icon,
+    title: Text(item.title),
+    description: Text(item.description),
+    initialValue: _service.isSelected(item),
+    enabled: !_busy,
+    onToggle: (value) => _toggle(item.localKey, value ?? false),
+  );
+
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
@@ -490,10 +482,6 @@ class _LocalBackupSettingsCardState extends State<LocalBackupSettingsCard> {
     final configured = _service.directory.isNotEmpty;
     final enabled = _service.enabled;
     final followWebDav = _service.followWebDav;
-    final history = _service.historySelected;
-    final collect = _service.collectSelected;
-    final shield = _service.shieldSelected;
-    final credentials = _service.credentialsSelected;
     // 没选目录时头部置灰；两颗手动按钮此时仍可点 —— 点下去会先让选目录。
     final dimmed = colors.onSurface.withValues(alpha: 0.38);
     final foreground = configured ? colors.onSurface : dimmed;
@@ -541,10 +529,10 @@ class _LocalBackupSettingsCardState extends State<LocalBackupSettingsCard> {
         children: [
           // 与【启用 WebDAV】卡同节奏：头部开关下先来一条线。
           const Divider(height: 1, indent: 16, endIndent: 16),
-          // 五个内容开关只在总开关开启时出现：总开关关着时它们全是禁用态，
+          // 内容开关只在总开关开启时出现：关着时它们全是禁用态，
           // 摆在界面上既点不动又占地方，不如整块藏掉，只留下面两颗手动按钮。
           if (enabled) ...[
-            // 放在分割线上方：它是选择器，不是四项内容之一。
+            // 放在分割线上方：它是选择器，不是内容项之一。
             SettingsTile.switchTile(
               leading: Icons.cloud_sync_rounded,
               title: const Text('跟随同步'),
@@ -554,55 +542,20 @@ class _LocalBackupSettingsCardState extends State<LocalBackupSettingsCard> {
               onToggle: (value) =>
                   _toggle(SettingsKeys.localBackupFollowWebDav, value ?? false),
             ),
-            // 跟随云端时四项由【启用 WebDAV】那边决定，这里全部藏起来：
-            // 分割线也一起去掉，否则会剩一条悬空的线。
+            // 受「跟随同步」管辖的项：跟随云端时由【启用 WebDAV】那边决定，
+            // 这里整块藏起来，分割线也一起去掉，否则会剩一条悬空的线。
             if (!followWebDav) ...[
               const Divider(height: 1, indent: 16, endIndent: 16),
-              SettingsTile.switchTile(
-                leading: Icons.history_rounded,
-                title: const Text('观看记录'),
-                description: const Text('备份播放进度与历史记录'),
-                initialValue: history,
-                enabled: !_busy,
-                onToggle: (value) => _toggle(
-                  SettingsKeys.localBackupEnableHistory,
-                  value ?? false,
-                ),
-              ),
-              SettingsTile.switchTile(
-                leading: Icons.favorite_rounded,
-                title: const Text('收藏列表'),
-                description: const Text('备份所有追番分类与收藏状态'),
-                initialValue: collect,
-                enabled: !_busy,
-                onToggle: (value) => _toggle(
-                  SettingsKeys.localBackupEnableCollect,
-                  value ?? false,
-                ),
-              ),
-              SettingsTile.switchTile(
-                leading: Icons.filter_alt_rounded,
-                title: const Text('弹幕屏蔽词'),
-                description: const Text('备份关键词与正则表达式规则'),
-                initialValue: shield,
-                enabled: !_busy,
-                onToggle: (value) => _toggle(
-                  SettingsKeys.localBackupEnableDanmakuShield,
-                  value ?? false,
-                ),
-              ),
-              SettingsTile.switchTile(
-                leading: Icons.key_rounded,
-                title: const Text('用户凭据'),
-                description: const Text('备份 Bangumi 与服务器账号信息（AES 加密存储）'),
-                initialValue: credentials,
-                enabled: !_busy,
-                onToggle: (value) => _toggle(
-                  SettingsKeys.localBackupEnableCredentials,
-                  value ?? false,
-                ),
-              ),
+              for (final item in localBackupItems)
+                if (item.followsWebDav) _buildItemTile(item),
             ],
+            // 不跟随的项（目前只有「应用设置」）永远显示：它只存本地，
+            // 藏起来的话开关还在生效，用户却再也关不掉。
+            for (final item in localBackupItems)
+              if (!item.followsWebDav) ...[
+                const Divider(height: 1, indent: 16, endIndent: 16),
+                _buildItemTile(item),
+              ],
           ],
           // 按钮区常驻：手动备份/恢复不看总开关，没设目录时点下去会先让选目录。
           Padding(
