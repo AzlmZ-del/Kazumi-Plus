@@ -116,6 +116,10 @@ class MainActivity: AudioServiceActivity() {
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger, DirectHttpHandler.CHANNEL
         ).setMethodCallHandler(DirectHttpHandler(this))
+        // 原样写盘通道：saver_gallery 会重编码，保存原图必须自己写（见 GalleryWriter）。
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger, GalleryWriter.CHANNEL
+        ).setMethodCallHandler(GalleryWriter(this))
         intentChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         intentChannel?.setMethodCallHandler { call, result ->
             if (call.method == "openWithMime") {
