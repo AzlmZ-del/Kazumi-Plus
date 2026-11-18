@@ -17,6 +17,7 @@ import 'package:kazumi/pages/plugin_editor/rule_management_widgets.dart';
 import 'package:kazumi/plugins/plugins_controller.dart';
 import 'package:kazumi/request/config/rules_repository_config.dart';
 import 'package:kazumi/services/network/rules_mirror.dart';
+import 'package:kazumi/services/network/rules_mirror_probe.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/utils/date_time.dart';
 
@@ -149,6 +150,10 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
         current: RulesMirror.current,
         modes: RulesMirror.values,
         setting: SettingsKeys.rulesMirror,
+        probe: (onResult, {force = false}) => RulesMirrorProbe.runCached(
+          (result) => onResult(AccelerationProbe.fromResult(result)),
+          force: force,
+        ),
       );
       if (changed && mounted) _refresh();
     } catch (_) {

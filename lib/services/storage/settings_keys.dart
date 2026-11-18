@@ -296,10 +296,17 @@ class SettingsKeys {
     'ech',
     group: SettingGroup.proxy,
   );
-  // 规则仓库加速档位。值为空时退回旧版的 `enableGitProxy` 开关，
-  // 让已安装用户保持现有行为。
+  // 规则仓库加速档位。空值表示「从未配置过」，此时按 GitHub 直连处理；
+  // 不再参考旧版的 `enableGitProxy`（它默认为真，会把新用户带到已失效的镜像）。
   static const rulesMirror = SettingKey<String>(
     'rulesMirror',
+    '',
+    group: SettingGroup.proxy,
+  );
+  // 上一次规则仓库加速测速结果的 JSON 快照，带目标仓库与时间戳。
+  // 只用来免掉一小时内的重复探测，不参与任何业务判断；失效后照常重测。
+  static const rulesMirrorProbeCache = SettingKey<String>(
+    'rulesMirrorProbeCache',
     '',
     group: SettingGroup.proxy,
   );
@@ -346,6 +353,7 @@ class SettingsKeys {
     false,
     group: SettingGroup.webdav,
   );
+
   /// 本地备份目录（空 = 尚未选择）。
   ///
   /// 存的是原生侧拿到的绝对路径，不是文档树 URI —— 备份就是普通的文件拷贝，
@@ -405,6 +413,7 @@ class SettingsKeys {
     false,
     group: SettingGroup.sync,
   );
+
   /// 整箱备份「应用设置」。不跟随 WebDAV：云端没有对应内容。
   static const localBackupEnableSettings = SettingKey<bool>(
     'localBackupEnableSettings',
@@ -810,6 +819,7 @@ class SettingsKeys {
     imageQuality,
     bangumiAcceleration,
     rulesMirror,
+    rulesMirrorProbeCache,
     enableSystemProxy,
     defaultStartupPage,
     deepLinkReturnHome,

@@ -24,12 +24,13 @@ class BgmAniListMap {
       'https://raw.githubusercontent.com/rhilip/BangumiExtLinker/'
       'master/data/anime_map.csv';
 
-  /// gitcode 只镜像 KazumiRules，套不到 CSV，退回 Pages。
-  static String get _csvUrl => switch (RulesMirror.current) {
-        RulesMirror.ghProxy => '${ApiEndpoints.ghProxyMirror}$_csvUrlRaw',
-        RulesMirror.ghfast => '${ApiEndpoints.ghfastMirror}$_csvUrlRaw',
-        RulesMirror.gitcode || RulesMirror.direct => _csvUrlPages,
-      };
+  /// 前缀式镜像直接拼 GitHub raw，其余档位（含 gitcode）退回 Pages。
+  ///
+  /// 不逐个列举枚举成员：镜像档还会增加，穷举式 switch 每加一档就要改这里。
+  static String get _csvUrl {
+    final prefix = RulesMirror.current.prefixOrNull;
+    return prefix == null ? _csvUrlPages : '$prefix$_csvUrlRaw';
+  }
 
   static Map<String, int>? _cache;
   static Future<Map<String, int>>? _loading;
@@ -73,8 +74,11 @@ class BgmAniListMap {
         _lastFetchedSource = await _readSourceMarker(cacheFile);
       }
     } catch (error, stackTrace) {
-      KazumiLogger().w('BgmAniListMap: read cache failed',
-          error: error, stackTrace: stackTrace);
+      KazumiLogger().w(
+        'BgmAniListMap: read cache failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
     _loading = null;
     return _cache ?? const {};
@@ -85,17 +89,18 @@ class BgmAniListMap {
   /// 成功覆盖缓存，失败静默忽略。调用方用 unawaited，不要 await。
   static Future<void> refreshInBackground() async {
     if (_refreshInFlight) return;
-    final sourceChanged = _lastFetchedSource != null &&
+    final sourceChanged =
+        _lastFetchedSource != null &&
         _lastFetchedSource != RulesMirror.current.name;
     if (!_stale() && !sourceChanged) return;
     _refreshInFlight = true;
     try {
       var response = await _fetchCsv();
       // 304 配空缓存会永久锁死，丢弃 ETag 强制重拉。
-      if (response.statusCode == 304 &&
-          (_cache == null || _cache!.isEmpty)) {
+      if (response.statusCode == 304 && (_cache == null || _cache!.isEmpty)) {
         KazumiLogger().w(
-            'BgmAniListMap: 304 but cache is empty, refetching without etag');
+          'BgmAniListMap: 304 but cache is empty, refetching without etag',
+        );
         _etag = null;
         response = await _fetchCsv();
       }
@@ -121,11 +126,15 @@ class BgmAniListMap {
       _lastFetch = DateTime.now();
       _lastFetchedSource = RulesMirror.current.name;
       await _writeSourceMarker(cacheFile);
-      KazumiLogger()
-          .i('BgmAniListMap: background refresh ok, ${_cache!.length} entries');
+      KazumiLogger().i(
+        'BgmAniListMap: background refresh ok, ${_cache!.length} entries',
+      );
     } catch (error, stackTrace) {
-      KazumiLogger().w('BgmAniListMap: background refresh failed, ignored',
-          error: error, stackTrace: stackTrace);
+      KazumiLogger().w(
+        'BgmAniListMap: background refresh failed, ignored',
+        error: error,
+        stackTrace: stackTrace,
+      );
     } finally {
       _refreshInFlight = false;
     }
@@ -144,8 +153,9 @@ class BgmAniListMap {
 
   static Future<void> _writeSourceMarker(File cacheFile) async {
     try {
-      await File('${cacheFile.path}.source')
-          .writeAsString(RulesMirror.current.name, flush: true);
+      await File(
+        '${cacheFile.path}.source',
+      ).writeAsString(RulesMirror.current.name, flush: true);
     } catch (_) {}
   }
 

@@ -29,6 +29,27 @@ class ApiEndpoints {
   /// 前缀式镜像的备用站
   static const String ghfastMirror = 'https://ghfast.top/';
 
+  /// gh-proxy.com：实测比 [ghProxyMirror] 稳定，两个内置仓库都能走。
+  static const String ghProxyComMirror = 'https://gh-proxy.com/';
+
+  /// ghproxy.imciel.com：延迟与 gh-proxy.com 相当。
+  static const String ghProxyImcielMirror = 'https://ghproxy.imciel.com/';
+
+  /// ghproxy.net：可用但明显偏慢。
+  static const String ghProxyNetMirror = 'https://ghproxy.net/';
+
+  /// ghproxy.cn：很慢，且只镜像官方仓库。
+  static const String ghProxyCnMirror = 'https://ghproxy.cn/';
+
+  /// jsDelivr 路径式镜像：GitHub raw 要改写成 `gh/<owner>/<repo>@<ref>/<path>`。
+  static const String jsDelivrMirror = 'https://cdn.jsdelivr.net/gh/';
+
+  /// jsDelivr 同一内容的分发节点，延迟接近主域。
+  static const String jsDelivrGcoreMirror = 'https://gcore.jsdelivr.net/gh/';
+
+  /// GitHub raw 的固定前缀，路径式镜像据此改写。
+  static const String githubRawPrefix = 'https://raw.githubusercontent.com/';
+
   /// 路径式镜像：只镜像了官方规则仓库，需替换 `pluginShop` 前缀而非拼接
   static const String gitcodeMirror =
       'https://raw.gitcode.com/gh_mirrors/ka/KazumiRules/raw/main/';
@@ -38,8 +59,7 @@ class ApiEndpoints {
       'https://raw.githubusercontent.com/AzlmZ-del/Kazumi-Plus-Rules/main/';
 
   /// 本版 Releases 所在仓库
-  static const String releasesRepo =
-      'https://github.com/AzlmZ-del/Kazumi-Plus';
+  static const String releasesRepo = 'https://github.com/AzlmZ-del/Kazumi-Plus';
 
   /// 在线升级：读本仓库的最新 Release
   static const String latestApp =
