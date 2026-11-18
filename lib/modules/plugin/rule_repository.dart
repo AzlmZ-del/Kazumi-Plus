@@ -178,8 +178,9 @@ class RuleRepositoryList {
     return null;
   }
 
+  /// 默认只启用个人仓库：官方仓库仍然内置、可手动打开，但不参与默认聚合。
   static List<RuleRepository> defaults() => <RuleRepository>[
-    RuleRepository(url: officialUrl),
+    RuleRepository(url: officialUrl, enabled: false),
     RuleRepository(url: personalUrl),
   ];
 
@@ -241,7 +242,8 @@ class RuleRepositoryList {
 
     final officialIndex = reordered.indexWhere((repo) => repo.isOfficial);
     if (officialIndex < 0) {
-      reordered.insert(0, RuleRepository(url: officialUrl));
+      // 补回内置仓库时沿用默认档位（官方默认关闭），不把关闭态变回开启。
+      reordered.insert(0, RuleRepository(url: officialUrl, enabled: false));
     } else if (officialIndex != 0) {
       reordered.insert(0, reordered.removeAt(officialIndex));
     }

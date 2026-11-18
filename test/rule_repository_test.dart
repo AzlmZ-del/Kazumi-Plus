@@ -55,13 +55,15 @@ void main() {
   });
 
   group('RuleRepositoryList.defaults', () {
-    test('contains the enabled built-in repositories', () {
+    test('keeps the official repo but leaves it disabled by default', () {
       final repositories = RuleRepositoryList.defaults();
 
       expect(repositories, hasLength(2));
       expect(repositories.first.isOfficial, isTrue);
       expect(repositories.last.isPersonal, isTrue);
-      expect(repositories.every((repository) => repository.enabled), isTrue);
+      // 默认只聚合个人仓库；官方仓库内置保留，但需要手动启用。
+      expect(repositories.first.enabled, isFalse);
+      expect(repositories.last.enabled, isTrue);
     });
   });
 
@@ -71,8 +73,9 @@ void main() {
         final repositories = RuleRepositoryList.decode(raw);
         expect(repositories, hasLength(2));
         expect(repositories.first.isOfficial, isTrue);
+        expect(repositories.first.enabled, isFalse);
         expect(repositories.last.isPersonal, isTrue);
-        expect(repositories.every((repository) => repository.enabled), isTrue);
+        expect(repositories.last.enabled, isTrue);
       }
     });
 
@@ -157,7 +160,10 @@ void main() {
 
       // Both built-ins are re-inserted at the front, so four entries expected.
       expect(decoded, hasLength(4));
-      expect(decoded.every((repository) => repository.enabled), isTrue);
+      // 自定义条目缺 enabled 时按启用处理；内置官方仓库仍是默认关闭档位。
+      expect(decoded.skip(2).every((repository) => repository.enabled), isTrue);
+      expect(decoded.first.enabled, isFalse);
+      expect(decoded[1].enabled, isTrue);
       expect(decoded.map((repository) => repository.url), [
         RuleRepositoryList.officialUrl,
         RuleRepositoryList.personalUrl,
@@ -200,7 +206,8 @@ void main() {
 
       expect(decoded, hasLength(3));
       expect(decoded.first.isOfficial, isTrue);
-      expect(decoded.first.enabled, isTrue);
+      // 补回来的内置仓库沿用默认档位：官方默认关闭，不会因补回而被动开启。
+      expect(decoded.first.enabled, isFalse);
       expect(decoded.last.url, 'https://example.com/a/');
     });
 

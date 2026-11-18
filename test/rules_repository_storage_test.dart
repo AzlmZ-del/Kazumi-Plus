@@ -43,7 +43,8 @@ void main() {
       expect(repositories, hasLength(2));
       expect(repositories.first.isOfficial, isTrue);
       expect(repositories.last.isPersonal, isTrue);
-      expect(repositories.every((repository) => repository.enabled), isTrue);
+      expect(repositories.first.enabled, isFalse);
+      expect(repositories.last.enabled, isTrue);
     });
 
     test('reads what save() wrote', () async {
