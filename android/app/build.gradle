@@ -104,19 +104,31 @@ flutter {
 
 dependencies {}
 
-// F-droid splits APKs by ABI, and requires different versionCode for each ABI.
-// For flutter version X.Y.Z, version code is X0Y0ZA, where A is the ABI code.
-// See:
-// * https://developer.android.com/build/gradle-tips
-// * https://developer.android.com/studio/build/configure-apk-splits
-// * https://gitlab.com/fdroid/fdroiddata/-/blob/master/metadata/im.nfc.nfsee.yml
+// 正式版 versionCode 只取 pubspec.yaml 的 +NNNNN（2.6.3 → 20603），CI 的
+// split-per-abi 包与之一一对应。本机测试包在此之上追加 ABI 编号
+// （arm64 → 206032），便于同机区分测试包与正式包，也避免互相覆盖。
 ext.abiCodes = ["armeabi-v7a": 1, "arm64-v8a": 2, "x86_64": 4]
+def testAbiCodes = [
+    'android-arm'  : 1,
+    'android-arm64': 2,
+    'android-x64'  : 4,
+]
+def isTestBuild =
+    (project.findProperty('kazumiTestBuild') ?: 'false').toString().toBoolean()
 import com.android.build.OutputFile
 android.applicationVariants.all { variant ->
     variant.outputs.each { output ->
-        def abiVersionCode = project.ext.abiCodes.get(output.getFilter(OutputFile.ABI))
-        if (abiVersionCode != null) {
-            output.versionCodeOverride = variant.versionCode * 10 + abiVersionCode
+        if (isTestBuild) {
+            def abiCode = project.ext.abiCodes.get(output.getFilter(OutputFile.ABI))
+            // 不 split 时 output 没有 ABI filter，只能从 target-platform 反推。
+            if (abiCode == null) {
+                abiCode = testAbiCodes[
+                    (project.findProperty('target-platform') ?: '').toString()
+                ]
+            }
+            if (abiCode != null) {
+                output.versionCodeOverride = variant.versionCode * 10 + abiCode
+            }
         }
     }
 }
