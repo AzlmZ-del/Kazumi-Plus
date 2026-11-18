@@ -34,6 +34,23 @@ class BangumiApi {
   static final AsyncRateLimiter _writeRateLimiter =
       AsyncRateLimiter(const Duration(milliseconds: 250));
 
+  // 只重试连接类瞬时故障；HTTP/证书/取消/解析错误重试不会自行恢复。
+  static Future<List<BangumiItem>> _fetchInitialList(
+      Future<List<BangumiItem>> Function() fetch) async {
+    try {
+      return await fetch();
+    } on NetworkException catch (e) {
+      if (e.type != NetworkExceptionType.connectionError &&
+          e.type != NetworkExceptionType.connectionTimeout &&
+          e.type != NetworkExceptionType.receiveTimeout &&
+          e.type != NetworkExceptionType.sendTimeout) {
+        rethrow;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      return await fetch();
+    }
+  }
+
   static Future<List<List<BangumiItem>>> getCalendar() async {
     List<List<BangumiItem>> bangumiCalendar = [];
     try {
@@ -201,17 +218,22 @@ class BangumiApi {
       'limit': limit,
       'offset': offset,
     };
-    try {
+    Future<List<BangumiItem>> fetch() async {
       final jsonData = await _client.get(
         ApiEndpoints.bangumiAPINextDomain + ApiEndpoints.bangumiTrendsNext,
         queryParameters: params,
       );
       final jsonList = jsonData['data'];
+      final result = <BangumiItem>[];
       for (dynamic jsonItem in jsonList) {
         if (jsonItem is Map<String, dynamic>) {
-          bangumiList.add(BangumiItem.fromJson(jsonItem['subject']));
+          result.add(BangumiItem.fromJson(jsonItem['subject']));
         }
       }
+      return result;
+    }
+    try {
+      bangumiList = offset == 0 ? await _fetchInitialList(fetch) : await fetch();
     } catch (e) {
       KazumiLogger().e('Network: resolve bangumi trends list failed', error: e);
     }
@@ -239,7 +261,7 @@ class BangumiApi {
     int offset = 0,
   }) async {
     List<BangumiItem> bangumiList = [];
-    try {
+    Future<List<BangumiItem>> fetch() async {
       final jsonData = await _client.get(
         ApiEndpoints.bangumiMirrorDomain +
             buildBangumiMirrorPopularPath(
@@ -249,11 +271,16 @@ class BangumiApi {
             ),
       );
       final jsonList = jsonData is List ? jsonData : jsonData['data'];
+      final result = <BangumiItem>[];
       for (dynamic jsonItem in jsonList) {
         if (jsonItem is Map<String, dynamic>) {
-          bangumiList.add(BangumiItem.fromJson(jsonItem));
+          result.add(BangumiItem.fromJson(jsonItem));
         }
       }
+      return result;
+    }
+    try {
+      bangumiList = offset == 0 ? await _fetchInitialList(fetch) : await fetch();
     } catch (e) {
       KazumiLogger()
           .e('Network: resolve bangumi mirror popular list failed', error: e);
