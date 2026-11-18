@@ -38,6 +38,7 @@ class _AppWidgetState extends State<AppWidget>
   bool _isHandlingWindowClose = false;
   bool _didApplyStoredThemeSettings = false;
   Brightness? _lastTitleBarBrightness;
+  StreamSubscription<void>? _settingsReloaded;
 
   @override
   void initState() {
@@ -92,6 +93,7 @@ class _AppWidgetState extends State<AppWidget>
 
   @override
   void dispose() {
+    _settingsReloaded?.cancel();
     trayManager.removeListener(this);
     windowManager.removeListener(this);
     WidgetsBinding.instance.removeObserver(this);
@@ -101,6 +103,17 @@ class _AppWidgetState extends State<AppWidget>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    // 恢复本地备份会整箱替换设置，主题、字号等要当场重读，不然只能重启生效。
+    // 订阅放在这里而不是 initState：初始化阶段还拿不到 ThemeProvider。
+    _settingsReloaded ??= GStorage.settingsReloaded.listen((_) {
+      if (!mounted) return;
+      final provider = context.read<ThemeProvider>();
+      // 清掉一次性守卫，再按存储重新应用主题与字体，并重建依赖主题的组件。
+      _didApplyStoredThemeSettings = false;
+      _applyStoredThemeSettings(provider);
+      _syncWindowsTitleBarBrightness(provider);
+      setState(() {});
+    });
     final themeProvider = context.watch<ThemeProvider>();
     _applyStoredThemeSettings(themeProvider);
     _syncWindowsTitleBarBrightness(themeProvider);
@@ -175,8 +188,9 @@ class _AppWidgetState extends State<AppWidget>
   void _syncWindowsTitleBarBrightness(ThemeProvider themeProvider) {
     if (!Platform.isWindows) return;
 
-    final brightness =
-        themeProvider.isEffectiveDark() ? Brightness.dark : Brightness.light;
+    final brightness = themeProvider.isEffectiveDark()
+        ? Brightness.dark
+        : Brightness.light;
     if (_lastTitleBarBrightness == brightness) return;
 
     _lastTitleBarBrightness = brightness;
@@ -224,13 +238,10 @@ class _AppWidgetState extends State<AppWidget>
 
         action = result.action;
         if (result.rememberChoice) {
-          await GStorage.putSetting(
-            SettingsKeys.exitBehavior,
-            switch (action) {
-              ExitDialogAction.exit => 0,
-              ExitDialogAction.minimizeToTray => 1,
-            },
-          );
+          await GStorage.putSetting(SettingsKeys.exitBehavior, switch (action) {
+            ExitDialogAction.exit => 0,
+            ExitDialogAction.minimizeToTray => 1,
+          });
         }
       }
 
@@ -250,11 +261,13 @@ class _AppWidgetState extends State<AppWidget>
   void didChangeAppLifecycleState(AppLifecycleState state) async {
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.paused) {
-      KazumiLogger()
-          .i("AppLifecycleState.paused: Application moved to background");
+      KazumiLogger().i(
+        "AppLifecycleState.paused: Application moved to background",
+      );
     } else if (state == AppLifecycleState.resumed) {
-      KazumiLogger()
-          .i("AppLifecycleState.resumed: Application moved to foreground");
+      KazumiLogger().i(
+        "AppLifecycleState.resumed: Application moved to foreground",
+      );
       await MeteredNetworkService.refresh();
     } else if (state == AppLifecycleState.inactive) {
       KazumiLogger().i("AppLifecycleState.inactive: Application is inactive");
@@ -266,7 +279,8 @@ class _AppWidgetState extends State<AppWidget>
     super.didChangePlatformBrightness();
     final ThemeProvider themeProvider = context.read<ThemeProvider>();
     KazumiLogger().i(
-        "Platform brightness changed, themeMode: ${themeProvider.themeMode}");
+      "Platform brightness changed, themeMode: ${themeProvider.themeMode}",
+    );
 
     _syncWindowsTitleBarBrightness(themeProvider);
   }
@@ -303,10 +317,16 @@ class _AppWidgetState extends State<AppWidget>
           localizationsDelegates: GlobalMaterialLocalizations.delegates,
           supportedLocales: const [
             Locale.fromSubtags(
-                languageCode: 'zh', scriptCode: 'Hans', countryCode: "CN")
+              languageCode: 'zh',
+              scriptCode: 'Hans',
+              countryCode: "CN",
+            ),
           ],
           locale: const Locale.fromSubtags(
-              languageCode: 'zh', scriptCode: 'Hans', countryCode: "CN"),
+            languageCode: 'zh',
+            scriptCode: 'Hans',
+            countryCode: "CN",
+          ),
           theme: lightTheme,
           darkTheme: effectiveDarkTheme,
           themeMode: themeProvider.themeMode,

@@ -64,6 +64,18 @@ class _WebDavServerCardState extends State<WebDavServerCard> {
   @override
   void initState() {
     super.initState();
+    _loadFromStorage();
+    // 恢复本地备份会把账号信息整份换掉，输入框与「已配置」状态要跟着重读。
+    _settingsReloaded = GStorage.settingsReloaded.listen((_) {
+      if (!mounted) return;
+      setState(_loadFromStorage);
+    });
+  }
+
+  StreamSubscription<void>? _settingsReloaded;
+
+  /// 表单内容只从存储读一次；恢复备份或其它入口改了设置时重新调用。
+  void _loadFromStorage() {
     _url.text = GStorage.getSetting(SettingsKeys.webDavURL);
     _username.text = GStorage.getSetting(SettingsKeys.webDavUsername);
     _password.text = GStorage.getSetting(SettingsKeys.webDavPassword);
@@ -71,6 +83,7 @@ class _WebDavServerCardState extends State<WebDavServerCard> {
 
   @override
   void dispose() {
+    _settingsReloaded?.cancel();
     _tileController.dispose();
     _url.dispose();
     _username.dispose();
@@ -184,10 +197,7 @@ class _WebDavServerCardState extends State<WebDavServerCard> {
           child: Container(
             width: 8,
             height: 8,
-            decoration: BoxDecoration(
-              color: dotColor,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
           ),
         ),
         if (label.isNotEmpty) ...[

@@ -66,6 +66,18 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
   @override
   void initState() {
     super.initState();
+    _loadFromStorage();
+    // 恢复本地备份会整份换掉账号信息，界面要按新 cookie 重读。
+    _settingsReloaded = GStorage.settingsReloaded.listen((_) {
+      if (!mounted) return;
+      setState(_loadFromStorage);
+    });
+  }
+
+  StreamSubscription<void>? _settingsReloaded;
+
+  /// 按存储里的账号信息刷新本卡状态；首帧与「恢复备份后」共用同一条路径。
+  void _loadFromStorage() {
     // 「登录并保存」会把账号密码记下来，下次进来直接回填，不用再敲一遍。
     _emailController.text = _session.savedEmail;
     _passwordController.text = _session.savedPassword;
@@ -92,6 +104,11 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
       } else {
         _validate();
       }
+    } else {
+      // 恢复到的备份里没有网页登录：把上一份登录痕迹清干净，别继续显示旧账号。
+      _loggedIn = false;
+      _expired = false;
+      _nickname = '';
     }
     // 验证码不在这里预取：卡片默认收起，`_ensureCaptcha` 会自己判定
     // 「折叠就不请求」，等用户真的展开（`onExpansionChanged`）时再拉。
@@ -112,6 +129,7 @@ class _BangumiWebLoginCardState extends State<BangumiWebLoginCard> {
 
   @override
   void dispose() {
+    _settingsReloaded?.cancel();
     _tileController.dispose();
     _emailController.dispose();
     _passwordController.dispose();

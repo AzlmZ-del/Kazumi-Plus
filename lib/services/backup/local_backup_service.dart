@@ -11,6 +11,8 @@ import 'package:kazumi/services/backup/local_backup_items.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/services/security/credential_cipher.dart';
 import 'package:kazumi/services/storage/storage.dart';
+import 'package:kazumi/services/sync/bangumi_sync_service.dart';
+import 'package:kazumi/services/sync/bangumi_web_session.dart';
 import 'package:kazumi/services/sync/webdav.dart';
 import 'package:kazumi/utils/async_serial_queue.dart';
 import 'package:kazumi/utils/file_system.dart';
@@ -41,19 +43,22 @@ class LocalBackupRestoreResult {
   final List<String> done;
   final List<String> missing;
 
-  /// 恢复里含「应用设置」时为真：主题、语言、字号等已写入，但要重启才全量生效。
+  /// 恢复里含「应用设置」时为真。
+  ///
+  /// 曾经用来提示「需要重启」；现在 [GStorage.restoreSettingsBox] 会广播
+  /// `settingsReloaded`，主题与字体当场重读，这个标记只保留语义、不再附加重启文案。
   final bool requiresRestart;
 
   bool get hasMissing => missing.isNotEmpty;
 
   /// 结果描述（不含「已恢复」前缀，前缀由调用方拼）。
-  /// 形如 `观看记录（未找到：收藏列表）`，含设置时再追加重启提示。
+  /// 形如 `观看记录（未找到：收藏列表）`；含设置时补一句已当场生效。
   String get detail {
     final restored = done.join('、');
     final base = missing.isEmpty
         ? restored
         : '$restored（未找到：${missing.join('、')}）';
-    return requiresRestart ? '$base。设置已还原，重启应用后全部生效' : base;
+    return requiresRestart ? '$base。设置已还原并立即生效' : base;
   }
 }
 
@@ -136,7 +141,9 @@ class LocalBackupService {
     GStorage.onCollectChanged = _onCollectChanged;
   }
 
-  static const Set<LocalBackupSection> _shieldOnly = {LocalBackupSection.shield};
+  static const Set<LocalBackupSection> _shieldOnly = {
+    LocalBackupSection.shield,
+  };
   static const Set<LocalBackupSection> _collectOnly = {
     LocalBackupSection.collect,
   };
@@ -296,9 +303,7 @@ class LocalBackupService {
       throw const LocalBackupException('请填写备份目录的完整路径');
     }
     if (!path.isAbsolute(target)) {
-      throw const LocalBackupException(
-        '请填写完整路径，例如 /storage/emulated/0/Kazumi',
-      );
+      throw const LocalBackupException('请填写完整路径，例如 /storage/emulated/0/Kazumi');
     }
     await _applyDirectory(target);
     return target;
@@ -323,7 +328,10 @@ class LocalBackupService {
     try {
       await ensureDirectoryWritable(target);
     } catch (e) {
-      KazumiLogger().w('LocalBackup: directory not writable: $target', error: e);
+      KazumiLogger().w(
+        'LocalBackup: directory not writable: $target',
+        error: e,
+      );
       throw const LocalBackupException('这个目录无法写入，请检查路径是否正确、是否有访问权限');
     }
     await _persistAccess(target);
@@ -346,8 +354,9 @@ class LocalBackupService {
         GStorage.getSetting(SettingsKeys.localBackupDirectoryBookmark),
         isDirectory: true,
       );
-      _accessLost =
-          !await _bookmarks.startAccessingSecurityScopedResource(restored);
+      _accessLost = !await _bookmarks.startAccessingSecurityScopedResource(
+        restored,
+      );
       if (!_accessLost && !path.equals(restored.path, target)) {
         await GStorage.putSetting(
           SettingsKeys.localBackupDirectory,
@@ -431,9 +440,7 @@ class LocalBackupService {
     if (!hasSelection) {
       // 跟随云端时四项都不在本地，用户看到「请先选择要备份的内容」会找不着地方改。
       throw LocalBackupException(
-        followWebDav
-            ? 'WebDAV 尚未启用任何同步内容，请先在【启用 WebDAV】里选择'
-            : '请先选择要备份的内容',
+        followWebDav ? 'WebDAV 尚未启用任何同步内容，请先在【启用 WebDAV】里选择' : '请先选择要备份的内容',
       );
     }
     final done = await _writeBackup();
@@ -535,7 +542,9 @@ class LocalBackupService {
         return true;
 
       case LocalBackupSection.settings:
-        await GStorage.exportSettingsBox(path.join(target, item.fileNames.first));
+        await GStorage.exportSettingsBox(
+          path.join(target, item.fileNames.first),
+        );
         return true;
     }
   }
@@ -685,7 +694,42 @@ class LocalBackupService {
       await GStorage.putSetting(key, value);
       restored++;
     }
+    // 凭据是逐键写回的，三个服务各自在内存里缓存了连接状态：
+    // - BangumiSyncService._verifiedToken / _username
+    // - BangumiWebSession._uid
+    // - WebDav.initialized（服务器卡片那个绿点就靠它）
+    // 不重置的话页面要继续显示恢复前的账号、灰点也要等重启才变绿。
+    final bangumi = BangumiSyncService();
+    bangumi.reloadAfterRestore();
+    BangumiWebSession().reloadAfterRestore();
+    final webDav = WebDav();
+    webDav.markDisconnected();
+    GStorage.notifySettingsReloaded();
     KazumiLogger().i('LocalBackup: credentials restored. keys=$restored');
+
+    // 恢复后主动重连，省掉用户手点「测试连接」：卡片副标题直接从
+    // 「已保存授权信息」变成「已连接 · 用户名」。
+    if (GStorage.getSetting(
+      SettingsKeys.bangumiAccessToken,
+    ).trim().isNotEmpty) {
+      try {
+        await bangumi.ping();
+      } catch (e) {
+        // 令牌可能已失效：凭据仍算恢复成功，副标题留在「已保存授权信息」。
+        KazumiLogger().w('LocalBackup: bangumi reconnect failed. $e');
+      }
+    }
+
+    // 恢复了服务器地址就顺手重连一次：让绿点当场亮起来，而不是等用户点测试连接。
+    if (GStorage.getSetting(SettingsKeys.webDavURL).trim().isNotEmpty) {
+      try {
+        await webDav.init();
+      } catch (e) {
+        // 连不上不算恢复失败：凭据已经落地，绿点保持灰/红即可。
+        KazumiLogger().w('LocalBackup: reconnect after restore failed. $e');
+      }
+      GStorage.notifySettingsReloaded();
+    }
   }
 
   Future<void> _restoreShieldRules(String filePath) async {

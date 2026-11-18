@@ -20,10 +20,7 @@ import 'package:kazumi/services/storage/storage.dart';
 /// 与【同步服务器】卡的分工一致——这里只解决「备份到哪儿」，
 /// 「备份什么」和「什么时候备份」都在下面的【启用本地备份】卡里。
 class LocalBackupDirectoryCard extends StatefulWidget {
-  const LocalBackupDirectoryCard({
-    super.key,
-    required this.onDirectoryChanged,
-  });
+  const LocalBackupDirectoryCard({super.key, required this.onDirectoryChanged});
 
   /// 目录变化后通知父级重建：下面的【启用本地备份】卡要靠它决定按钮可用态。
   final VoidCallback onDirectoryChanged;
@@ -238,9 +235,7 @@ class _LocalBackupDirectoryCardState extends State<LocalBackupDirectoryCard> {
         expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
         leading: Icon(Icons.folder_rounded, color: colors.onSurfaceVariant),
         title: const SyncCardTitle('本地备份路径'),
-        subtitle: SyncCardSubtitle(
-          configured ? directory : '尚未选择备份目录',
-        ),
+        subtitle: SyncCardSubtitle(configured ? directory : '尚未选择备份目录'),
         trailing: SyncExpandChevron(expanded: expanded),
         onExpansionChanged: (value) => setState(() => _expanded = value),
         children: [
@@ -318,11 +313,18 @@ class _LocalBackupDirectoryCardState extends State<LocalBackupDirectoryCard> {
 /// 再给动作按钮。区别只在总开关控制的是「本地备份是否启用」，
 /// 而且没有网络可连，所以只有「选好目录」这一个前置条件。
 class LocalBackupSettingsCard extends StatefulWidget {
-  const LocalBackupSettingsCard({super.key, this.onDirectoryChanged});
+  const LocalBackupSettingsCard({
+    super.key,
+    this.onDirectoryChanged,
+    this.onRestored,
+  });
 
   /// 本卡替用户选了备份目录（无目录时点备份会先选目录）后，通知页面重建
   /// 上面的【本地备份路径】卡，把新目录回填到输入框。
   final VoidCallback? onDirectoryChanged;
+
+  /// 从本地恢复成功后调用：服务器地址/账号等来自存储，需要整页重读。
+  final VoidCallback? onRestored;
 
   @override
   State<LocalBackupSettingsCard> createState() =>
@@ -425,6 +427,8 @@ class _LocalBackupSettingsCardState extends State<LocalBackupSettingsCard> {
           sourceDirectory: source,
           ignoreSelection: ignoreSelection,
         );
+        // 本卡只重建自己；同页的服务器地址与账号来自存储，得让页面整页重读。
+        widget.onRestored?.call();
         return result.detail;
       },
     );

@@ -77,9 +77,7 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
       KazumiLogger().w('WebDAV settings operation failed', error: e);
       if (mounted) {
         _failed = true;
-        _message = showBusyFeedback
-            ? '未能完成，请检查网络或服务器配置后重试。'
-            : _message;
+        _message = showBusyFeedback ? '未能完成，请检查网络或服务器配置后重试。' : _message;
       }
     } finally {
       if (mounted) setState(() => _busyAction = null);
@@ -112,11 +110,13 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
     );
   }
 
-  Future<void> _setEnabled(bool enabled) =>
-      _runAction(busyKey: 'other', action: () async {
-        await WebDav().setEnabled(enabled);
-        _message = null;
-      });
+  Future<void> _setEnabled(bool enabled) => _runAction(
+    busyKey: 'other',
+    action: () async {
+      await WebDav().setEnabled(enabled);
+      _message = null;
+    },
+  );
 
   Future<void> _syncHistory() => _runSync(
     busyKey: 'history',
@@ -248,6 +248,11 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
             ),
             LocalBackupSettingsCard(
               onDirectoryChanged: _onLocalBackupDirectoryChanged,
+              // 恢复完成后整页重读：服务器卡片的地址/账号、以及各开关的
+              // 文案都来自存储，只重建这张卡不会让它们变。
+              onRestored: () {
+                if (mounted) setState(() {});
+              },
             ),
           ],
         ),
@@ -384,28 +389,28 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
                           : '立即同步观看记录',
                       icon: Icons.sync_rounded,
                     ),
-                  SyncActionButton(
-                    onPressed: collect && _busyAction == null
-                        ? _syncCollectibles
-                        : null,
-                    text: _busyAction == 'collect' || _busyAction == 'other'
-                        ? '请稍候…'
-                        : '立即同步收藏列表',
-                    icon: Icons.sync_rounded,
-                  ),
-                  SyncActionButton(
-                    onPressed: shield && _busyAction == null
-                        ? _syncDanmakuShield
-                        : null,
-                    text: _busyAction == 'shield' || _busyAction == 'other'
-                        ? '请稍候…'
-                        : '立即同步弹幕屏蔽词',
-                    icon: Icons.sync_rounded,
-                  ),
-                ],
+                    SyncActionButton(
+                      onPressed: collect && _busyAction == null
+                          ? _syncCollectibles
+                          : null,
+                      text: _busyAction == 'collect' || _busyAction == 'other'
+                          ? '请稍候…'
+                          : '立即同步收藏列表',
+                      icon: Icons.sync_rounded,
+                    ),
+                    SyncActionButton(
+                      onPressed: shield && _busyAction == null
+                          ? _syncDanmakuShield
+                          : null,
+                      text: _busyAction == 'shield' || _busyAction == 'other'
+                          ? '请稍候…'
+                          : '立即同步弹幕屏蔽词',
+                      icon: Icons.sync_rounded,
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
           if (enabled && credentials)
             Padding(
               // 「账号信息备份」区：与上方按钮区同款 16dp 内缩，顶部 10dp 拉开。
@@ -417,9 +422,8 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
                   spacing: 10,
                   children: [
                     SyncActionButton(
-                      onPressed: configured &&
-                              _busyAction == null &&
-                              _hasAnyCredential
+                      onPressed:
+                          configured && _busyAction == null && _hasAnyCredential
                           ? _uploadCredentials
                           : null,
                       text:

@@ -417,6 +417,15 @@ class BangumiWebSession {
     }
   }
 
+  /// 从备份恢复凭据后调用：丢掉内存里的登录态，让界面按新 cookie 重读。
+  ///
+  /// 与 [logout] 不同，这里**不写存储**——存储刚被恢复流程覆盖过，再写会把
+  /// 刚恢复的 cookie 抹掉。只清 [uid] 这类进程内缓存。
+  void reloadAfterRestore() {
+    _cookies.clear();
+    _uid = 0;
+  }
+
   Future<bool> _refreshUid() async {
     // /subject/1 页面约 57 KB，比首页小得多，够用来读 CHOBITS_UID。
     final response = await _dio.get<String>(

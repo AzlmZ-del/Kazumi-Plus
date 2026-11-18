@@ -80,6 +80,16 @@ class WebDav {
 
   Future<void> init() => _runWebDavExclusive(_init);
 
+  /// 从备份恢复凭据后调用：把内存里的连接态清成「未连接」。
+  ///
+  /// 服务器卡片那个绿点读的就是 [initialized]，不清的话恢复完仍显示旧连接，
+  /// 要等重启才变。只动内存，不碰存储。
+  void markDisconnected() {
+    initialized = false;
+    _lastPingError = null;
+    _isPinging = false;
+  }
+
   Future<void> _init() async {
     initialized = false;
     var directory = await getApplicationSupportDirectory();
@@ -221,9 +231,8 @@ class WebDav {
   /// 本地是否存有任何可备份的凭据。
   ///
   /// 「立即备份」在没有任何凭据时给出明确报错，而不是往云端传一个空壳文件。
-  bool get hasAnyCredential => _credentialKeys.any(
-        (key) => GStorage.getSetting(key).trim().isNotEmpty,
-      );
+  bool get hasAnyCredential =>
+      _credentialKeys.any((key) => GStorage.getSetting(key).trim().isNotEmpty);
 
   /// 参与账号信息备份的凭据键（本地备份复用同一份清单）。
   static List<SettingKey<String>> get credentialKeys => _credentialKeys;
@@ -278,9 +287,7 @@ class WebDav {
         'cipher': 'aes-256-gcm',
         'data': CredentialCipher.encryptToBase64(jsonEncode(payload)),
       };
-      final runFile = File(
-        '${webDavLocalTempDirectory.path}/credentials.json',
-      );
+      final runFile = File('${webDavLocalTempDirectory.path}/credentials.json');
       await runFile.writeAsString(jsonEncode(envelope), flush: true);
       await _publishRemoteFile(
         sourceFilePath: runFile.path,
@@ -376,9 +383,7 @@ class WebDav {
       if (!await _remoteEntryExists(_credentialsPath)) {
         throw Exception('云端还没有账号信息备份');
       }
-      final runFile = File(
-        '${webDavLocalTempDirectory.path}/credentials.json',
-      );
+      final runFile = File('${webDavLocalTempDirectory.path}/credentials.json');
       if (await runFile.exists()) {
         await runFile.delete();
       }
@@ -390,16 +395,14 @@ class WebDav {
       if (cipher is! String || cipher.isEmpty || data is! String) {
         throw Exception('备份文件格式不正确');
       }
-      final inner = jsonDecode(
-        CredentialCipher.decryptFromBase64(data),
-      ) as Map<String, dynamic>;
+      final inner =
+          jsonDecode(CredentialCipher.decryptFromBase64(data))
+              as Map<String, dynamic>;
       final credentials = inner['credentials'];
       if (credentials is! Map<String, dynamic>) {
         throw Exception('备份文件格式不正确');
       }
-      final byName = {
-        for (final key in _credentialKeys) key.name: key,
-      };
+      final byName = {for (final key in _credentialKeys) key.name: key};
       var restored = 0;
       for (final entry in credentials.entries) {
         final key = byName[entry.key];

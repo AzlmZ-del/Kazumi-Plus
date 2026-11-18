@@ -159,8 +159,9 @@ class GStorage {
     collectibles = await _openBoxSafe<CollectedBangumi>('collectibles');
     histories = await _openBoxSafe<History>('histories');
     _setting = await _openBoxSafe<dynamic>('setting');
-    collectChanges =
-        await _openBoxSafe<CollectedBangumiChange>('collectchanges');
+    collectChanges = await _openBoxSafe<CollectedBangumiChange>(
+      'collectchanges',
+    );
     shieldList = await _openBoxSafe<String>('shieldList');
     searchHistory = await _openBoxSafe<SearchHistory>('searchHistory');
     downloads = await _openBoxSafe<DownloadRecord>('downloads');
@@ -176,8 +177,9 @@ class GStorage {
       return await Hive.openBox<T>(boxName);
     } catch (e) {
       KazumiLogger().e(
-          'GStorage: Box "$boxName" corrupted, attempting recovery',
-          error: e);
+        'GStorage: Box "$boxName" corrupted, attempting recovery',
+        error: e,
+      );
 
       // 删掉损坏的 box 文件。
       await _deleteBoxFiles(boxName);
@@ -185,12 +187,15 @@ class GStorage {
       // 再打开一次（会新建一个空 box）。
       try {
         final box = await Hive.openBox<T>(boxName);
-        KazumiLogger()
-            .i('GStorage: Box "$boxName" recovered successfully (data lost)');
+        KazumiLogger().i(
+          'GStorage: Box "$boxName" recovered successfully (data lost)',
+        );
         return box;
       } catch (e2) {
-        KazumiLogger()
-            .e('GStorage: Failed to recover box "$boxName"', error: e2);
+        KazumiLogger().e(
+          'GStorage: Failed to recover box "$boxName"',
+          error: e2,
+        );
         rethrow;
       }
     }
@@ -213,8 +218,10 @@ class GStorage {
         KazumiLogger().i('GStorage: Deleted lock file: $boxName.lock');
       }
     } catch (e) {
-      KazumiLogger()
-          .e('GStorage: Failed to delete box files for "$boxName"', error: e);
+      KazumiLogger().e(
+        'GStorage: Failed to delete box files for "$boxName"',
+        error: e,
+      );
     }
   }
 
@@ -238,8 +245,9 @@ class GStorage {
       await HistoryStorageCoordinator().run(() async {
         for (final tempBoxItem in tempBoxItems) {
           final tempHistory = tempBoxItem.value as History;
-          tempHistory.entryKind =
-              HistoryEntryKind.normalize(tempHistory.entryKind);
+          tempHistory.entryKind = HistoryEntryKind.normalize(
+            tempHistory.entryKind,
+          );
           final targetKey = tempHistory.key;
           final existing = histories.get(targetKey);
           if (existing == null ||
@@ -254,14 +262,18 @@ class GStorage {
   }
 
   static Future<List<CollectedBangumi>> getCollectiblesFromFile(
-      String backupFilePath) async {
+    String backupFilePath,
+  ) async {
     final backupFile = File(backupFilePath);
     final backupContent = await backupFile.readAsBytes();
-    final tempBox =
-        await Hive.openBox('tempCollectiblesBox', bytes: backupContent);
+    final tempBox = await Hive.openBox(
+      'tempCollectiblesBox',
+      bytes: backupContent,
+    );
     final tempBoxItems = tempBox.toMap().entries;
     KazumiLogger().i(
-        'WebDav: get collectibles from file. tempCollectiblesBox length ${tempBoxItems.length}');
+      'WebDav: get collectibles from file. tempCollectiblesBox length ${tempBoxItems.length}',
+    );
 
     final List<CollectedBangumi> collectibles = [];
     for (var tempBoxItem in tempBoxItems) {
@@ -272,14 +284,18 @@ class GStorage {
   }
 
   static Future<List<CollectedBangumiChange>> getCollectChangesFromFile(
-      String backupFilePath) async {
+    String backupFilePath,
+  ) async {
     final backupFile = File(backupFilePath);
     final backupContent = await backupFile.readAsBytes();
-    final tempBox =
-        await Hive.openBox('tempCollectChangesBox', bytes: backupContent);
+    final tempBox = await Hive.openBox(
+      'tempCollectChangesBox',
+      bytes: backupContent,
+    );
     final tempBoxItems = tempBox.toMap().entries;
     KazumiLogger().i(
-        'WebDav: get collectChanges from file. tempCollectChangesBox length ${tempBoxItems.length}');
+      'WebDav: get collectChanges from file. tempCollectChangesBox length ${tempBoxItems.length}',
+    );
 
     final List<CollectedBangumiChange> collectChanges = [];
     for (var tempBoxItem in tempBoxItems) {
@@ -290,8 +306,9 @@ class GStorage {
   }
 
   static Future<void> patchCollectibles(
-      List<CollectedBangumi> remoteCollectibles,
-      List<CollectedBangumiChange> remoteChanges) async {
+    List<CollectedBangumi> remoteCollectibles,
+    List<CollectedBangumiChange> remoteChanges,
+  ) async {
     await _runCollectChangesWriteExclusive(() async {
       final mergeResult = CollectSyncMerger.mergeWebDav(
         localCollectibles: collectibles.values.toList(),
@@ -336,7 +353,25 @@ class GStorage {
 
   static Stream<void> watchSettings(Iterable<SettingKey<Object?>> keys) {
     final names = keys.map((key) => key.name).toSet();
-    return _setting.watch().where((event) => names.contains(event.key)).map((_) {});
+    return _setting
+        .watch()
+        .where((event) => names.contains(event.key))
+        .map((_) {});
+  }
+
+  /// 整箱被替换后的通知（目前只有「从本地恢复设置」会触发）。
+  ///
+  /// 订阅方要按「设置已整体换掉」重新读一遍，而不是只看单个键的变更事件：
+  /// 恢复走的是 clear + putAll，一次性刷进去上百个键，逐键监听接不住。
+  static final _settingsReloaded = StreamController<void>.broadcast();
+
+  static Stream<void> get settingsReloaded => _settingsReloaded.stream;
+
+  /// 设置整箱已被替换，通知所有订阅方重新读取。
+  static void notifySettingsReloaded() {
+    if (!_settingsReloaded.isClosed) {
+      _settingsReloaded.add(null);
+    }
   }
 
   static List<String> getStringListSettingByName(
@@ -471,6 +506,8 @@ class GStorage {
     KazumiLogger().i(
       'GStorage: settings restored. keys=${entries.length} total=${merged.length}',
     );
+    // 整箱换过之后逐键监听接不住，让界面自己重新读设置（主题、字号等）。
+    notifySettingsReloaded();
     return entries.length;
   }
 
@@ -502,6 +539,7 @@ class GStorage {
       KazumiLogger().w('GStorage: failed to remove temp dir', error: e);
     }
   }
+
   static Future<void> resetDanmakuSettings() async {
     await resetSettings(SettingsKeys.byGroup(SettingGroup.danmaku));
   }
