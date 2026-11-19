@@ -40,6 +40,12 @@ class CreditsPage extends StatelessWidget {
                   url: ApiEndpoints.bangumiIndex,
                 ),
                 AboutLinkTile(
+                  icon: Icons.event_note_rounded,
+                  title: 'bangumi-data',
+                  subtitle: '放送时刻与平台 · CC BY 4.0',
+                  url: ApiEndpoints.bangumiDataIndex,
+                ),
+                AboutLinkTile(
                   icon: Icons.subtitles_rounded,
                   title: '弹弹play',
                   subtitle: '弹幕',

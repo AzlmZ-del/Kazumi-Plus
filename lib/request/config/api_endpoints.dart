@@ -81,6 +81,10 @@ class ApiEndpoints {
   /// Bangumi 官网
   static const String bangumiIndex = 'https://bangumi.tv/';
 
+  /// bangumi-data 数据集（CC BY 4.0，时间表的放送时刻与平台来源）
+  static const String bangumiDataIndex =
+      'https://github.com/bangumi-data/bangumi-data';
+
   /// Bangumi API 地址。
   static const String bangumiAPIDomain = 'https://api.bgm.tv';
 
