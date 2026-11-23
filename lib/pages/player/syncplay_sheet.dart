@@ -14,7 +14,7 @@ import 'package:kazumi/services/player/syncplay_endpoint.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/utils/device.dart';
 
-// 每一步都先关掉上一步再开下一步，避免模态路由层层堆叠。
+// Close each step before opening the next to avoid stacked modal routes.
 enum _SyncPlayDestination { create, join, server }
 
 Future<void> showSyncPlaySheet(
@@ -163,12 +163,12 @@ class _SyncPlayHomeSheet extends StatelessWidget {
     final ColorScheme colorScheme = Theme.of(context).colorScheme;
 
     return Observer(builder: (context) {
-      // 可观察值要在这里全部读出来：延迟执行的 body builder 不在追踪范围内。
+      // Read all observables here; the deferred body builder is not tracked.
       final bool hasSession = playerController.syncplay.hasSession;
       final String room = playerController.syncplay.syncplayRoom;
       final int rtt = playerController.syncplay.syncplayClientRtt;
       final bool connected = room.isNotEmpty;
-      // 连接期间锁住服务器选择，即使还没加入房间。
+      // Lock server selection while connected, even before joining a room.
       final bool connecting = hasSession && !connected;
 
       return _SyncPlaySheetScaffold(
@@ -597,7 +597,7 @@ class _SyncPlayServerSheetState extends State<_SyncPlayServerSheet> {
   late String _selectedEndPoint;
   String? _customEndPointError;
 
-  // 只有用户明确选了自定义服务器之后才请求键盘焦点。
+  // Request keyboard focus only after an explicit custom-server selection.
   bool _focusCustomEndPoint = false;
 
   @override
@@ -652,7 +652,9 @@ class _SyncPlayServerSheetState extends State<_SyncPlayServerSheet> {
           children: [
             SplitListGroup(children: [
               for (final endPoint in endPoints)
-                _buildEndPointTile(context, endPoint),
+                Builder(
+                  builder: (context) => _buildEndPointTile(context, endPoint),
+                ),
             ]),
             if (_selectedEndPoint == _customOption) ...[
               const SizedBox(height: 16),
@@ -686,6 +688,7 @@ class _SyncPlayServerSheetState extends State<_SyncPlayServerSheet> {
     final bool isCustom = endPoint == _customOption;
 
     return ListTile(
+      statesController: SplitListRow.statesOf(context),
       contentPadding: const EdgeInsets.symmetric(horizontal: 18),
       leading: Icon(
         isCustom ? Icons.edit_outlined : Icons.public_rounded,
