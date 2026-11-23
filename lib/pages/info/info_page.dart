@@ -60,7 +60,8 @@ class _InfoPageState extends State<InfoPage>
   late final TabController infoTabController;
   late final bool showRating;
 
-  /// 直连/ECH 模式下 R18 条目的剧集只对已登录用户开放；镜像不受影响。
+  /// Episodes of R18 entries are gated to signed-in users on direct/ECH routes;
+  /// mirrors are unaffected.
   bool get _episodesRequireLogin =>
       infoController.bangumiItem.nsfw &&
       BangumiAcceleration.current != BangumiAcceleration.mirror &&
@@ -72,7 +73,7 @@ class _InfoPageState extends State<InfoPage>
   bool commentsIsLoading = false;
   bool charactersIsLoading = false;
 
-  /// 标题栏显示的番剧名（中文名优先）。
+  /// Title shown in the app bar, preferring the Chinese name.
   String get _displayTitle => infoController.bangumiItem.nameCn.trim().isEmpty
       ? infoController.bangumiItem.name
       : infoController.bangumiItem.nameCn;
@@ -213,13 +214,11 @@ class _InfoPageState extends State<InfoPage>
     }
     final editing =
         infoController.bangumiItem.interest?.hasReviewContent ?? false;
-    final submitted = await KazumiDialog.show<bool>(
-      context: context,
-      builder: (context) => RatingReviewDialog(
-        bangumiItem: infoController.bangumiItem,
-        onSubmit: (review) =>
-            infoController.rateBangumi(review, localType: localType),
-      ),
+    final submitted = await showRatingReviewDialog(
+      context,
+      bangumiItem: infoController.bangumiItem,
+      onSubmit: (review) =>
+          infoController.rateBangumi(review, localType: localType),
     );
     if (submitted == true && mounted) {
       setState(() {});
@@ -315,7 +314,7 @@ class _InfoPageState extends State<InfoPage>
   Future<void> _loadBangumiInfo() async {
     final loadingStartedAt = DateTime.now();
     try {
-      // 只补元信息，不替换已渲染的图片地址，避免图片重新加载。
+      // Attach metadata without replacing rendered image URLs.
       await infoController.queryBangumiInfoByID(
         infoController.bangumiItem.id,
         type: 'attach',
