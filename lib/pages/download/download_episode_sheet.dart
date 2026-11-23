@@ -68,7 +68,7 @@ class _DownloadEpisodeSheetState extends State<DownloadEpisodeSheet> {
         _selectedEpisodes.length == selectableEpisodes.length;
 
     return LayoutBuilder(builder: (context, constraints) {
-      // 窗口再矮也要留出标题、操作栏和一行剧集的空间。
+      // Reserve header, actions and one episode row even on short windows.
       final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
       final minSize = (240 * math.max(1.0, textScale) / constraints.maxHeight)
           .clamp(0.3, 1.0);
@@ -168,7 +168,7 @@ class _DownloadEpisodeSheetState extends State<DownloadEpisodeSheet> {
                                   }
                                 });
                               },
-                        // 用最宽的那个文案占位，按钮宽度才不会来回变。
+                        // Reserve the widest label to keep the action width stable.
                         child: Stack(
                           alignment: Alignment.center,
                           children: [
@@ -304,8 +304,8 @@ class _EpisodeTile extends StatelessWidget {
                 )
               else
                 Positioned(
-                  top: 4,
-                  right: 4,
+                  top: 8,
+                  right: 8,
                   child: AnimatedScale(
                     scale: isSelected ? 1 : 0,
                     duration: const Duration(milliseconds: 250),
