@@ -14,7 +14,7 @@ class HistoryRecordTile extends StatelessWidget {
     required this.onDelete,
     required this.collectType,
     required this.onChangeCollect,
-    this.borderRadius = const BorderRadius.all(Radius.circular(24)),
+    required this.borderRadius,
     this.editing = false,
     this.busy = false,
   });
@@ -63,7 +63,7 @@ class HistoryRecordTile extends StatelessWidget {
       key: ValueKey(history.key),
       direction:
           busy || editing ? DismissDirection.none : DismissDirection.endToStart,
-      // 由父级负责把已删除的记录移出列表；写盘失败时这一行仍然可用。
+      // The parent removes saved deletions; failed writes keep the row usable.
       confirmDismiss: (_) async {
         await onDelete();
         return false;
@@ -82,7 +82,7 @@ class HistoryRecordTile extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: Stack(
           children: [
-            // 菜单的焦点要放在卡片的 InkWell 之外，否则高亮会卡住不消失。
+            // Keep menu focus outside the card's InkWell to prevent stuck highlights.
             Positioned.fill(
               child: Semantics(
                 button: !editing && !busy,

@@ -9,13 +9,10 @@ import 'package:kazumi/bean/widget/split_list_row.dart';
 import 'package:kazumi/services/network/image_saver.dart';
 import 'package:kazumi/utils/device.dart';
 
-/// 弹出「保存图片」卡片，选完格式直接落盘。
+/// Opens the save-image sheet; the picked format is written straight away.
 ///
-/// 全屏预览的长按与详情页封面的长按共用这一处，避免两份菜单各写一遍。
-/// 卡片用底部弹层而不是贴着手指的气泡：手机与桌面同一套，长按位置也不挑剔。
-///
-/// [label] 是弹层标题里的对象名（`封面` / `图片`），会拼上分辨率；
-/// [fileBaseName] 是不带扩展名的文件名，扩展名由真实图片格式决定。
+/// [label] names the object in the title and gets the resolution appended,
+/// [fileBaseName] omits the extension since the image format decides it.
 Future<void> showImageSaveSheet(
   BuildContext context, {
   required String imageUrl,
@@ -27,12 +24,12 @@ Future<void> showImageSaveSheet(
     return;
   }
 
-  // 尺寸要下载完才知道，弹层不等人：先出标题与按钮，信息到了再补。
+  // The size is unknown until the download ends, so details land after the sheet.
   final info = ValueNotifier<ImageFileInfo?>(null);
   var sheetOpen = true;
   unawaited(() async {
     final described = await ImageSaver.describe(imageUrl);
-    // 弹层可能已经被关掉甚至销毁，晚到的信息不能再写进已释放的 notifier。
+    // The sheet may already be disposed: late data must not reach its notifier.
     if (described == null || !sheetOpen || !context.mounted) return;
     info.value = described;
   }());
@@ -44,10 +41,8 @@ Future<void> showImageSaveSheet(
       builder: (context, described, _) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 标题自带分辨率：`图片（1366 × 1948）`。
-          // 不用 MaterialBottomSheetHeader——它固定 titleLarge(22pt)，
-          // 加上分辨率会换行撑成两排，而那个组件还被十几个弹层共用，
-          // 不为这一处调全局字号。
+          // Not MaterialBottomSheetHeader: its fixed titleLarge (22pt) wraps once the
+          // resolution is appended, and a dozen sheets share that component.
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 0, 8, 8),
             child: Row(
@@ -107,7 +102,7 @@ Future<void> showImageSaveSheet(
     ),
   );
 
-  // 先关标志再释放，避免异步回调抢在中间写进已释放的 notifier。
+  // Clear the flag first: an async callback must not write to a released notifier.
   sheetOpen = false;
   info.dispose();
   if (!context.mounted || format == null) return;
@@ -119,12 +114,9 @@ Future<void> showImageSaveSheet(
   );
 }
 
-/// 保存卡片里的一行，样式对齐设置页的 `_TileLabel`：
-/// 主标题 bodyLarge + onSurface，副标题 bodySmall + onSurfaceVariant，
-/// 图标 24、间距 16、标题与副标题之间空 2。
-///
-/// 不复用 ListTile：它的 title/subtitle 走 ListTileTheme 的字号，
-/// 和设置卡片对不上，之前这里就比设置页大一档。
+/// One row inside the save sheet, styled after the settings page `_TileLabel`:
+/// `bodyLarge` title, `bodyMedium` subtitle. `ListTile` is not reused because its
+/// theme sizes sit one step larger than those cards.
 class _SaveOptionTile extends StatelessWidget {
   const _SaveOptionTile({
     required this.icon,
@@ -145,13 +137,13 @@ class _SaveOptionTile extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      onHighlightChanged: SplitListRow.pressReporterOf(context),
+      statesController: SplitListRow.statesOf(context),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
           children: [
             Icon(icon, size: 24, color: colorScheme.onSurfaceVariant),
-            const SizedBox(width: 16),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -165,7 +157,7 @@ class _SaveOptionTile extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     description,
-                    style: textTheme.bodySmall?.copyWith(
+                    style: textTheme.bodyMedium?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
                   ),
@@ -179,7 +171,7 @@ class _SaveOptionTile extends StatelessWidget {
   }
 }
 
-/// 按指定格式保存一张网络图片，并提示结果。
+/// Saves a network image in the given format and reports the result.
 Future<void> saveImageFromUrl(
   BuildContext context, {
   required String imageUrl,

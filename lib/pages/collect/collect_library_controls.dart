@@ -16,8 +16,8 @@ class _CollectCategories extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    // 插值出来的字重每帧都是新的字体实例，所以这里只用 w500 常量字重——
-    // TabBar 只对颜色做过渡，选中项在切换时一次性变粗。
+    // Each lerped weight is a new font instance, so TabBar animates only the
+    // color and the selected label turns bold once per category change.
     final labelStyle =
         theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500);
     return TabBar(
@@ -78,53 +78,20 @@ class _CollectLayoutSwitch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      spacing: 2,
-      children: [
+    return ConnectedButtonGroup<CollectLayout>(
+      expanded: false,
+      segments: [
         for (final layout in [CollectLayout.cards, CollectLayout.list])
-          Semantics(
-            selected: value == layout,
-            inMutuallyExclusiveGroup: true,
-            child: IconButton.filledTonal(
-              tooltip: '${layout.label}布局',
-              isSelected: value == layout,
-              onPressed: () => onChanged(layout),
-              style: ButtonStyle(
-                minimumSize: const WidgetStatePropertyAll(Size(48, 48)),
-                visualDensity: VisualDensity.standard,
-                backgroundColor: WidgetStateProperty.resolveWith((states) =>
-                    states.contains(WidgetState.selected)
-                        ? colors.secondaryContainer
-                        : colors.surfaceContainerLow),
-                foregroundColor: WidgetStateProperty.resolveWith((states) =>
-                    states.contains(WidgetState.selected)
-                        ? colors.onSecondaryContainer
-                        : colors.onSurfaceVariant),
-                shape: WidgetStateProperty.resolveWith((states) =>
-                    RoundedRectangleBorder(
-                      borderRadius: states.contains(WidgetState.pressed)
-                          ? BorderRadius.circular(12)
-                          : states.contains(WidgetState.selected)
-                              ? BorderRadius.circular(24)
-                              : BorderRadiusDirectional.horizontal(
-                                  start: Radius.circular(
-                                      layout == CollectLayout.cards ? 24 : 8),
-                                  end: Radius.circular(
-                                      layout == CollectLayout.list ? 24 : 8),
-                                ),
-                    )),
-                animationDuration: MediaQuery.disableAnimationsOf(context)
-                    ? Duration.zero
-                    : const Duration(milliseconds: 200),
-              ),
-              icon: Icon(layout == CollectLayout.list
-                  ? Icons.view_list_rounded
-                  : Icons.grid_view_rounded),
-            ),
+          ButtonSegment(
+            value: layout,
+            tooltip: '${layout.label}布局',
+            icon: Icon(layout == CollectLayout.list
+                ? Icons.view_list_rounded
+                : Icons.grid_view_rounded),
           ),
       ],
+      selected: value,
+      onSelected: onChanged,
     );
   }
 }

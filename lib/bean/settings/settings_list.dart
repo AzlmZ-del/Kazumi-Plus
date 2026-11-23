@@ -127,7 +127,7 @@ class _TileLabel extends StatelessWidget {
       children: [
         if (leading != null) ...[
           Icon(leading, size: 24, color: secondary),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
         ],
         Expanded(
           child: Column(
@@ -138,13 +138,11 @@ class _TileLabel extends StatelessWidget {
                 style: textTheme.bodyLarge?.copyWith(color: foreground),
                 child: title,
               ),
-              if (description != null) ...[
-                const SizedBox(height: 2),
+              if (description != null)
                 DefaultTextStyle.merge(
-                  style: textTheme.bodySmall?.copyWith(color: secondary),
+                  style: textTheme.bodyMedium?.copyWith(color: secondary),
                   child: description!,
                 ),
-              ],
             ],
           ),
         ),
@@ -173,9 +171,9 @@ class SettingsCategoryTile extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     return InkWell(
       onTap: onTap,
-      onHighlightChanged: SplitListRow.pressReporterOf(context),
+      statesController: SplitListRow.statesOf(context),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
           children: [
             Container(
@@ -191,16 +189,15 @@ class SettingsCategoryTile extends StatelessWidget {
                 color: colorScheme.onSecondaryContainer,
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(title, style: textTheme.bodyLarge),
-                  const SizedBox(height: 2),
                   Text(
                     description,
-                    style: textTheme.bodySmall
+                    style: textTheme.bodyMedium
                         ?.copyWith(color: colorScheme.onSurfaceVariant),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -311,7 +308,7 @@ class SettingsTile<T> extends StatelessWidget {
         initialValue = null,
         radioValue = null;
 
-  /// 点整行时 [onToggle] 收到 null，拨开关时收到新值。
+  /// Row taps pass null to [onToggle]; switch gestures pass the new value.
   const SettingsTile.switchTile({
     super.key,
     required this.title,
@@ -377,12 +374,11 @@ class SettingsTile<T> extends StatelessWidget {
 
     return InkWell(
       onTap: _tapHandler(context),
-      onHighlightChanged: SplitListRow.pressReporterOf(context),
+      statesController: SplitListRow.statesOf(context),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: ConstrainedBox(
-          // 42 = 标题 + 一行描述，让行高稳定在 66dp；开关等行内控件不再决定行高。
-          constraints: const BoxConstraints(minHeight: 42),
+          constraints: BoxConstraints(minHeight: description == null ? 36 : 52),
           child: Row(
             children: [
               Expanded(
@@ -412,9 +408,9 @@ class SettingsTile<T> extends StatelessWidget {
                 Switch(
                   value: initialValue ?? false,
                   onChanged: enabled ? onToggle : null,
-                  // 默认左右各 4dp 透明内边距，会让开关轨道比卡头里的开关偏左。
+                  // M3's 4dp side padding shifts the track off the header switch.
                   padding: EdgeInsets.zero,
-                  // padded 触摸目标会把盒子撑到 48dp、比文本块高 6dp；整行可点，收掉不损点击。
+                  // A padded target inflates the box to 48dp; the row is tappable anyway.
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
               ],

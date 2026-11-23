@@ -5,6 +5,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 
+import 'package:kazumi/bean/widget/expressive_motion.dart';
+
 BoxConstraints _adaptiveBottomSheetConstraints(
   BuildContext context, {
   required double maxHeightFactor,
@@ -31,7 +33,7 @@ const ShapeBorder _materialSheetShape = RoundedRectangleBorder(
   borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
 );
 
-// 路由自带动画与表层入场弹簧是两套独立运动，这里只配路由那一套。
+// Native route motion and the extra surface entrance spring are separate.
 const AnimationStyle _materialSheetAnimationStyle = AnimationStyle(
   duration: Duration(milliseconds: 250),
   reverseDuration: Duration(milliseconds: 200),
@@ -49,7 +51,7 @@ Future<T?> showAdaptiveBottomSheet<T>({
 }) {
   return showModalBottomSheet<T>(
     context: context,
-    // 手柄与背景都交给自绘 surface，这里清空默认样式，避免叠出第二层圆角帽。
+    // A single surface owns the handle and background to avoid a second cap.
     backgroundColor: Colors.transparent,
     elevation: 0,
     shape: const RoundedRectangleBorder(),
@@ -98,11 +100,7 @@ class _MaterialSheetSurfaceState extends State<_MaterialSheetSurface>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || MediaQuery.disableAnimationsOf(context)) return;
         _entrance.animateWith(SpringSimulation(
-          SpringDescription.withDampingRatio(
-            mass: 1,
-            stiffness: 380,
-            ratio: 0.8,
-          ),
+          ExpressiveMotion.defaultSpatial,
           0,
           1,
           0,
@@ -144,13 +142,13 @@ class _MaterialSheetSurfaceState extends State<_MaterialSheetSurface>
                     MaterialLocalizations.of(context).modalBarrierDismissLabel,
                 onDismiss: () => Navigator.of(context).maybePop(),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 22),
                   child: Center(
                     child: Container(
                       width: 32,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: colors.onSurfaceVariant.withValues(alpha: 0.4),
+                        color: colors.onSurfaceVariant,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -168,7 +166,7 @@ class _MaterialSheetSurfaceState extends State<_MaterialSheetSurface>
       clipBehavior: Clip.none,
       alignment: Alignment.topCenter,
       children: [
-        // 弹簧回弹过冲时会露出底部空隙，用一块向下延伸 400 的色块盖住。
+        // Cover the bottom gap during spring overshoot.
         Positioned(
           left: 0,
           right: 0,

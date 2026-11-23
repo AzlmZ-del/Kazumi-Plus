@@ -1,5 +1,8 @@
 part of 'source_sheet.dart';
 
+const _expandDuration = Duration(milliseconds: 250);
+const _expandCurve = Curves.easeInOutCubic;
+
 class _SourceSearchGroup {
   const _SourceSearchGroup({
     required this.name,
@@ -14,7 +17,7 @@ class _SourceSearchGroup {
   final PluginSearchStatus status;
   final List<SearchItem> results;
 
-  /// 本次搜索耗时；未开始或已取消时为 null。
+  /// Duration of this search; null before it starts or after cancellation.
   final int? elapsedMs;
 
   bool get isSearching => status == PluginSearchStatus.pending;
@@ -30,13 +33,13 @@ class _SourceSearchGroup {
         PluginSearchStatus.captcha => '需要验证',
       };
 
-  /// 状态标签 + 耗时，供列表右侧展示。耗时未就绪时只显示状态。
+  /// Status chip plus elapsed time for the right side of the row; time stays hidden until known.
   String get statusLabelWithElapsed =>
       elapsedMs == null ? statusLabel : '$statusLabel · ${elapsedMs}ms';
 
-  /// 耗时分级；阈值与配色统一由 [speedTierOf] / [speedTierColor] 定义。
+  /// Time tier; thresholds and colors come from [speedTierOf] / [speedTierColor].
   ///
-  /// 只在有结果时着色——无结果 / 失败 / 需要验证的源，速度没有参考意义。
+  /// Colored only with results: for empty, failed or verification sources speed means nothing.
   SpeedTier? get speedTier => hasResults ? speedTierOf(elapsedMs) : null;
 }
 
@@ -115,7 +118,7 @@ class _SourceSheetViewState extends State<_SourceSheetView> {
   void _collapseFromFooter(String name) {
     final headerContext = _headerKeys[name]?.currentContext;
     if (headerContext != null) {
-      // 趁 header 还在布局中先定位，收起后就找不到锚点了。
+      // Anchor before shrinking, while the header is still laid out.
       Scrollable.ensureVisible(headerContext, alignment: 0);
     }
     _setDisplay(name, _SourceDisplay.collapsed);
@@ -124,8 +127,8 @@ class _SourceSheetViewState extends State<_SourceSheetView> {
   Widget _animateSize(Widget child) => MediaQuery.disableAnimationsOf(context)
       ? child
       : AnimatedSize(
-          duration: splitListMotionDuration,
-          curve: splitListMotionCurve,
+          duration: _expandDuration,
+          curve: _expandCurve,
           alignment: Alignment.topCenter,
           child: child,
         );
@@ -193,7 +196,7 @@ class _SourceSheetViewState extends State<_SourceSheetView> {
     final collapsed = display == _SourceDisplay.collapsed;
     final duration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
-        : splitListMotionDuration;
+        : _expandDuration;
 
     void toggle() => _setDisplay(group.name,
         collapsed ? _SourceDisplay.preview : _SourceDisplay.collapsed);
@@ -245,7 +248,7 @@ class _SourceSheetViewState extends State<_SourceSheetView> {
                               AnimatedRotation(
                                 turns: collapsed ? 0 : 0.5,
                                 duration: duration,
-                                curve: splitListMotionCurve,
+                                curve: _expandCurve,
                                 child: Icon(Icons.expand_more_rounded,
                                     size: 20, color: colors.onSurfaceVariant),
                               ),
@@ -283,8 +286,8 @@ class _SourceSheetViewState extends State<_SourceSheetView> {
   Widget _buildSourceBody(_SourceSearchGroup group, {required bool showAll}) {
     if (!group.hasResults) {
       return SplitListRow(
-        topRadius: splitListOuterRadius,
-        bottomRadius: splitListOuterRadius,
+        first: true,
+        last: true,
         child: switch (group.status) {
           PluginSearchStatus.pending => _buildSearching(),
           PluginSearchStatus.success ||
@@ -325,7 +328,7 @@ class _SourceSheetViewState extends State<_SourceSheetView> {
         if (group.results.length > 1) ...[
           const SizedBox(height: splitListRowGap),
           SplitListRow(
-            bottomRadius: splitListOuterRadius,
+            last: true,
             onTap: () => showAll
                 ? _collapseFromFooter(group.name)
                 : _setDisplay(group.name, _SourceDisplay.expanded),
@@ -397,10 +400,8 @@ class _SourceSheetViewState extends State<_SourceSheetView> {
     final theme = Theme.of(context);
     final result = group.results[index];
     return SplitListRow(
-      topRadius: index == 0 ? splitListOuterRadius : splitListInnerRadius,
-      bottomRadius: group.results.length == 1
-          ? splitListOuterRadius
-          : splitListInnerRadius,
+      first: index == 0,
+      last: group.results.length == 1,
       onTap: () => widget.onPlay(group.name, result),
       child: Semantics(
         button: true,

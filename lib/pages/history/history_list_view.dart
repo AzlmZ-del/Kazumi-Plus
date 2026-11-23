@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:kazumi/bean/widget/empty_state_widget.dart';
+import 'package:kazumi/bean/widget/split_list_row.dart';
 import 'package:kazumi/bean/widget/state_presentation.dart';
 import 'package:kazumi/modules/history/history_module.dart';
 import 'package:kazumi/pages/history/history_list_query.dart';
@@ -61,7 +62,7 @@ class _HistoryListViewState extends State<HistoryListView> {
     final colors = theme.colorScheme;
     final groups =
         groupHistoryEntries(widget.entries, query: _query, source: _source);
-    // 拆成多个 sliver 委托时，每个日期分组的第一张卡片都会被提前布局。
+    // Separate sliver delegates eagerly lay out the first card of every date.
     final rows = <_HistoryListRow>[
       for (final group in groups) ...[
         _HistoryListRow(group),
@@ -97,7 +98,7 @@ class _HistoryListViewState extends State<HistoryListView> {
         autofocus: true,
         child: LayoutBuilder(builder: (context, constraints) {
           final contentWidth = constraints.maxWidth.clamp(0.0, 960.0);
-          // 内容居中，但滚动区域仍保持整宽。
+          // Preserve full-width scrolling while centering the content.
           final inset = (constraints.maxWidth - contentWidth) / 2 +
               (constraints.maxWidth < 600 ? 16.0 : 24.0);
           return Scrollbar(
@@ -221,13 +222,13 @@ class _HistoryListViewState extends State<HistoryListView> {
         ),
       );
     }
-    final shape = BorderRadius.vertical(
-      top: Radius.circular(entryIndex == 0 ? 24 : 4),
-      bottom: Radius.circular(entryIndex == group.entries.length - 1 ? 24 : 4),
+    final shape = splitListRowRadius(
+      first: entryIndex == 0,
+      last: entryIndex == group.entries.length - 1,
     );
     return Padding(
       key: row.key,
-      padding: const EdgeInsets.only(bottom: 2),
+      padding: const EdgeInsets.only(bottom: splitListRowGap),
       child: widget.itemBuilder(group.entries[entryIndex], shape),
     );
   }

@@ -13,7 +13,7 @@ class SyncPageBody extends StatelessWidget {
   final List<Widget> children;
   final double maxWidth;
 
-  /// 卡片之间的垂直间距。各页可按自身信息密度覆盖默认值。
+  /// Vertical gap between cards. Pages override it to match their density.
   final double spacing;
 
   @override
@@ -87,42 +87,30 @@ class SyncPageIntro extends StatelessWidget {
   }
 }
 
-/// 同步设置页折叠卡片的头部固定高度（dp）。
-///
-/// `ListTile` 两行内容的默认高度本来就是 72（`list_tile.dart:1503` 的
-/// `_defaultTileHeight`，`(false, true) => 72.0`），这里显式写出来是为了
-/// **把契约钉住**：以后谁改了标题/副标题字号，也不用重新算一遍会不会变矮。
-///
-/// ⚠️ 它不是硬约束。`_computeSizes` 在内容放不下时会走 `compact` 分支
-/// （`list_tile.dart:1662`），高度变成 `2×minVerticalPadding + 标题高 + 副标题高`，
-/// 比 72 还大 —— 系统字体放大到 1.5 倍以上就会触发。这是**故意留的**：
-/// 与其把文字裁掉，不如让卡片长高。
+/// Header height of the sync collapse cards (dp), pinned to the 72dp two-line
+/// `ListTile` default (`list_tile.dart:1503`). A floor only: `_computeSizes`
+/// grows past it when large text does not fit (`list_tile.dart:1662`).
 const double kSyncCardTileHeight = 72;
 
-/// 同步设置页折叠卡片的立体感强度，传给 `TonalCard.elevation`。
+/// Outline strength for the sync cards, passed to `TonalCard.elevation`.
 ///
-/// 1.5 是第二档（第一版用 1，用户觉得偏弱）：亮色下投影 7% 黑、
-/// 模糊 13px、下移 3.25px；深色下改画 10% 白光描边（黑底上黑影是隐形的）。
+/// 1.5 is the second step; the first release used 1 and read too weak.
 const double kSyncCardElevation = 1.5;
 
-/// 同步设置页动作按钮的高度（dp）。宽度不锁死，由父级拉伸到整行。
+/// Action button height on the sync page (dp); width comes from the parent.
 ///
-/// 2026-10-27 用户拍板：从 48 收到 40（`kSyncBundledButtonHeight`），
-/// 与「重新检查 / 退出登录」等 bundled 按钮同高；宽度上各调用点
-/// 额外包 16dp 内缩，对齐卡内 `Divider(indent: 16)`。
+/// Chosen to match the bundled buttons, with callers adding a 16dp inset to align
+/// with `Divider(indent: 16)`.
 const double kSyncActionButtonHeight = 40;
 
-/// 同步设置页动作按钮的统一外观：与未改版前的 `FilledButton.tonalIcon` 同配色
-/// （`secondaryContainer` 底 + `onSecondaryContainer` 字），
-/// 字号用 `bodyLarge`（16sp），和 `SyncCardTitle` 完全一致。
-///
-/// 配色取值照抄 `filled_button.dart:689-704` 的 `_FilledTonalButtonDefaultsM3`，
-/// 连禁用态和 `overlayColor` 一起搬过来，保证按下/悬停的水波纹也是原来的观感。
+/// Shared look for the sync action buttons, matching the pre-redesign
+/// `FilledButton.tonalIcon` colors (`filled_button.dart:689-704`), disabled and
+/// ripple states included.
 ButtonStyle syncActionButtonStyle(BuildContext context) {
   final theme = Theme.of(context);
   final colors = theme.colorScheme;
   return ButtonStyle(
-    // 禁用态沿用 M3 的灰，避免 `WidgetStatePropertyAll` 把禁用样式一起盖掉。
+    // Keep the M3 disabled grey; `WidgetStatePropertyAll` would override it.
     backgroundColor: WidgetStateProperty.resolveWith(
       (states) => states.contains(WidgetState.disabled)
           ? colors.onSurface.withValues(alpha: 0.12)
@@ -153,17 +141,10 @@ ButtonStyle syncActionButtonStyle(BuildContext context) {
   );
 }
 
-/// 卡片头部里的小号动作按钮（如「测试连接」）。
+/// Small action button in a card header (for example "test connection").
 ///
-/// 与 `syncActionButtonStyle` 同配色，但整体收紧一档：
-/// 字号 12sp、左右内边距 8dp、圆角 14dp，配合调用方把高度钉到 28dp。
-/// 卡片头部只有 72dp 高，用 16sp 的大按钮会把标题栏顶得比别的卡高。
-///
-/// 字重保持 `labelLarge` 的 w500 **不降**：12sp 若跟着降到 w400，
-/// 在 `secondaryContainer` 上会显得发虚。
-///
-/// 目前两个调用点（「Bangumi 账号」与「同步服务器」）都走这一份，
-/// 两边尺寸必须一致，所以这里不再留开关。
+/// Same colors as [syncActionButtonStyle] but 12sp at w500: headers are only 72dp
+/// tall, where a 16sp button would tower over the other cards.
 ButtonStyle syncHeaderButtonStyle(BuildContext context) {
   final theme = Theme.of(context);
   final colors = theme.colorScheme;
@@ -201,28 +182,14 @@ ButtonStyle syncHeaderButtonStyle(BuildContext context) {
   );
 }
 
-/// 并排 / 紧凑场景下动作按钮的高度（dp）。
-///
-/// 比 [StateActionButton.styleOf] 默认的 48dp 矮一档，正好与 M3 `TextButton`
-/// 的默认 `minimumSize: Size(64, 40)`（`text_button.dart:362`）齐平，
-/// 因此和「获取授权码」这类 `TextButton.icon` 并排时上下沿能对齐。
+/// Action button height for side-by-side / compact cases (dp), matching the M3
+/// `TextButton` default `Size(64, 40)` (`text_button.dart:362`) so it lines up
+/// with `TextButton.icon` siblings.
 const double kSyncBundledButtonHeight = 40;
 
-/// 并排 / 紧凑动作按钮的样式：`StateActionButton.styleOf` 收紧一档后的版本。
-///
-/// 只改三处，配色、字号（`labelLarge` 14sp）、圆角（28 / 按下 16）全不动：
-///
-/// - `minimumSize` 从 `Size(64, 48)` 收到 `Size(64, kSyncBundledButtonHeight)`：
-///   只改外层 `SizedBox` 没用 —— `button_style_button.dart:473-480` 会把解析出的
-///   约束和这个最小尺寸取大值，必须在这里一起覆盖。
-/// - 左右内边距 24 → 8：半行宽约 141dp，扣掉内边距 48 + 图标 18 + 图标文字间距 8
-///   后文字只剩 67dp，四字（`labelLarge` 14sp 约 56~60dp）加 `_InputPadding` 刚好放得下。
-///   垂直 12 → 8：图标 18 与单行文字 14 的行高里，18 + 8×2 = 34 < 40，余量充足。
-/// - `tapTargetSize` 收成 `shrinkWrap`：M3 默认 `padded` 会把可点区域撑到 48dp，
-///   视觉 40dp 却按 48dp 占位，并排时多出一圈透明边距。
-///
-/// 目前两个调用点：『网页登录』卡的三颗按钮、『Bangumi 账号』的「验证并保存」。
-/// 两边必须一致，所以不再留开关。
+/// [StateActionButton.styleOf] tightened one step: lower `minimumSize`, 8dp padding
+/// and `shrinkWrap` so layout matches the visible 40dp. A wrapping `SizedBox` is not
+/// enough, since `button_style_button.dart:473-480` takes the larger constraint.
 ButtonStyle syncBundledButtonStyle(BuildContext context) {
   return StateActionButton.styleOf(context).copyWith(
     minimumSize: const WidgetStatePropertyAll(
@@ -235,19 +202,11 @@ ButtonStyle syncBundledButtonStyle(BuildContext context) {
   );
 }
 
-/// 卡片展开区里 `SwitchListTile` 的副标题样式：**12sp**。
+/// Subtitle style for `SwitchListTile` inside the expanded card: 12sp to match the
+/// header, where `ListTile` would use 14sp (`list_tile.dart:1847`).
 ///
-/// `ListTile` 默认副标题是 `bodyMedium`（14sp，`list_tile.dart:1847`），
-/// 比卡片头部的 `SyncCardSubtitle`（12sp）大一档，同一张卡里会一粗一细。
-/// 这里压到 12sp，与卡片头部对齐。
-///
-/// 注意**不给颜色**：`SwitchListTile` 没有 `subtitleTextStyle` 参数
-/// （`switch_list_tile.dart:173-221` 的构造参数表里没有这一项，传了编译不过），
-/// 只能把样式挂到 `subtitle` 那个 `Text` 上。
-/// 而 `TextStyle.inherit` 默认为 true，`Text` 会把自身样式 **merge** 到
-/// 外层 `AnimatedDefaultTextStyle`（`list_tile.dart:943`）之上 ——
-/// 只要这里不写 `color`，颜色就仍由 `ListTile` 的 `effectiveColor` 决定，
-/// 同步中 / 未配置时的置灰效果照旧。
+/// No color on purpose: leaving it out keeps the greying from the `ListTile`
+/// `AnimatedDefaultTextStyle` (`list_tile.dart:943`) for disabled states.
 TextStyle syncSwitchSubtitleStyle(BuildContext context) {
   final base = Theme.of(context).textTheme.bodySmall!;
   return TextStyle(
@@ -258,47 +217,35 @@ TextStyle syncSwitchSubtitleStyle(BuildContext context) {
   );
 }
 
-/// 卡片头部的主标题，与「多设备同步」页 `SettingsTile` 的 title 同款：
-/// `bodyLarge`（16sp / 行高 1.50）。
-///
-/// 之所以要显式指定，是因为 `ExpansionTile` 走的是 `ListTile` 默认样式
-/// （`list_tile.dart:1844` 的 `bodyLarge`），但副标题是 `bodyMedium`（14sp），
-/// 与 `SettingsTile` 的 12sp 不一致；两个页面的卡片头部看起来就会差一档。
+/// Card header title, `bodyLarge` (16sp), matching the `SettingsTile` title on the
+/// multi-device page instead of `ExpansionTile`'s `ListTile` defaults.
 class SyncCardTitle extends StatelessWidget {
   const SyncCardTitle(this.text, {super.key, this.color});
 
   final String text;
 
-  /// 显式指定颜色。不传时沿用外层 `ListTile` 算好的那个
-  /// （`AnimatedDefaultTextStyle` 传下来的），这样卡片被禁用时仍然是灰的。
-  ///
-  /// 自绘头部（如「启用 WebDAV」卡片）没有 `ListTile` 兜底，
-  /// 需要自己传颜色，才能保住「未配置时置灰」的效果。
+  /// Overrides the inherited color; hand-built headers have no `ListTile` to
+  /// supply the greyed-out state.
   final Color? color;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    // 颜色沿用外层 `ListTile` 算好的那个（`AnimatedDefaultTextStyle` 传下来的），
-    // 这样将来卡片被禁用时仍然是灰色的，不会被写死的颜色盖掉。
     final inherited = color ?? DefaultTextStyle.of(context).style.color;
     return Text(text, style: textTheme.bodyLarge?.copyWith(color: inherited));
   }
 }
 
-/// 卡片头部的副标题，与 `SettingsTile` 的 description 同款：
-/// `bodySmall`（12sp / 行高 1.33）+ `onSurfaceVariant` 灰色。
+/// Card header subtitle, `bodySmall` (12sp) plus `onSurfaceVariant`, matching the
+/// `SettingsTile` description.
 ///
-/// `ListTile` 默认把副标题染成和主标题一样的 `onSurface`
-/// （`list_tile.dart:938` 的 `subtitleColor = effectiveColor`），
-/// 所以颜色也必须显式给，否则只有字号对了、层次还是平的。
+/// The color is explicit because `ListTile` tints subtitles with `onSurface`.
 class SyncCardSubtitle extends StatelessWidget {
   const SyncCardSubtitle(this.text, {super.key, this.color});
 
   final String text;
 
-  /// 显式指定颜色。不传时用 `onSurfaceVariant`（与 `SettingsTile` 的
-  /// description 一致）。自绘头部需要置灰时自己传。
+  /// Overrides the default `onSurfaceVariant` when a header greys itself out.
   final Color? color;
 
   @override
@@ -310,10 +257,8 @@ class SyncCardSubtitle extends StatelessWidget {
   );
 }
 
-/// 折叠卡片右侧的箭头：收起时朝右，展开时顺时针转 90° 朝下。
-///
-/// `ExpansionTile` 默认的 `trailing` 是 `expand_more`（朝下），与本页其余
-/// 卡片（如「启用 WebDAV」）的「右 → 下」习惯不一致，所以统一换成这个。
+/// Collapse chevron: right when collapsed, down when expanded, following the
+/// "enable WebDAV" cards rather than `ExpansionTile`'s `expand_more`.
 class SyncExpandChevron extends StatelessWidget {
   const SyncExpandChevron({super.key, required this.expanded, this.color});
 
@@ -330,13 +275,9 @@ class SyncExpandChevron extends StatelessWidget {
   );
 }
 
-/// 同步设置页的动作按钮：撑满父级给定宽度 × `kSyncActionButtonHeight`（40dp）、
-/// 强调色底、白字、与卡片主标题同字号。
+/// Sync page action button: full width × `kSyncActionButtonHeight`, accent fill.
 ///
-/// 宽度用 `double.infinity` 交给父级决定，调用方都是
-/// `CrossAxisAlignment.stretch` 的列/展开区；要缩进时由调用点外面包
-/// `Padding(horizontal: 16)`（对齐卡内 `Divider(indent: 16)`），
-/// 组件本身不管横向内边距。
+/// Callers supply the 16dp inset that aligns with `Divider(indent: 16)`.
 class SyncActionButton extends StatelessWidget {
   const SyncActionButton({
     super.key,
@@ -350,7 +291,7 @@ class SyncActionButton extends StatelessWidget {
   final String text;
   final IconData? icon;
 
-  /// 预留更长的状态文案宽度，避免切换文字时按钮跳动。
+  /// Reserves room for a longer status label so the button does not jump.
   final String? reserveText;
 
   @override

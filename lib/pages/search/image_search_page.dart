@@ -12,9 +12,11 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:kazumi/bean/appbar/sys_app_bar.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
+import 'package:kazumi/bean/widget/connected_button_group.dart';
 import 'package:kazumi/bean/widget/empty_state_widget.dart';
 import 'package:kazumi/bean/widget/error_widget.dart';
 import 'package:kazumi/bean/widget/loading_indicator.dart';
+import 'package:kazumi/bean/widget/split_list_row.dart';
 import 'package:kazumi/bean/widget/state_presentation.dart';
 import 'package:kazumi/modules/search/image_search_module.dart';
 import 'package:kazumi/pages/search/search_controller.dart';
@@ -80,7 +82,7 @@ class _ImageSearchPageState extends State<ImageSearchPage> {
 
   void _onUrlChanged() {
     final value = _urlController.text.trim();
-    // 光标移动不算内容变化，否则会把已有结果清掉。
+    // Ignore cursor moves so they do not clear active results.
     if (value == _lastUrlText) return;
     _lastUrlText = value;
     _previewDebounce?.cancel();
@@ -198,7 +200,7 @@ class _ImageSearchPageState extends State<ImageSearchPage> {
     try {
       if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
     } catch (_) {
-      // 落到下面那条统一错误提示。
+      // Fall through to the shared error message.
     }
     if (!mounted) return;
     KazumiDialog.showToast(context: context, message: '暂时无法打开链接，请稍后再试');
@@ -286,7 +288,7 @@ class _ImageSearchPageState extends State<ImageSearchPage> {
       ..sort((a, b) => (b.similarity ?? 0).compareTo(a.similarity ?? 0));
     final showResults = searching || results.isNotEmpty || error.isNotEmpty;
     final short = constraints.maxHeight < 440;
-    // 键盘占掉大半高度时，表单要还能滚动。
+    // Keep the form scrollable when the keyboard consumes most of the height.
     final pinAction =
         splitLayout && (showResults || short) && constraints.maxHeight >= 240;
     final source = _buildSource(context, searching, showResults,
@@ -304,7 +306,7 @@ class _ImageSearchPageState extends State<ImageSearchPage> {
     if (splitLayout) {
       final contentWidth = constraints.maxWidth.clamp(0.0, 1440.0);
       final inset = (constraints.maxWidth - contentWidth) / 2 + padding;
-    // 右侧留白留在视口内，边缘才能继续拖动滚动。
+      // Keep the right gutter inside the viewport for edge scrolling.
       return Center(
         child: Padding(
           padding: EdgeInsets.fromLTRB(inset, 0, showResults ? 0 : inset, 16),
@@ -373,7 +375,7 @@ class _ImageSearchPageState extends State<ImageSearchPage> {
         child: source,
       ),
     );
-    // 键盘弹出改变按钮位置时，输入框不能丢焦点。
+    // Preserve input focus when the keyboard changes button placement.
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -533,17 +535,10 @@ class _ImageSearchPageState extends State<ImageSearchPage> {
               : _hasImage
                   ? _search
                   : null,
-      style: ButtonStyle(
+      style: StateActionButton.styleOf(context, medium: true).copyWith(
         minimumSize: const WidgetStatePropertyAll(Size.fromHeight(56)),
-        padding: const WidgetStatePropertyAll(
-            EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
         textStyle: WidgetStatePropertyAll(
             type.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-        shape: WidgetStateProperty.resolveWith((states) =>
-            RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(
-                    states.contains(WidgetState.pressed) ? 16 : 28))),
-        animationDuration: _transition,
       ),
       icon: searching || _isPicking
           ? LoadingIndicator(size: 24, color: colors.onSurfaceVariant)

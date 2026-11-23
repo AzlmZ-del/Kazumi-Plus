@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:kazumi/bean/widget/loading_indicator.dart';
+import 'package:kazumi/bean/widget/split_list_row.dart';
 import 'package:kazumi/bean/widget/state_presentation.dart';
 import 'package:kazumi/modules/bangumi/sync_priority.dart';
 import 'package:kazumi/modules/collect/collect_sync_plan.dart';
@@ -19,17 +20,16 @@ enum CollectSyncStep {
   final IconData _icon;
 
   CollectSyncDestination get _settings => switch (this) {
-    bangumi => CollectSyncDestination.bangumiSettings,
-    webDav || upload => CollectSyncDestination.webDavSettings,
-  };
+        bangumi => CollectSyncDestination.bangumiSettings,
+        webDav || upload => CollectSyncDestination.webDavSettings,
+      };
 }
 
-typedef CollectSyncOperation =
-    Future<bool> Function(
-      CollectSyncStep step, {
-      required ValueChanged<String> onError,
-      required void Function(String message, int current, int total) onProgress,
-    });
+typedef CollectSyncOperation = Future<bool> Function(
+  CollectSyncStep step, {
+  required ValueChanged<String> onError,
+  required void Function(String message, int current, int total) onProgress,
+});
 
 enum _StepStatus { waiting, running, succeeded, failed, skipped }
 
@@ -68,15 +68,15 @@ class _CollectSyncDialogState extends State<CollectSyncDialog> {
   bool get _finished => _phase == _SyncPhase.finished;
 
   List<_StepState> _createSteps() => [
-    if (widget.plan.shouldSyncWebDavCollectibles)
-      _StepState(CollectSyncStep.webDav),
-    if (widget.plan.shouldSyncBangumi) _StepState(CollectSyncStep.bangumi),
-    if (widget.plan.shouldSyncWebDavCollectibles &&
-        widget.plan.shouldSyncBangumi)
-      _StepState(CollectSyncStep.upload),
-  ];
+        if (widget.plan.shouldSyncWebDavCollectibles)
+          _StepState(CollectSyncStep.webDav),
+        if (widget.plan.shouldSyncBangumi) _StepState(CollectSyncStep.bangumi),
+        if (widget.plan.shouldSyncWebDavCollectibles &&
+            widget.plan.shouldSyncBangumi)
+          _StepState(CollectSyncStep.upload),
+      ];
 
-  // 路由被移除后，退出动画结束前仍处于 mounted 状态。
+  // Removed routes can stay mounted until their exit animation ends.
   bool get _active => mounted && (ModalRoute.of(context)?.isActive ?? false);
   bool get _hasFailure =>
       _steps.any((step) => step.status == _StepStatus.failed);
@@ -93,16 +93,12 @@ class _CollectSyncDialogState extends State<CollectSyncDialog> {
       if (!_active) return;
       if (state.step == CollectSyncStep.upload &&
           !widget.plan.shouldUploadWebDavAfterBangumi(
-            webDavSynced: _steps.any(
-              (s) =>
-                  s.step == CollectSyncStep.webDav &&
-                  s.status == _StepStatus.succeeded,
-            ),
-            bangumiSynced: _steps.any(
-              (s) =>
-                  s.step == CollectSyncStep.bangumi &&
-                  s.status == _StepStatus.succeeded,
-            ),
+            webDavSynced: _steps.any((s) =>
+                s.step == CollectSyncStep.webDav &&
+                s.status == _StepStatus.succeeded),
+            bangumiSynced: _steps.any((s) =>
+                s.step == CollectSyncStep.bangumi &&
+                s.status == _StepStatus.succeeded),
           )) {
         setState(() {
           state.status = _StepStatus.skipped;
@@ -123,9 +119,8 @@ class _CollectSyncDialogState extends State<CollectSyncDialog> {
           onProgress: (message, current, total) {
             if (!_active || state.status != _StepStatus.running) return;
             setState(() {
-              state.message = total > 0
-                  ? '$message · $current / $total'
-                  : message;
+              state.message =
+                  total > 0 ? '$message · $current / $total' : message;
               state.progress = total > 0
                   ? (current / total).clamp(0.0, 1.0).toDouble()
                   : null;
@@ -200,8 +195,8 @@ class _CollectSyncDialogState extends State<CollectSyncDialog> {
                     icon: failed
                         ? Icons.sync_problem_rounded
                         : _finished
-                        ? Icons.done_all_rounded
-                        : Icons.sync_rounded,
+                            ? Icons.done_all_rounded
+                            : Icons.sync_rounded,
                     size: 64,
                     iconSize: 32,
                     backgroundColor: failed
@@ -230,22 +225,19 @@ class _CollectSyncDialogState extends State<CollectSyncDialog> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (description != null) ...[
-                Text(
-                  description,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: colors.onSurfaceVariant,
-                  ),
-                ),
+                Text(description,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: colors.onSurfaceVariant)),
                 const SizedBox(height: 24),
               ],
               if (!widget.plan.canSync) ...[
                 _setupRow(CollectSyncDestination.webDavSettings),
-                const SizedBox(height: 4),
+                const SizedBox(height: splitListRowGap),
                 _setupRow(CollectSyncDestination.bangumiSettings),
               ] else ...[
                 for (var i = 0; i < _steps.length; i++) ...[
-                  if (i > 0) const SizedBox(height: 4),
+                  if (i > 0) const SizedBox(height: splitListRowGap),
                   _stepRow(_steps[i], i),
                 ],
                 if (_phase == _SyncPhase.ready &&
@@ -253,9 +245,8 @@ class _CollectSyncDialogState extends State<CollectSyncDialog> {
                   const SizedBox(height: 16),
                   Text(
                     '冲突处理：${widget.priority.label}',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colors.onSurfaceVariant,
-                    ),
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: colors.onSurfaceVariant),
                   ),
                 ],
               ],
@@ -273,9 +264,8 @@ class _CollectSyncDialogState extends State<CollectSyncDialog> {
                       minimumSize: const Size(64, 48),
                     ),
                     onPressed: () => Navigator.of(context).pop(),
-                    child: Text(
-                      widget.plan.canSync && !_finished ? '取消' : '关闭',
-                    ),
+                    child:
+                        Text(widget.plan.canSync && !_finished ? '取消' : '关闭'),
                   ),
                 if (widget.plan.canSync)
                   StateActionButton(
@@ -292,40 +282,31 @@ class _CollectSyncDialogState extends State<CollectSyncDialog> {
     );
   }
 
-  BorderRadius _rowRadius(int index, int length) => BorderRadius.vertical(
-    top: Radius.circular(index == 0 ? 20 : 4),
-    bottom: Radius.circular(index == length - 1 ? 20 : 4),
-  );
-
   Widget _setupRow(CollectSyncDestination destination) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final (title, description, icon) = switch (destination) {
       CollectSyncDestination.webDavSettings => (
-        'WebDAV',
-        '设置服务器，开启收藏列表同步',
-        Icons.cloud_sync_rounded,
-      ),
+          'WebDAV',
+          '设置服务器，开启收藏列表同步',
+          Icons.cloud_sync_rounded
+        ),
       CollectSyncDestination.bangumiSettings => (
-        'Bangumi',
-        '连接账号，开启状态同步',
-        Icons.bookmarks_rounded,
-      ),
+          'Bangumi',
+          '连接账号，开启状态同步',
+          Icons.bookmarks_rounded
+        ),
     };
-    return Material(
-      color: colors.surfaceContainerLow,
-      borderRadius: _rowRadius(
-        destination.index,
-        CollectSyncDestination.values.length,
-      ),
-      clipBehavior: Clip.antiAlias,
+    return SplitListRow(
+      first: destination.index == 0,
+      last: destination.index == CollectSyncDestination.values.length - 1,
+      onTap: () => Navigator.of(context).pop(destination),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: Icon(icon, color: colors.primary),
         title: Text(title, style: theme.textTheme.titleSmall),
         subtitle: Text(description),
         trailing: const Icon(Icons.chevron_right_rounded),
-        onTap: () => Navigator.of(context).pop(destination),
       ),
     );
   }
@@ -341,8 +322,8 @@ class _CollectSyncDialogState extends State<CollectSyncDialog> {
     final foreground = failed
         ? colors.onErrorContainer
         : active
-        ? colors.onSecondaryContainer
-        : colors.onSurface;
+            ? colors.onSecondaryContainer
+            : colors.onSurface;
     final statusLabel = switch (state.status) {
       _StepStatus.waiting => _running ? '等待中' : '第 ${index + 1} 步',
       _StepStatus.running => '同步中',
@@ -362,9 +343,12 @@ class _CollectSyncDialogState extends State<CollectSyncDialog> {
         color: failed
             ? colors.errorContainer
             : active
-            ? colors.secondaryContainer
-            : colors.surfaceContainerLow,
-        borderRadius: _rowRadius(index, _steps.length),
+                ? colors.secondaryContainer
+                : colors.surfaceContainerLow,
+        borderRadius: splitListRowRadius(
+          first: index == 0,
+          last: index == _steps.length - 1,
+        ),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -384,20 +368,14 @@ class _CollectSyncDialogState extends State<CollectSyncDialog> {
                       runSpacing: 4,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Text(
-                          state.step._title,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            color: foreground,
-                          ),
-                        ),
-                        Text(
-                          statusLabel,
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            color: active || failed
-                                ? foreground
-                                : colors.onSurfaceVariant,
-                          ),
-                        ),
+                        Text(state.step._title,
+                            style: theme.textTheme.titleSmall
+                                ?.copyWith(color: foreground)),
+                        Text(statusLabel,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                                color: active || failed
+                                    ? foreground
+                                    : colors.onSurfaceVariant)),
                       ],
                     ),
                     if (detail != null) ...[
@@ -429,9 +407,8 @@ class _CollectSyncDialogState extends State<CollectSyncDialog> {
                       LinearProgressIndicator(
                         value: state.progress,
                         color: colors.primary,
-                        backgroundColor: colors.onSecondaryContainer.withValues(
-                          alpha: 0.12,
-                        ),
+                        backgroundColor:
+                            colors.onSecondaryContainer.withValues(alpha: 0.12),
                         minHeight: 4,
                         borderRadius: BorderRadius.circular(4),
                         trackGap: 4,

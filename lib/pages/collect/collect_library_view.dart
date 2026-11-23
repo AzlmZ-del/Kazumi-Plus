@@ -2,8 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:kazumi/bean/card/network_img_layer.dart';
+import 'package:kazumi/bean/widget/connected_button_group.dart';
 import 'package:kazumi/bean/widget/empty_state_widget.dart';
 import 'package:kazumi/bean/widget/kazumi_menu.dart';
+import 'package:kazumi/bean/widget/tonal_card.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/modules/collect/collect_layout.dart';
 import 'package:kazumi/modules/collect/collect_module.dart';
@@ -51,7 +53,7 @@ class _CollectLibraryViewState extends State<CollectLibraryView>
   final _searchController = TextEditingController();
   final _searchFocus = FocusNode();
   final _libraryFocus = FocusNode();
-  // 分类滚动视图被替换时，保住 tab 动画的状态。
+  // Keep tab animations alive when the category scroll view is replaced.
   final _categoriesKey = GlobalKey();
   late TabController _tabController;
   bool? _disableAnimations;
@@ -63,8 +65,8 @@ class _CollectLibraryViewState extends State<CollectLibraryView>
   String _query = '';
   bool _searchExpanded = false;
 
-  // 点击动画期间是「被点中的那个 tab」，其余时候是「主导页」，
-  // 这样侧滑过程中也能实时更新。切换 tab 只通知监听者，不触发重建。
+  // The tapped tab while a tap animates, otherwise the dominant page so swipes
+  // update mid-gesture. Tab switches rebuild nothing but its listeners.
   final _selectedType = ValueNotifier<CollectType?>(CollectType.watching);
 
   @override
@@ -121,7 +123,7 @@ class _CollectLibraryViewState extends State<CollectLibraryView>
   }
 
   void _resetResults() {
-    // 连未挂载的分类的滚动位置也一起重置。
+    // Reset saved offsets for unmounted categories too.
     _resultsStorage = PageStorageBucket();
     for (final controller in _scrollControllers.values) {
       if (controller.hasClients) controller.jumpTo(0);

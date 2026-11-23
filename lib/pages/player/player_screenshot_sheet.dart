@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:kazumi/bean/widget/kazumi_menu.dart';
+import 'package:kazumi/bean/widget/state_presentation.dart';
 import 'package:kazumi/pages/player/controller/player_screenshot_controller.dart';
 import 'package:kazumi/pages/player/player_screenshot_image.dart';
 import 'package:kazumi/services/player/screenshot_candidate.dart';
@@ -59,7 +60,7 @@ class _PlayerScreenshotSheetState extends State<_PlayerScreenshotSheet> {
   String? _activeId;
   final FocusNode _focus = FocusNode(debugLabel: 'Screenshot review');
   final TransformationController _transform = TransformationController();
-  // 尺寸变化导致布局切换时，保住已有的预览状态。
+  // Preserve the preview when resizing switches layouts.
   final GlobalKey _previewKey = GlobalKey();
   final Map<String, double?> _aspectRatios = {};
   int _index = 0;
@@ -101,7 +102,7 @@ class _PlayerScreenshotSheetState extends State<_PlayerScreenshotSheet> {
       _aspectRatios.removeWhere((id, _) => !ids.contains(id));
       _pages = PageController(initialPage: _index, keepPage: false);
     });
-    // 先摘掉旧的 PageView，再销毁它的 controller。
+    // Detach the old PageView before disposing its controller.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       oldPages.dispose();
       if (mounted) _warmNeighbors();
@@ -142,7 +143,7 @@ class _PlayerScreenshotSheetState extends State<_PlayerScreenshotSheet> {
       _aspectRatios[item.id] = ratio;
       if (resize) setState(() {});
     } catch (_) {
-      // 无效的图片数据由图片组件自己兜底。
+      // The image widget handles invalid image data.
     } finally {
       descriptor?.dispose();
       buffer?.dispose();
@@ -722,7 +723,7 @@ class _PlayerScreenshotSheetState extends State<_PlayerScreenshotSheet> {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          // 单行布局所需的大致宽度，低于它就得改成上下堆叠。
+          // Rough width the single-row layout needs before it must stack.
           final rowWidth =
               saveWidth + scaler.scale(96) + scaler.scale(128) + 56;
           final stacked = stackActions || constraints.maxWidth < rowWidth;
@@ -738,7 +739,7 @@ class _PlayerScreenshotSheetState extends State<_PlayerScreenshotSheet> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // 「全选」按内容撑开，这样「选择」文案不会被截断。
+                // Select-all stays intrinsic so the pick label never truncates.
                 Row(
                   children: [
                     Expanded(child: pick),
@@ -801,32 +802,31 @@ class _PlayerScreenshotSheetState extends State<_PlayerScreenshotSheet> {
       );
 
   ButtonStyle _toggleStyle({required bool selected}) {
+    final style = _actionStyle();
+    if (!selected) return style;
     final colors = Theme.of(context).colorScheme;
-    return _actionStyle(selected: selected).copyWith(
-      backgroundColor: WidgetStatePropertyAll(
-        selected ? colors.secondaryContainer : colors.surfaceContainerHighest,
+    return style.copyWith(
+      backgroundColor: WidgetStateProperty.resolveWith(
+        (states) =>
+            states.contains(WidgetState.disabled) ? null : colors.secondary,
+      ),
+      foregroundColor: WidgetStateProperty.resolveWith(
+        (states) =>
+            states.contains(WidgetState.disabled) ? null : colors.onSecondary,
+      ),
+      shape: WidgetStateProperty.resolveWith(
+        (states) => RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(
+            states.contains(WidgetState.pressed) ? 8 : 12,
+          ),
+        ),
       ),
     );
   }
 
-  ButtonStyle _actionStyle({bool selected = false}) => ButtonStyle(
-    minimumSize: const WidgetStatePropertyAll(Size(48, 48)),
-    padding: const WidgetStatePropertyAll(
-      EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-    ),
-    animationDuration: _motion,
-    shape: WidgetStateProperty.resolveWith(
-      (states) => RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(
-          states.contains(WidgetState.pressed)
-              ? 12
-              : selected
-              ? 16
-              : 24,
-        ),
-      ),
-    ),
-  );
+  ButtonStyle _actionStyle() => StateActionButton.styleOf(
+    context,
+  ).copyWith(minimumSize: const WidgetStatePropertyAll(Size(48, 48)));
 
   Widget _empty(BuildContext context) => Center(
     child: SingleChildScrollView(

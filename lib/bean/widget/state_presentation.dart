@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:material_new_shapes/material_new_shapes.dart';
 
-/// [StateActionButton] 的图标边长统一值（18dp）。
+/// Shared icon edge length for [StateActionButton] (18dp); all icon call sites
+/// follow it.
 ///
-/// 全局统一的一处开关：`StateActionButton` / `StateActionButton.tonal` 的
-/// `iconSize` 默认值就是它，21 个带图标的调用点全部跟随。
-///
-/// 为什么不是 M3 默认的 20dp：Material Icons 的字形几乎写满方框（20dp 时
-/// 实际墨迹 16.8~17.5dp），而 MiSans 汉字的墨迹高只有 `0.92 × fontSize`
-/// （14sp → 12.9dp），并排时图标看着比文字块头大 30%。
+/// M3's 20dp reads 30% bulkier than MiSans CJK ink beside it (`0.92 × fontSize`,
+/// 12.9dp at 14sp), because Material Icons glyphs nearly fill the box.
 const double kStateActionButtonIconSize = 18;
 
 class StateIconBadge extends StatelessWidget {
@@ -19,6 +16,7 @@ class StateIconBadge extends StatelessWidget {
     required this.iconSize,
     required this.backgroundColor,
     required this.foregroundColor,
+    this.shape,
   });
 
   final IconData icon;
@@ -27,10 +25,13 @@ class StateIconBadge extends StatelessWidget {
   final Color backgroundColor;
   final Color foregroundColor;
 
+  /// Defaults to [MaterialShapes.cookie4Sided].
+  final RoundedPolygon? shape;
+
   @override
   Widget build(BuildContext context) => ExcludeSemantics(
     child: ClipPath(
-      clipper: const _StateShapeClipper(),
+      clipper: _StateShapeClipper(shape ?? MaterialShapes.cookie4Sided),
       child: ColoredBox(
         color: backgroundColor,
         child: SizedBox.square(
@@ -43,17 +44,18 @@ class StateIconBadge extends StatelessWidget {
 }
 
 class _StateShapeClipper extends CustomClipper<Path> {
-  const _StateShapeClipper();
+  const _StateShapeClipper(this.shape);
 
-  static final _path = MaterialShapes.cookie4Sided.toPath();
+  final RoundedPolygon shape;
+  static final _paths = Expando<Path>();
 
   @override
-  Path getClip(Size size) => _path.transform(
+  Path getClip(Size size) => (_paths[shape] ??= shape.toPath()).transform(
     Matrix4.diagonal3Values(size.width, size.height, 1).storage,
   );
 
   @override
-  bool shouldReclip(_StateShapeClipper oldClipper) => false;
+  bool shouldReclip(_StateShapeClipper oldClipper) => oldClipper.shape != shape;
 }
 
 class StateActionButton extends StatelessWidget {
@@ -81,36 +83,32 @@ class StateActionButton extends StatelessWidget {
   final String text;
   final IconData? icon;
 
-  /// 图标边长，默认 [kStateActionButtonIconSize]（18dp）。
+  /// Icon edge length, defaulting to [kStateActionButtonIconSize].
   ///
-  /// 需要「图标视觉上与 14sp 文字等高」时才有意义 —— 实测 MiSans 的汉字
-  /// 墨迹高约 `0.92 × fontSize`（14sp → 12.9dp），而 Material Icons 的字形几乎写满
-  /// 整个方框（20dp 时墨迹 16.8~17.5dp，比字大 30%），所以并排时图标显得块头压过文字。
-  ///
-  /// 不能靠 `ButtonStyle.iconSize` 覆盖：下面 `build` 里的 `Icon` 显式传了 `size`，
-  /// 会盖掉 `AnimatedTheme` 下发的 `IconTheme`（`button_style_button.dart:553`）。
+  /// Set here rather than via `ButtonStyle.iconSize`: the `Icon` in `build` passes
+  /// `size`, overriding the `IconTheme` (`button_style_button.dart:553`).
   final double iconSize;
 
-  /// 用一个更长的占位文字预留标签宽度，按钮尺寸不变。
+  /// Reserves label space for a longer status without changing button size.
   final String? reserveText;
 
-  /// 覆盖默认样式（`styleOf`）。传了就完全以这里为准，
-  /// 用于「同步设置」这类需要统一规格的局部场景。
+  /// Overrides the default [styleOf]; used where callers need one shared spec.
   final ButtonStyle? style;
   final bool _tonal;
 
-  static ButtonStyle styleOf(BuildContext context) {
+  /// Round at rest and squarer while pressed; [medium] is the 56dp size.
+  static ButtonStyle styleOf(BuildContext context, {bool medium = false}) {
     return ButtonStyle(
-      minimumSize: const WidgetStatePropertyAll(Size(64, 48)),
-      padding: const WidgetStatePropertyAll(
-        EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      minimumSize: WidgetStatePropertyAll(Size(64, medium ? 56 : 48)),
+      padding: WidgetStatePropertyAll(
+        EdgeInsets.symmetric(horizontal: medium ? 24 : 16, vertical: 12),
       ),
       shape: WidgetStateProperty.resolveWith(
-        (states) => RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(
-            states.contains(WidgetState.pressed) ? 16 : 28,
-          ),
-        ),
+        (states) => states.contains(WidgetState.pressed)
+            ? RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(medium ? 12 : 8),
+              )
+            : const StadiumBorder(),
       ),
       animationDuration: MediaQuery.disableAnimationsOf(context)
           ? Duration.zero
