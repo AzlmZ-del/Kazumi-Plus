@@ -3,9 +3,9 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:kazumi/request/config/api_endpoints.dart';
 import 'package:kazumi/request/core/dio_factory.dart';
+import 'package:kazumi/request/core/ech_adapter.dart';
 import 'package:kazumi/request/core/network_error_mapper.dart';
 import 'package:kazumi/services/network/bangumi_acceleration.dart';
-import 'package:kazumi/services/network/bangumi_mirror_signature.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/utils/bangumi_mirror_credentials.dart';
 import 'package:kazumi/utils/constants.dart';
@@ -15,6 +15,11 @@ class BangumiClient {
   BangumiClient._();
 
   static final BangumiClient instance = BangumiClient._();
+
+  /// Request extra that forces a request onto the official host, bypassing
+  /// mirror routing. Mirrors forward without credentials, so R18-scoped data
+  /// (comments, item details) comes back as an upstream error there.
+  static const forceOfficialKey = 'bangumiForceOfficial';
 
   Future<dynamic> get(
     String url, {
@@ -53,21 +58,35 @@ class BangumiClient {
     Map<String, dynamic>? queryParameters,
     bool requiresAuth = false,
     bool anonymous = false,
+    String? accessToken,
     CancelToken? cancelToken,
+    Map<String, dynamic>? extra,
   }) async {
+    final uri = Uri.parse(url);
+    final route = _route(uri, requiresAuth, extra);
     try {
       final response = await DioFactory.bangumiDio.post(
-        url,
+        route == BangumiAcceleration.mirror
+            ? ApiEndpoints.bangumiMirrorDomain +
+                  uri.path +
+                  (uri.hasQuery ? '?${uri.query}' : '')
+            : url,
         data: data,
-        queryParameters: queryParameters,
+        queryParameters: route == BangumiAcceleration.mirror
+            ? null
+            : queryParameters,
         options: Options(
           headers: _headers(
+            route: route,
             requiresAuth: requiresAuth,
             anonymous: anonymous,
+            accessToken: accessToken,
             url: url,
             method: 'POST',
+            path: uri.path,
             data: data,
           ),
+          extra: route == BangumiAcceleration.ech ? echExtra : extra,
         ),
         cancelToken: cancelToken,
       );
@@ -77,12 +96,28 @@ class BangumiClient {
     }
   }
 
+  /// User-scoped requests always reach the official API over ECH, unless the
+  /// caller explicitly forces the official host for an unauthenticated retry.
+  BangumiAcceleration _route(
+    Uri uri,
+    bool requiresAuth,
+    Map<String, dynamic>? extra,
+  ) {
+    if (extra?[forceOfficialKey] == true) return BangumiAcceleration.direct;
+    if (!ApiEndpoints.bangumiPublicApiHosts.contains(uri.host)) {
+      return BangumiAcceleration.direct;
+    }
+    return requiresAuth ? BangumiAcceleration.ech : BangumiAcceleration.current;
+  }
+
   Map<String, dynamic> _headers({
+    BangumiAcceleration? route,
     required bool requiresAuth,
     bool anonymous = false,
     String? accessToken,
     required String url,
     required String method,
+    String? path,
     Object? data,
   }) {
     final headers = <String, dynamic>{...bangumiHTTPHeader};
@@ -93,9 +128,9 @@ class BangumiClient {
         (accessToken ??
                 GStorage.getSetting<String>(SettingsKeys.bangumiAccessToken))
             .trim();
-    // `anonymous` 是为鉴权兜底路径准备的：`bangumiSyncEnable` 会给每个请求
-    // 都带上令牌，所以如果不显式关掉，一个「要求不带鉴权」的重试
-    // 仍会把刚被拒的凭据再发一遍。
+    // `anonymous` exists for the auth fallback: `bangumiSyncEnable` adds a token
+    // to every request, so an unauthenticated retry must opt out explicitly or
+    // it would resend the credentials that were just rejected.
     if (!anonymous &&
         (requiresAuth || bangumiSyncEnable) &&
         token.isNotEmpty) {
@@ -118,11 +153,19 @@ class BangumiClient {
 
   bool _shouldSignProtectedMirrorRequest(String url, String method) {
     final uri = Uri.parse(url);
-    if (!hasBangumiMirrorCredentials ||
-        BangumiAcceleration.current != BangumiAcceleration.mirror ||
+    if (BangumiAcceleration.current != BangumiAcceleration.mirror ||
         !ApiEndpoints.bangumiPublicApiHosts.contains(uri.host)) {
       return false;
     }
-    return isSignatureProtectedBangumiPath(method, uri.path);
+    final path = uri.path;
+    if (method == 'POST' && path == '/v0/search/subjects') {
+      return true;
+    }
+    if (method != 'GET') {
+      return false;
+    }
+    return path.startsWith('/p1/subjects/') && path.endsWith('/comments') ||
+        path.startsWith('/p1/episodes/') && path.endsWith('/comments') ||
+        path.startsWith('/p1/characters/') && path.endsWith('/comments');
   }
 }

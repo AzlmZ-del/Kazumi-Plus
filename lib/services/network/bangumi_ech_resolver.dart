@@ -14,7 +14,7 @@ class BangumiEchResolver {
       client: bootstrap,
       endpoint: endpoint,
       hosts: _hosts,
-      // 共用的 Cloudflare ECH 配置与固定 IP，绕开被污染的 Bangumi DNS。
+      // Shared Cloudflare ECH config and pinned IPs bypass polluted DNS.
       configDomains: {for (final host in _hosts) host: 'crypto.cloudflare.com'},
       addressOverrides: {for (final host in _hosts) host: _addresses},
     );
@@ -22,26 +22,26 @@ class BangumiEchResolver {
   }
 }
 
-/// ECH 发现阶段的重试包装。
+/// Retry wrapper around ECH discovery.
 ///
-/// DoH 查询是 ECH 链路的第一跳，失败后重试成本最低（被拒的查询约 0.1s 返回，
-/// 还没花任何 TCP/TLS 时间）。实测 alidns 会直接丢掉约四分之一的查询，
-/// 这里最多重试 [maxAttempts] 次，带指数退避。
+/// The DoH lookup is the first hop of the ECH chain and the cheapest to retry:
+/// alidns drops roughly a quarter of queries. Up to [maxAttempts] attempts,
+/// each with exponential backoff.
 ///
-/// 只重试 [EchException]。`DohEchResolver` 失败时会清掉 in-flight 记录、
-/// 只缓存成功结果，所以每次重试都是真正重新查询。
+/// Only [EchException] is retried. `DohEchResolver` clears in-flight records on
+/// failure and caches only successes, so every retry is a real re-query.
 class RetryingEchResolver implements EchResolver {
   RetryingEchResolver(this._inner, this.client);
 
-  /// 总尝试次数（含首次）。
+  /// Total attempts, including the first.
   static const int maxAttempts = 3;
 
-  /// 首次重试前的等待，之后每次翻倍。
+  /// Delay before the first retry; doubles on each subsequent attempt.
   static const Duration baseDelay = Duration(milliseconds: 100);
 
   final EchResolver _inner;
 
-  /// 由 [_inner] 持有的 DoH 引导客户端，随本解析器一起释放。
+  /// DoH bootstrap client owned by [_inner] and released with this resolver.
   final http.Client client;
 
   @override

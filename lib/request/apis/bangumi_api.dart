@@ -1,7 +1,6 @@
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/request/config/api_endpoints.dart';
 import 'package:kazumi/request/clients/bangumi_client.dart';
-import 'package:kazumi/request/core/bangumi_transport.dart';
 import 'package:kazumi/request/core/network_exception.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/modules/bangumi/bangumi_relation.dart';
@@ -34,7 +33,7 @@ class BangumiApi {
   static final AsyncRateLimiter _writeRateLimiter =
       AsyncRateLimiter(const Duration(milliseconds: 250));
 
-  // 只重试连接类瞬时故障；HTTP/证书/取消/解析错误重试不会自行恢复。
+  // Retry only transient connection failures; HTTP/certificate/cancel/parse errors won't recover on retry.
   static Future<List<BangumiItem>> _fetchInitialList(
       Future<List<BangumiItem>> Function() fetch) async {
     try {
@@ -74,8 +73,8 @@ class BangumiApi {
     return bangumiCalendar;
   }
 
-  // 换季时的官方兜底。镜像模式改用缓存的
-  // /kazumi/v1/calendar/season 接口，而不是 Bangumi 搜索。
+  // Official fallback for season switching. Mirror mode uses the cached
+  // /kazumi/v1/calendar/season endpoint instead of Bangumi search.
   static Future<List<List<BangumiItem>>> getCalendarBySearch(
       List<String> dateRange, int limit, int offset) async {
     List<BangumiItem> bangumiList = [];
@@ -363,21 +362,20 @@ class BangumiApi {
       final url = ApiEndpoints.formatUrl(
           ApiEndpoints.bangumiAPIDomain + ApiEndpoints.bangumiRankSearch,
           [limit, offset]);
-      // nsfw 过滤只对带鉴权的请求生效。若存下的令牌已过期，
-      // 接口会返回 401，此时退回匿名请求，而不是让整次搜索失败。
+      // nsfw filtering only applies to authenticated requests. If the stored token has expired,
+      // the API returns 401 — fall back to anonymous instead of failing the whole search.
       final jsonData = wantNsfw
           ? await _requestWithAuthFallback(
               (anonymous) => _client.post(url,
                   data: params,
                   anonymous: anonymous,
-                  // nsfw 过滤只对已鉴权的调用方生效，所以这里显式取令牌，
-                  // 而不是指望同步开关刚好是开着的。
+                  // nsfw filtering applies only to authenticated callers, so request the token
+                  // explicitly instead of relying on the sync toggle happening to be on.
                   requiresAuth: !anonymous),
             )
           : await _client.post(url, data: params);
       final jsonList = jsonData['data'];
-      // 以前无条件的丢掉未翻译条目。现在仍以丢掉为默认，
-      // 但尊重设置项，让用户可以选择看到它们。
+      // Untranslated entries are still dropped by default, but the setting lets users show them.
       final showUntranslated =
           GStorage.getSetting(SettingsKeys.bangumiShowUntranslated);
       for (dynamic jsonItem in jsonList) {
@@ -403,8 +401,8 @@ class BangumiApi {
     }
   }
 
-  /// 先用存下的凭据执行 [request]，服务端拒绝时改为匿名重试一次。
-  /// 其它失败原样抛出。
+  /// Runs [request] with stored credentials, then retries anonymously once if the server rejects (401).
+  /// Other failures are rethrown unchanged.
   static Future<dynamic> _requestWithAuthFallback(
     Future<dynamic> Function(bool anonymous) request,
   ) async {
@@ -426,8 +424,7 @@ class BangumiApi {
                   ApiEndpoints.bangumiInfoByIDNext,
               [id]),
           anonymous: anonymous,
-          // R18 条目详情只对已鉴权的调用方开放，所以只要存了令牌，
-          // 第一次尝试就一定带上它。
+          // R18 item details require auth, so always attach the stored token on the first attempt.
           requiresAuth: !anonymous,
         ),
       );
@@ -488,10 +485,10 @@ class BangumiApi {
     return episodeInfo;
   }
 
-  /// 拉取条目下的全部剧集。
+  /// Fetches all episodes for a subject.
   ///
-  /// 默认吞掉异常并返回空列表（播放器的分集选择弹窗依赖这个宽松行为）；
-  /// 详情页需要区分「没有剧集」和「拉取失败」时把 [throwOnError] 设为 true。
+  /// Swallows errors and returns an empty list by default (the player's episode picker relies on this);
+  /// set [throwOnError] to true when the detail page needs to distinguish "no episodes" from "fetch failed".
   static Future<List<EpisodeInfo>> getBangumiEpisodesByID(
     int id, {
     bool throwOnError = false,
@@ -507,8 +504,8 @@ class BangumiApi {
           'offset': offset,
           'limit': limit,
         };
-        // R18 条目只在官方主机上、且只有已鉴权的调用方能拿到剧集列表，
-        // 镜像那边则允许匿名。所以先带令牌请求，失败再退回匿名。
+        // R18 episode lists are available only on the official host and only to authenticated callers;
+        // mirrors allow anonymous access. Send the token first, then fall back to anonymous.
         final jsonData = await _requestWithAuthFallback(
           (anonymous) => _client.get(
             ApiEndpoints.bangumiAPIDomain + ApiEndpoints.bangumiEpisodeByID,
@@ -568,11 +565,11 @@ class BangumiApi {
     return CharacterCommentResponse.fromJson(jsonData);
   }
 
-  /// 拉取评论分页；配置的加速源提供不了时，退回官方主机。
+  /// Fetches a page of comments, falling back to the official host if the configured mirror fails.
   ///
-  /// 镜像转发 `/p1/.../comments` 时不带凭据，所以需要鉴权的条目
-  /// （包括 R18）会返回上游错误。带上存下的令牌去官方主机重试就能拿回来；
-  /// 其它条目匿名也行，所以令牌被拒时仍能降级处理。
+  /// Mirrors forward `/p1/.../comments` without credentials, so subjects requiring auth
+  /// (including R18) return an upstream error. Retrying the official host with the stored token fixes that;
+  /// other subjects work anonymously, so a rejected token can still degrade gracefully.
   static Future<dynamic> _getCommentsWithFallback(String url) async {
     try {
       return await _client.get(url);
@@ -586,7 +583,7 @@ class BangumiApi {
         url,
         anonymous: anonymous,
         requiresAuth: !anonymous,
-        extra: const {bangumiForceOfficialKey: true},
+        extra: const {BangumiClient.forceOfficialKey: true},
       ),
     );
   }
@@ -628,7 +625,7 @@ class BangumiApi {
     try {
       final jsonData = await _client.get(
         ApiEndpoints.formatUrl(
-            ApiEndpoints.bangumiAuthAPIMirrorDomain +
+            ApiEndpoints.bangumiAPIDomain +
                 ApiEndpoints.bangumiUsernameByToken,
             []),
         requiresAuth: true,
@@ -668,7 +665,7 @@ class BangumiApi {
       Future<Map> fetchPageData(int offset, int pageLimit) async {
         await rateLimiter.acquire();
         final url = ApiEndpoints.formatUrl(
-            ApiEndpoints.bangumiAuthAPIMirrorDomain +
+            ApiEndpoints.bangumiAPIDomain +
                 ApiEndpoints.bangumiGetAllCollections,
             [username, pageLimit, offset]);
         final jsonData = await _client.get(
@@ -812,7 +809,7 @@ class BangumiApi {
     try {
       await _client.post(
         ApiEndpoints.formatUrl(
-            ApiEndpoints.bangumiAuthAPIMirrorDomain +
+            ApiEndpoints.bangumiAPIDomain +
                 ApiEndpoints.bangumiSetCollection,
             [id]),
         data: data,

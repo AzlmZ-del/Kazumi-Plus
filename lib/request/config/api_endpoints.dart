@@ -1,179 +1,177 @@
 import 'package:flutter/services.dart' show appBuildName;
 
 class ApiEndpoints {
-  /// 当前版本
+  /// Current version.
   static const String version = appBuildName ?? '0.0.0';
 
-  /// 规则API级别
+  /// Rule API level.
   static const int apiLevel = 9;
 
-  /// 项目主页
+  /// Project homepage.
   static const String projectUrl = "https://kazumi.app/";
 
-  /// Github 项目主页
+  /// GitHub project homepage.
   static const String sourceUrl = "https://github.com/Predidit/Kazumi";
 
-  /// 图标作者
+  /// Icon author.
   static const String iconUrl = "https://www.pixiv.net/users/66219277";
 
-  /// 规则仓库
+  /// Rule repository.
   static const String pluginShop =
       'https://raw.githubusercontent.com/Predidit/KazumiRules/main/';
 
-  /// gh-proxy 加速站点。裸域名单独留一份，供需要自己拼前缀的调用方使用。
+  /// gh-proxy acceleration host. Kept bare for callers that build their own prefix.
   static const String ghProxyHost = 'cdn.gh-proxy.org';
 
-  /// 前缀式镜像：把完整 URL 拼在它后面
+  /// Prefix mirror: append the full URL to this base.
   static const String ghProxyMirror = 'https://$ghProxyHost/';
 
-  /// 前缀式镜像的备用站
+  /// Backup prefix mirror.
   static const String ghfastMirror = 'https://ghfast.top/';
 
-  /// gh-proxy.com：实测比 [ghProxyMirror] 稳定，两个内置仓库都能走。
+  /// gh-proxy.com: tested more stable than [ghProxyMirror]; works for both built-in repos.
   static const String ghProxyComMirror = 'https://gh-proxy.com/';
 
-  /// ghproxy.imciel.com：延迟与 gh-proxy.com 相当。
+  /// ghproxy.imciel.com: latency comparable to gh-proxy.com.
   static const String ghProxyImcielMirror = 'https://ghproxy.imciel.com/';
 
-  /// ghproxy.net：可用但明显偏慢。
+  /// ghproxy.net: works but noticeably slower.
   static const String ghProxyNetMirror = 'https://ghproxy.net/';
 
-  /// ghproxy.cn：很慢，且只镜像官方仓库。
+  /// ghproxy.cn: very slow, and mirrors only the official repo.
   static const String ghProxyCnMirror = 'https://ghproxy.cn/';
 
-  /// jsDelivr 路径式镜像：GitHub raw 要改写成 `gh/<owner>/<repo>@<ref>/<path>`。
+  /// jsDelivr path mirror: rewrite GitHub raw as `gh/<owner>/<repo>@<ref>/<path>`.
   static const String jsDelivrMirror = 'https://cdn.jsdelivr.net/gh/';
 
-  /// jsDelivr 同一内容的分发节点，延迟接近主域。
+  /// jsDelivr CDN node for the same content, with latency close to the main domain.
   static const String jsDelivrGcoreMirror = 'https://gcore.jsdelivr.net/gh/';
 
-  /// GitHub raw 的固定前缀，路径式镜像据此改写。
+  /// Fixed GitHub raw prefix; path mirrors rewrite based on this.
   static const String githubRawPrefix = 'https://raw.githubusercontent.com/';
 
-  /// 路径式镜像：只镜像了官方规则仓库，需替换 `pluginShop` 前缀而非拼接
+  /// Path mirror: only the official rule repo; replace the `pluginShop` prefix rather than append.
   static const String gitcodeMirror =
       'https://raw.gitcode.com/gh_mirrors/ka/KazumiRules/raw/main/';
 
-  /// 个人规则仓库，与官方仓库并列内置
+  /// Personal rule repo, bundled alongside the official one.
   static const String personalPluginShop =
       'https://raw.githubusercontent.com/AzlmZ-del/Kazumi-Plus-Rules/main/';
 
-  /// 本版 Releases 所在仓库
+  /// Repo hosting this build's releases.
   static const String releasesRepo = 'https://github.com/AzlmZ-del/Kazumi-Plus';
 
-  /// 在线升级：读本仓库的最新 Release
+  /// In-app update: read the latest release of this repo.
   static const String latestApp =
       'https://api.github.com/repos/AzlmZ-del/Kazumi-Plus/releases/latest';
 
-  /// 在线升级镜像：用 gh-proxy 转发 api.github.com，国内可直连
+  /// In-app update mirror: gh-proxy forwarding of api.github.com, reachable directly in CN.
   static const String latestAppMirror =
       'https://cdn.gh-proxy.org/https://api.github.com/repos/AzlmZ-del/Kazumi-Plus/releases/latest';
 
-  /// Release 附件下载加速前缀（直接拼在完整 URL 前）
+  /// Release asset download acceleration prefix (prepend to the full URL).
   static const String releaseDownloadProxy = 'https://cdn.gh-proxy.org/';
 
-  /// Bangumi 镜像测试后端
+  /// Bangumi mirror test backend.
   static const String bangumiMirrorDomain = 'https://api.kazumi.fyi';
 
-  /// 弹弹官网
+  /// DanDanPlay website.
   static const String dandanIndex = 'https://www.dandanplay.com/';
 
-  /// Bangumi 官网
+  /// Bangumi website.
   static const String bangumiIndex = 'https://bangumi.tv/';
 
-  /// bangumi-data 数据集（CC BY 4.0，时间表的放送时刻与平台来源）
+  /// bangumi-data dataset (CC BY 4.0; broadcast times and platform sources for schedules).
   static const String bangumiDataIndex =
       'https://github.com/bangumi-data/bangumi-data';
 
-  /// Bangumi API 地址。
+  /// Bangumi API base URL.
   static const String bangumiAPIDomain = 'https://api.bgm.tv';
 
-  /// Bangumi 鉴权 API
-  static const String bangumiAuthAPIMirrorDomain = 'https://api.bgmapi.com';
 
-  /// Telegram 群组
+  /// Telegram group.
   static const String telegramGroup = 'https://t.me/kazumi_app';
 
-  /// 条目关联信息
+  /// Subject relations.
   static const String bangumiRelationsByID = '/v0/subjects/{0}/subjects';
 
-  /// 条目搜索
+  /// Subject search.
   static const String bangumiRankSearch =
       '/v0/search/subjects?limit={0}&offset={1}';
 
-  /// 从条目ID获取角色信息
+  /// Get characters of a subject by ID.
   static const String bangumiCharacterByID = '/v0/subjects/{0}/characters';
 
-  /// 从条目ID获取工作人员信息
+  /// Get staff of a subject by ID.
   static const String bangumiStaffByID = '/v0/subjects/{0}/persons';
 
-  /// 从条目ID获取剧集ID
+  /// Get episode IDs of a subject by ID.
   static const String bangumiEpisodeByID = '/v0/episodes';
 
-  /// 返回当前 Access Token 对应的用户信息
+  /// Get the user info for the current access token.
   static const String bangumiUsernameByToken = '/v0/me';
 
-  /// 新增或修改用户单个条目收藏
+  /// Add or update a single collection entry for the user.
   static const String bangumiSetCollection = '/v0/users/-/collections/{0}';
 
-  /// 获取用户全部收藏（不限类型）。用户名，分页参数1(limit)，分页参数2(offset)
+  /// Get all collections of a user (any type). Args: username, limit, offset.
   static const String bangumiGetAllCollections =
       '/v0/users/{0}/collections?subject_type=2&limit={1}&offset={2}';
 
-  /// Bangumi Next API 域名。
+  /// Bangumi Next API Domain
   static const String bangumiAPINextDomain = 'https://next.bgm.tv';
 
   static const bangumiPublicApiHosts = {'api.bgm.tv', 'next.bgm.tv'};
 
-  /// 每日放送
+  /// Daily broadcast calendar.
   static const String bangumiCalendar = '/p1/calendar';
 
-  /// 番剧趋势
+  /// Trending subjects.
   static const String bangumiTrendsNext = '/p1/trending/subjects';
 
-  /// Kazumi Bangumi 镜像缓存榜单
+  /// Kazumi Bangumi mirror cached popularity ranking.
   static const String bangumiMirrorPopularSubjects =
       '/kazumi/v1/popular/subjects';
 
-  /// Kazumi Bangumi 镜像季节时间表
+  /// Kazumi Bangumi mirror seasonal calendar.
   static const String bangumiMirrorSeasonCalendar =
       '/kazumi/v1/calendar/season';
 
-  /// 番剧信息
+  /// Subject info.
   static const String bangumiInfoByIDNext = '/p1/subjects/{0}';
 
-  /// 番剧评论
+  /// Subject comments.
   static const String bangumiCommentsByIDNext =
       '/p1/subjects/{0}/comments?limit={1}&offset={2}';
 
-  /// 番剧剧集评论
+  /// Episode comments.
   static const String bangumiEpisodeCommentsByIDNext =
       '/p1/episodes/{0}/comments';
 
-  /// 番剧角色信息
+  /// Character info.
   static const String bangumiCharacterInfoByCharacterIDNext =
       '/p1/characters/{0}';
 
-  /// 番剧角色评论
+  /// Character comments.
   static const String bangumiCharacterCommentsByIDNext =
       '/p1/characters/{0}/comments';
 
-  /// DanDanPlay API 域名。
+  /// DanDanPlay API Domain
   static const String dandanAPIDomain = 'https://api.dandanplay.net';
 
-  /// 获取弹幕
+  /// Get danmaku (comments).
   static const String dandanAPIComment = "/api/v2/comment/";
 
-  /// 检索弹弹番剧元数据
+  /// Search DanDanPlay subject metadata.
   static const String dandanAPISearchEpisodes = "/api/v2/search/episodes";
 
-  /// 获取弹弹番剧元数据
+  /// Get DanDanPlay subject metadata.
   static const String dandanAPIInfo = "/api/v2/bangumi/";
 
-  /// 获取弹弹番剧元数据（通过BGM番剧ID）
+  /// Get DanDanPlay subject metadata by Bangumi (BGM) subject ID.
   static const String dandanAPIInfoByBgmBangumiId = "/api/v2/bangumi/bgmtv/{0}";
 
-  /// 图片识别番剧
+  /// Identify a subject from an image.
   static const String traceApi = 'https://api.trace.moe/search';
 
   static String formatUrl(String url, List<dynamic> params) {

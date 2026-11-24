@@ -1,10 +1,8 @@
 import 'package:dio/dio.dart';
-import 'package:kazumi/request/core/bangumi_transport.dart';
 import 'package:kazumi/request/core/dio_logger_interceptor.dart';
+import 'package:kazumi/request/core/ech_adapter.dart';
 import 'package:kazumi/request/core/network_config.dart';
-import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/services/network/source_network_route.dart';
-import 'package:kazumi/services/network/rules_mirror.dart';
 import 'package:kazumi/utils/http_headers.dart';
 
 class DioFactory {
@@ -40,32 +38,24 @@ class DioFactory {
     defaultHeaders: {'referer': '', 'user-agent': getRandomUA()},
   );
 
-  static Dio get bangumiDio {
-    if (_bangumiDio != null) return _bangumiDio!;
-    final config = NetworkConfig.fromSettings();
-    final dio = _create(
-      config,
-      defaultHeaders: {'referer': ''},
-      interceptors: [BangumiAccelerationInterceptor()],
-    );
-    dio.httpClientAdapter = BangumiEchAdapter(
-      fallback: dio.httpClientAdapter,
-      config: config,
-    );
-    return _bangumiDio = dio;
-  }
+  static Dio get bangumiDio => _bangumiDio ??= _create(
+    NetworkConfig.fromSettings(),
+    defaultHeaders: {'referer': ''},
+    ech: true,
+  );
 
   static Dio get rulesRepoDio => _rulesRepoDio ??= _create(
     NetworkConfig.fromSettings(),
     defaultHeaders: {'user-agent': getRandomHttpUA()},
-    interceptors: [_RulesMirrorInterceptor()],
+    ech: true,
   );
 
   static Dio get pluginDio => _pluginDio ??= _create(
     NetworkConfig.fromSettings(),
     defaultHeaders: {
-      // 站点抓取一律用非浏览器 UA：浏览器 UA + BoringSSL 指纹会被 WAF 判为
-      // 伪装爬虫并直接 403。规则显式配了 userAgent 时以规则为准。
+      // Always use a non-browser UA for site scraping: a browser UA combined
+      // with the BoringSSL fingerprint makes WAF flag us as a bot and return 403.
+      // An explicit userAgent in the rule takes precedence.
       'user-agent': getRandomHttpUA(),
       'accept-language': getRandomAcceptedLanguage(),
     },
@@ -84,16 +74,16 @@ class DioFactory {
   }
 
   static void reset() {
-    // 换掉旧适配器时要放过已经在飞的请求。
+    // Retire old adapters without interrupting requests already in flight.
     _apiDio?.close();
     _bangumiDio?.close();
     _rulesRepoDio?.close();
     _pluginDio?.close();
+    _downloadDio?.close();
     for (final dio in _sourceDios.values) {
       dio.close();
     }
     _sourceDios.clear();
-    _downloadDio?.close();
     _apiDio = null;
     _bangumiDio = null;
     _rulesRepoDio = null;
@@ -104,7 +94,7 @@ class DioFactory {
   static Dio _create(
     NetworkConfig config, {
     Map<String, dynamic> defaultHeaders = const {},
-    List<Interceptor> interceptors = const [],
+    bool ech = false,
   }) {
     final dio = Dio(
       BaseOptions(
@@ -116,25 +106,12 @@ class DioFactory {
             status != null && status >= 200 && status < 300,
       ),
     );
-    dio.httpClientAdapter = config.createAdapter();
-    dio.interceptors.addAll(interceptors);
+    dio.httpClientAdapter = ech
+        ? EchAdapter(fallback: config.createAdapter(), config: config)
+        : config.createAdapter();
     if (config.enableLog) {
       dio.interceptors.add(DioLoggerInterceptor());
     }
     return dio;
-  }
-}
-
-class _RulesMirrorInterceptor extends Interceptor {
-  @override
-  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    // 镜像配置只放在一个枚举里，这样设置页与请求路径永远不会
-    // 对「当前用的是哪个主机」各说各话。
-    final mirrored = RulesMirror.current.map(options.uri.toString());
-    if (mirrored != null) {
-      KazumiLogger().d('Rules mirror: $mirrored');
-      options.path = mirrored;
-    }
-    handler.next(options);
   }
 }
