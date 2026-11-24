@@ -121,19 +121,16 @@ class BangumiClient {
     Object? data,
   }) {
     final headers = <String, dynamic>{...bangumiHTTPHeader};
-    final bangumiSyncEnable = GStorage.getSetting(
-      SettingsKeys.bangumiSyncEnable,
-    );
     final token =
         (accessToken ??
                 GStorage.getSetting<String>(SettingsKeys.bangumiAccessToken))
             .trim();
-    // `anonymous` exists for the auth fallback: `bangumiSyncEnable` adds a token
-    // to every request, so an unauthenticated retry must opt out explicitly or
-    // it would resend the credentials that were just rejected.
-    if (!anonymous &&
-        (requiresAuth || bangumiSyncEnable) &&
-        token.isNotEmpty) {
+    // Only send the token where the API actually needs it. `bangumiSyncEnable`
+    // is deliberately not consulted: it used to attach the token to every
+    // request, so an expired token turned public endpoints (`next.bgm.tv` p1
+    // series) into 401 and blanked the whole browse UI. `anonymous` lets the
+    // auth fallback retry without the credentials the server just rejected.
+    if (requiresAuth && !anonymous && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
     }
     if (_shouldSignProtectedMirrorRequest(url, method)) {

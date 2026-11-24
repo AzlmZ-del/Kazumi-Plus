@@ -163,7 +163,7 @@ class BangumiApi {
     return bangumiCalendar;
   }
 
-  static Future<List<BangumiItem>> getBangumiList(
+  static Future<({List<BangumiItem> items, bool failed})> getBangumiList(
       {int rank = 2, String tag = ''}) async {
     List<BangumiItem> bangumiList = [];
     late Map<String, dynamic> params;
@@ -205,11 +205,12 @@ class BangumiApi {
       }
     } catch (e) {
       KazumiLogger().e('Network: resolve bangumi list failed', error: e);
+      return (items: bangumiList, failed: true);
     }
-    return bangumiList;
+    return (items: bangumiList, failed: false);
   }
 
-  static Future<List<BangumiItem>> getBangumiTrendsList(
+  static Future<({List<BangumiItem> items, bool failed})> getBangumiTrendsList(
       {int type = 2, int limit = 24, int offset = 0}) async {
     List<BangumiItem> bangumiList = [];
     var params = <String, dynamic>{
@@ -235,8 +236,9 @@ class BangumiApi {
       bangumiList = offset == 0 ? await _fetchInitialList(fetch) : await fetch();
     } catch (e) {
       KazumiLogger().e('Network: resolve bangumi trends list failed', error: e);
+      return (items: bangumiList, failed: true);
     }
-    return bangumiList;
+    return (items: bangumiList, failed: false);
   }
 
   static String buildBangumiMirrorPopularPath({
@@ -254,7 +256,8 @@ class BangumiApi {
     ).toString();
   }
 
-  static Future<List<BangumiItem>> getBangumiMirrorPopularSubjects({
+  static Future<({List<BangumiItem> items, bool failed})>
+      getBangumiMirrorPopularSubjects({
     String tag = '',
     int limit = 24,
     int offset = 0,
@@ -283,8 +286,9 @@ class BangumiApi {
     } catch (e) {
       KazumiLogger()
           .e('Network: resolve bangumi mirror popular list failed', error: e);
+      return (items: bangumiList, failed: true);
     }
-    return bangumiList;
+    return (items: bangumiList, failed: false);
   }
 
   static List<String> _buildNumberFilter<T extends num>(T? min, T? max) {

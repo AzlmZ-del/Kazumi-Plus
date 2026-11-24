@@ -99,7 +99,7 @@ void main() {
         });
       };
 
-      final result = await BangumiApi.getBangumiTrendsList(offset: 0);
+      final result = (await BangumiApi.getBangumiTrendsList(offset: 0)).items;
 
       expect(adapter.requests, hasLength(2));
       expect(result, hasLength(1));
@@ -119,7 +119,7 @@ void main() {
         throw netError(request, DioExceptionType.connectionError);
       };
 
-      final result = await BangumiApi.getBangumiTrendsList(offset: 0);
+      final result = (await BangumiApi.getBangumiTrendsList(offset: 0)).items;
 
       expect(adapter.requests, hasLength(2));
       expect(result, isEmpty);
@@ -127,7 +127,7 @@ void main() {
   );
 
   test('trends healthy first attempt performs a single request', () async {
-    final result = await BangumiApi.getBangumiTrendsList(offset: 0);
+    final result = (await BangumiApi.getBangumiTrendsList(offset: 0)).items;
 
     expect(adapter.requests, hasLength(1));
     expect(result, isEmpty);
@@ -136,7 +136,7 @@ void main() {
   test('trends legal empty result performs a single request', () async {
     adapter.respond = (_, _) async => _json({'data': []});
 
-    final result = await BangumiApi.getBangumiTrendsList(offset: 0);
+    final result = (await BangumiApi.getBangumiTrendsList(offset: 0)).items;
 
     expect(adapter.requests, hasLength(1));
     expect(result, isEmpty);
@@ -168,7 +168,7 @@ void main() {
       ],
     });
 
-    final result = await BangumiApi.getBangumiTrendsList(offset: 0);
+    final result = (await BangumiApi.getBangumiTrendsList(offset: 0)).items;
 
     expect(adapter.requests, hasLength(1));
     expect(result, isEmpty);
@@ -179,7 +179,7 @@ void main() {
       throw netError(request, DioExceptionType.connectionError);
     };
 
-    final result = await BangumiApi.getBangumiTrendsList(offset: 24);
+    final result = (await BangumiApi.getBangumiTrendsList(offset: 24)).items;
 
     expect(adapter.requests, hasLength(1));
     expect(result, isEmpty);
@@ -202,9 +202,9 @@ void main() {
         ]);
       };
 
-      final result = await BangumiApi.getBangumiMirrorPopularSubjects(
+      final result = (await BangumiApi.getBangumiMirrorPopularSubjects(
         offset: 0,
-      );
+      )).items;
 
       expect(adapter.requests, hasLength(2));
       expect(result, hasLength(1));
@@ -222,7 +222,7 @@ void main() {
       throw netError(request, DioExceptionType.connectionError);
     };
 
-    final result = await BangumiApi.getBangumiMirrorPopularSubjects(offset: 24);
+    final result = (await BangumiApi.getBangumiMirrorPopularSubjects(offset: 24)).items;
 
     expect(adapter.requests, hasLength(1));
     expect(result, isEmpty);

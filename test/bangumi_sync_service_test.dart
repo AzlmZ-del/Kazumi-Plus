@@ -141,8 +141,9 @@ void main() {
     await started.future;
     expect(GStorage.getSetting(SettingsKeys.bangumiAccessToken), 'saved-token');
     await BangumiClient.instance.get('https://api.bgm.tv/v0/subjects/1');
-    expect(
-        adapter.requests.last.headers['Authorization'], 'Bearer saved-token');
+    // Public endpoints no longer carry the token, so a stale draft cannot leak
+    // into them; the saved credential is asserted straight from storage above.
+    expect(adapter.requests.last.headers['Authorization'], isNull);
     response.complete(_user('replacement-user'));
     await saving;
     expect(GStorage.getSetting(SettingsKeys.bangumiAccessToken),
