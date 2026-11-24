@@ -42,7 +42,8 @@ class PluginCatalogView extends StatefulWidget {
 
   final PluginsController controller;
 
-  /// 打开仓库管理页。传 `null` 会隐藏所有入口——引导页要的就是这个效果。
+  /// Opens the repository management page. Passing `null` hides every entry
+  /// point, which is what the onboarding page wants.
   final VoidCallback? onManageRepositories;
 
   final Widget Function(BuildContext context, List<Widget> slivers)?
@@ -62,12 +63,17 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
   bool _loading = true;
   bool _loadFailed = false;
 
-  /// 每次加载后记下的仓库总数，让表头直接取用，
-  /// 不必每帧都去读一次设置。
+  /// Repository counts captured after each load so the header can read them
+  /// directly instead of querying the settings on every frame.
   int _repositoryCount = 0;
   int _enabledRepositoryCount = 0;
 
-  /// 加载失败的仓库主机名。用户关掉横幅就清空，出现新的失败集合时再重新显示。
+  /// Header summary: names the custom repositories in use, otherwise the mirror
+  /// serving the built-in ones. Counts stay in the entry below to avoid duplication.
+  String _repositorySummary = '';
+
+  /// Host names of repositories that failed to load. Cleared when the user
+  /// dismisses the banner, and shown again for a new set of failures.
   String _dismissedFailures = '';
 
   PluginsController get _controller => widget.controller;
@@ -120,6 +126,12 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
     _enabledRepositoryCount = repositories
         .where((repository) => repository.enabled)
         .length;
+    final custom = repositories.where(
+      (repository) => repository.enabled && !repository.isBuiltIn,
+    );
+    _repositorySummary = custom.isEmpty
+        ? '默认仓库（${RulesMirror.current.label}）'
+        : '自定义仓库（${custom.map((repository) => repository.displayLabel).join('、')}）';
   }
 
   void _refresh() {
@@ -127,10 +139,11 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
     _startRefresh();
   }
 
-  /// 重新加载目录，且不受「正在加载」守卫的拦截。
+  /// Reloads the catalog without being blocked by the loading guard.
   ///
-  /// 仓库配置变更后调用。与 [_refresh] 不同，它不能被首次加载吞掉，
-  /// 否则开关一个仓库之后列表还停在旧目录上。
+  /// Called after repository configuration changes. Unlike [_refresh], it must
+  /// not be swallowed by the first load, or toggling a repository would leave
+  /// the list on the old catalog.
   void reload() => _startRefresh();
 
   void _startRefresh() {
@@ -224,9 +237,9 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (!widget._onboarding) ...[
-          const RulePageIntro(
+          RulePageIntro(
             title: '发现更多来源',
-            description: '浏览社区规则，为你的番剧搜索添加更多选择。',
+            description: _repositorySummary,
             icon: Icons.travel_explore_rounded,
           ),
           if (widget.onManageRepositories != null) ...[
@@ -307,10 +320,11 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
     );
   }
 
-  /// 进入仓库管理页的紧凑入口。
+  /// Compact entry point to the repository management page.
   ///
-  /// 只有宿主页面接了 [PluginCatalogView.onManageRepositories] 才渲染；
-  /// 引导页什么都不传，因此不会出现管理界面。
+  /// Only rendered when the host page wires up
+  /// [PluginCatalogView.onManageRepositories]; the onboarding page passes
+  /// nothing, so no management UI appears.
   Widget _repositoryEntry() {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
@@ -357,10 +371,10 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
     );
   }
 
-  /// 黄色横幅，列出上次加载失败的仓库。
+  /// Yellow banner listing repositories that failed on the last load.
   ///
-  /// 部分失败不算错误：其余目录仍然完全可用，所以这条横幅可以关掉，
-  /// 而不是接管整个页面。
+  /// Partial failure is not an error: the remaining catalogs are fully usable,
+  /// so the banner can be dismissed instead of taking over the whole page.
   Widget? _failureBanner() {
     if (widget._onboarding || _loading || _loadFailed) {
       return null;
@@ -417,18 +431,20 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
     );
   }
 
-  /// 规则的来源，排成作者下面的一行。
+  /// Source of a rule, laid out on the line below the author.
   ///
-  /// 优先用仓库名；没有就用仓库 URL 的主机名；内置仓库一律用固定名称，
-  /// 不展开成主机。`+N` 表示被同名冲突挡住的规则条数，点这一行可以展开——
-  /// 这行来源取代了原先同时承载两者的 chip。
+  /// Prefers the repository name; falls back to the host name of the
+  /// repository URL; built-in repositories always use a fixed label rather than
+  /// expanding to the host. `+N` is the number of rules shadowed by a name
+  /// clash, and tapping the line expands them. This source line replaces the
+  /// chip that used to carry both.
   String _sourceLabel(PluginHTTPItem item) {
     final base = _repositoryName(item);
     final shadowedCount = _controller.shadowedRulesFor(item.name).length;
     return shadowedCount == 0 ? base : '$base +$shadowedCount';
   }
 
-  /// 目录条目所属仓库的名称。
+  /// Name of the repository the catalog entry belongs to.
   String _repositoryName(PluginHTTPItem item) {
     final builtIn = RuleRepositoryList.builtInLabelOf(item.repositoryUrl);
     if (builtIn != null) {
@@ -624,8 +640,9 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
                     final item = items[index];
                     final status = _controller.pluginStatus(item);
                     final busy = _installing.contains(item.name);
-                    // 地址行显示的是规则自己的 baseURL，索引文件里没有这个字段；
-                    // 它是异步解析出来的，解析完成前这一行就不显示。
+                    // The address line shows the rule's own baseURL, which the
+                    // index file does not carry; it is resolved asynchronously
+                    // and stays hidden until resolution finishes.
                     return FutureBuilder<String?>(
                       future: _controller.ruleBaseUrl(item),
                       builder: (context, snapshot) {
@@ -639,28 +656,33 @@ class PluginCatalogViewState extends State<PluginCatalogView> {
                             height: 16,
                             radius: 6,
                             fontSize: 10,
-                            // 版本号固定绿色，不跟主题走：它是「版本」这个身份的
-                            // 固定记号，换了主题也该一眼认出来。
+                            // Version stays green regardless of theme: it is the
+                            // fixed marker of the "version" identity and should
+                            // remain recognisable under any theme.
                             background: const Color(0xFFCDEFD4),
                             foreground: const Color(0xFF1B5E33),
                           ),
-                          // 源类型跟作者同一行：它描述规则的实现方式，
-                          // 不是身份信息，不该挤在名称旁边。
+                          // Source type shares the author line: it describes how
+                          // the rule is implemented, not identity, so it does
+                          // not belong next to the name.
                           subtitleTag: item.type.isEmpty
                               ? null
                               : RuleTag(
                                   label: item.type,
                                   width: 44,
-                                  // 16 = bodySmall 的行高，再高就会把作者行撑开。
+                                  // 16 = bodySmall line height; anything taller
+                                  // stretches the author line.
                                   height: 16,
                                   radius: 6,
                                   fontSize: 10,
-                                  // 源类型固定蓝色，同样不跟主题走。
+                                  // Source type is fixed blue, also ignoring the
+                                  // theme.
                                   background: const Color(0xFFCFE3FA),
                                   foreground: const Color(0xFF14406B),
                                 ),
-                          // 与【我的规则】卡同款：直连声明堆在右列第三枚，
-                          // 配色同样用 tertiaryContainer 动态主题色。
+                          // Same as the "My Rules" card: the direct-connection
+                          // declaration is the third tag in the right column and
+                          // uses the dynamic tertiaryContainer theme colour.
                           stackedTags: item.directConnection
                               ? [
                                   RuleTag(

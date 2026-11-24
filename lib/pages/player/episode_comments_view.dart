@@ -71,7 +71,7 @@ class EpisodeCommentsView extends StatelessWidget {
                 child: GeneralErrorWidget(
                   icon: Icons.cloud_off_rounded,
                   title: '评论暂时未能加载',
-                  errMsg: '请检查网络后重试，或切换分集查看讨论。',
+                  errMsg: '请检查网络连接后重试。',
                   onRetry: onRefresh,
                   retryText: '重新加载',
                 ),
@@ -115,7 +115,7 @@ class EpisodeCommentsView extends StatelessWidget {
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) => KeepAlive(
-                      // 保住 BBCode 图片的布局尺寸与已展开的讨论，滚动回来不会重排。
+                      // Retain BBCode image geometry and expanded discussions.
                       key: ObjectKey(comments[index]),
                       keepAlive: true,
                       child: IndexedSemantics(
@@ -305,7 +305,7 @@ class _EpisodeHeader extends StatelessWidget {
                   )),
             ),
             const SizedBox(height: 6),
-            // 先占住一行，元信息到位时不会把内容顶下去。
+            // Reserve one line to prevent jumps when metadata arrives.
             Tooltip(
               message: subtitle,
               child: Text(subtitle,

@@ -256,7 +256,7 @@ class _PluginViewPageState extends State<PluginViewPage> {
                       children: [
                         RulePageIntro(
                           title: '我的规则',
-                          description: '管理你的番剧来源。拖动调整搜索顺序，点按规则进行编辑。',
+                          description: '播放来源按当前列表顺序展示',
                           icon: Icons.extension_rounded,
                           actions: [
                             FilledButton.icon(
@@ -391,7 +391,7 @@ class _PluginViewPageState extends State<PluginViewPage> {
                             fontSize: 10,
                             background: const Color(0xFFCDEFD4),
                             foreground: const Color(0xFF1B5E33)),
-                        // 源类型跟作者/站点同一行，与规则仓库页保持一致。
+                        // Source type shares the row with author/site, matching the rules repo page.
                         subtitleTag: plugin.sourceTypeLabel.isEmpty
                             ? null
                             : RuleTag(
@@ -402,7 +402,7 @@ class _PluginViewPageState extends State<PluginViewPage> {
                                 fontSize: 10,
                                 background: const Color(0xFFCFE3FA),
                                 foreground: const Color(0xFF14406B)),
-                        // 与版本号同列、同规格，堆在类型 chip 下方。
+                        // Same column and spec as the version tag, stacked below the type chip.
                         stackedTags: [
                           if (plugin.directConnection)
                             RuleTag(
@@ -430,7 +430,7 @@ class _PluginViewPageState extends State<PluginViewPage> {
                           _selected.add(plugin.name);
                         }),
                         tags: [
-                          // 有登录流程才标，没登录的不打扰。
+                          // Only tagged when the source has a login flow.
                           if (plugin.authEnabled)
                             RuleTag(
                                 label: '启用登录',
@@ -461,7 +461,7 @@ class _PluginViewPageState extends State<PluginViewPage> {
                               message: '拖动排序',
                               child: ReorderableDragStartListener(
                                 index: index,
-                                // 32 而非 48：图标 24 贴边，才不会比右侧 chip 偏左 12px。
+                                // 32 instead of 48: a flush 24px icon keeps it from sitting 12px left of the right-side chip.
                                 child: const SizedBox.square(
                                     dimension: 32,
                                     child: Icon(Icons.drag_indicator_rounded)),
@@ -487,7 +487,7 @@ class _PluginViewPageState extends State<PluginViewPage> {
         builder: (context, toggle) => IconButton(
             tooltip: '${plugin.name} 的更多操作',
             onPressed: toggle,
-            // 与拖拽手柄一致收到 32，图标才不会比右侧 chip 偏左。
+            // Matches the 32px drag handle so the icon is not left of the right-side chip.
             constraints: const BoxConstraints.tightFor(width: 32, height: 32),
             padding: EdgeInsets.zero,
             iconSize: 24,

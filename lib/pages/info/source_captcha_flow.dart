@@ -26,8 +26,9 @@ class _SourceCaptchaFlow {
       _dialogs.run(
         (task) async {
           final service = CaptchaVerificationService();
-          // 让验证 WebView 与后续 dio 请求共用规则 UA，clearance cookie 才不会
-          // 因 UA 不一致而作废（规则未配 UA 时内部回落到浏览器 UA 池）。
+          // Share the rule's UA between the captcha WebView and later dio
+          // requests so the clearance cookie is not invalidated by a UA mismatch
+          // (falls back to the browser UA pool when the rule sets none).
           service.applyRuleUserAgent(plugin.userAgent);
           service.applyRuleNetwork(plugin.directConnection);
           final verified = Completer<String>();
@@ -53,7 +54,7 @@ class _SourceCaptchaFlow {
                 onVerified: verified.complete,
               ),
             );
-            // 提交在 JS 点击后就返回了，此时验证还没真正完成。
+            // Submission returns after the JS click, before verification completes.
             if (!finalizing) {
               timeout?.cancel();
               timeout = Timer(const Duration(seconds: 8), task.cancel);
@@ -118,14 +119,14 @@ class _VerifyDialogFrame extends StatelessWidget {
   const _VerifyDialogFrame({
     required this.pluginName,
     required this.title,
-    required this.description,
+    this.description,
     required this.child,
     this.actions = const [],
   });
 
   final String pluginName;
   final String title;
-  final String description;
+  final String? description;
   final Widget child;
   final List<Widget> actions;
 
@@ -140,7 +141,8 @@ class _VerifyDialogFrame extends StatelessWidget {
       constraints: const BoxConstraints(maxWidth: 420),
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-      contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+      contentPadding:
+          EdgeInsets.fromLTRB(24, description == null ? 20 : 12, 24, 0),
       actionsPadding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
       actionsOverflowButtonSpacing: 8,
       title: Column(
@@ -173,13 +175,15 @@ class _VerifyDialogFrame extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              description,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colors.onSurfaceVariant,
+            if (description != null) ...[
+              Text(
+                description!,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colors.onSurfaceVariant,
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
+            ],
             child,
             if (actions.isEmpty) const SizedBox(height: 24),
           ],
@@ -304,7 +308,6 @@ class _CaptchaDialogState extends State<_CaptchaDialog> {
     return _VerifyDialogFrame(
       pluginName: widget.pluginName,
       title: '输入验证码',
-      description: '输入下图中的字符，继续检索此来源。',
       actions: [
         TextButton(
           style: TextButton.styleFrom(minimumSize: const Size(72, 48)),

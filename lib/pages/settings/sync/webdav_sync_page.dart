@@ -22,44 +22,45 @@ class WebDavSyncPage extends StatefulWidget {
 }
 
 class _WebDavSyncPageState extends State<WebDavSyncPage> {
-  /// 动作按钮的左右内缩，对齐卡内 `Divider(indent: 16)`，
-  /// 与「追番同步」页各卡的同名常量取同一个值。
+  /// Horizontal inset of the action buttons, matching the card's `Divider(indent: 16)`
+  /// and the same-named constant on the anime sync cards.
   static const double _buttonInset = 16;
 
-  /// 正在执行的动作标识。每个动作一个 key，`_runAction` 期间置为该 key：
-  /// 只有对应按钮显示忙碌态，其余按钮保持原样（互斥由 `_busy` 判定拦截）。
+  /// Key of the running action, set by `_runAction` for its duration: only that
+  /// button shows a busy state, the others stay unchanged.
   ///
-  /// `null` = 空闲。`'other'` = 「启用 WebDAV」开关拨动这类没有独立按钮的
-  /// 页级动作，此时所有动作按钮都进忙碌态。
+  /// `null` = idle. `'other'` = page-level actions without their own button,
+  /// such as toggling the WebDAV switch; all action buttons go busy then.
   String? _busyAction;
 
-  /// 任意动作在跑即视为忙碌（互斥 + `PopScope` 返回拦截共用）。
+  /// Busy while any action runs (shared by the mutex and `PopScope` interception).
   bool get _busy => _busyAction != null;
 
   bool _failed = false;
   String? _message;
 
-  /// 「启用 WebDAV」卡片是否展开。展开后下方露出要同步的内容与手动同步按钮。
+  /// Whether the WebDAV card is expanded, revealing its content and sync buttons.
   bool _expanded = false;
 
-  /// 拨开关时要联动展开/折叠，得拿到 `ExpansionTile` 的控制器。
+  /// Controller for the `ExpansionTile`, so the switch can expand/collapse it.
   final ExpansibleController _enableController = ExpansibleController();
 
-  // 进页面一律折叠：展开态不跟开关联动，要自己点开。
-  // （页内拨开关时仍会跟着展开/折叠，见 `_toggleEnabled`。）
+  // Always collapsed on entry: expanding needs a tap, the switch does not drive
+  // it (in-page toggles still do, see `_toggleEnabled`).
 
   @override
   void dispose() {
-    // 控制器由本页持有，`ExpansionTile` 不会替我们释放。
+    // The page owns the controller; `ExpansionTile` does not dispose it.
     _enableController.dispose();
     super.dispose();
   }
 
-  /// 页级动作统一入口：跑 [action] 前把 `_busyAction` 置为 [busyKey]。
+  /// Entry point for page-level actions: sets `_busyAction` to [busyKey] while
+  /// [action] runs.
   ///
-  /// [busyKey] 决定哪颗按钮显示忙碌态（`'other'` = 无独立按钮的页级动作，
-  /// 全部按钮进忙碌态）。忙碌期间再点任何动作都会在这里被拦掉（互斥），
-  /// 但 UI 上只有 busyKey 对应的按钮变化。
+  /// [busyKey] picks the button showing the busy state (`'other'` = no own
+  /// button, all busy). Further clicks are dropped here (mutex), but only the
+  /// button matching busyKey changes.
   Future<void> _runAction({
     required String busyKey,
     required Future<void> Function() action,
@@ -84,11 +85,11 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
     }
   }
 
-  /// 同步/备份动作统一走胶囊提示：开始、成功、失败都弹 toast，
-  /// 不往页面里塞常驻反馈条（同步耗时长时那条会一直挂着，反而碍眼）。
+  /// Sync/backup actions report via toasts: start, success and failure all pop
+  /// one, with no persistent feedback bar on the page.
   ///
-  /// 忙碌态只标在触发按钮上（[busyKey]），其余按钮视觉不变；
-  /// 互斥仍由 `_busy` 判定，忙碌期间的点击在这里直接忽略。
+  /// Only the triggering button ([busyKey]) shows busy; the mutex still comes
+  /// from `_busy` and clicks during it are ignored here.
   Future<void> _runSync({
     required String busyKey,
     required String startMessage,
@@ -133,13 +134,13 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
     },
   );
 
-  /// 备份目录改动后重建下面的卡片：按钮的可用态读的就是目录。
+  /// Rebuild the cards below when the backup directory changes; button states read it.
   void _onLocalBackupDirectoryChanged() {
     if (mounted) setState(() {});
   }
 
-  /// 服务器配置保存成功（或失败关掉了同步）后刷新本页：
-  /// `configured` / 域名 / 「启用 WebDAV」卡的置灰状态都跟着变。
+  /// Refresh the page after the server config is saved (or a failure disabled
+  /// sync): `configured`, the host and the WebDAV card's dimmed state change.
   void _onConfigurationChanged() {
     if (mounted) {
       setState(() {
@@ -171,7 +172,7 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
     action: () => widget.danmakuShieldSync.sync(),
   );
 
-  /// 本地是否存有任何凭据（Bangumi Token/账密/Cookie、WebDAV 配置）。
+  /// Whether any credential is stored locally (Bangumi token/account/cookie, WebDAV config).
   bool get _hasAnyCredential => WebDav().hasAnyCredential;
 
   Future<void> _uploadCredentials() => _runSync(
@@ -248,8 +249,8 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
             ),
             LocalBackupSettingsCard(
               onDirectoryChanged: _onLocalBackupDirectoryChanged,
-              // 恢复完成后整页重读：服务器卡片的地址/账号、以及各开关的
-              // 文案都来自存储，只重建这张卡不会让它们变。
+              // Reload the whole page after a restore: the server card's
+              // address/account and the switch labels all come from storage.
               onRestored: () {
                 if (mounted) setState(() {});
               },
@@ -260,7 +261,7 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
     );
   }
 
-  /// 「启用 WebDAV」卡片：头部是开关，展开后露出要同步的内容与手动同步按钮。
+  /// The WebDAV card: the switch is the header, expanding reveals content and buttons.
   Widget _enableCard({
     required bool configured,
     required bool enabled,
@@ -274,9 +275,7 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
     final dimmed = colors.onSurface.withValues(alpha: 0.38);
     final foreground = configured ? colors.onSurface : dimmed;
     final secondary = configured ? colors.onSurfaceVariant : dimmed;
-    final subtitle = configured
-        ? (enabled ? '已开启，请选择要同步内容' : '开启后选择要同步的内容')
-        : '请先配置服务器';
+    final subtitle = configured ? null : '请先配置服务器';
 
     return TonalCard(
       elevation: kSyncCardElevation,
@@ -288,22 +287,25 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
         collapsedShape: const Border(),
         minTileHeight: kSyncCardTileHeight,
         tilePadding: const EdgeInsets.symmetric(horizontal: 20),
-        // 展开区四边统一 12dp（与其余五张卡一致）。
-        // 里面的 `SwitchListTile` 自带 16dp 内容边距，合计 28dp。
+        // 12dp on all sides of the expanded area, as in the other five cards.
+        // The inner `SwitchListTile` adds 16dp of content padding, 28dp total.
         childrenPadding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
         expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
         leading: Icon(Icons.cloud_sync_rounded, color: secondary),
         title: SyncCardTitle('启用 WebDAV', color: foreground),
-        subtitle: SyncCardSubtitle(subtitle, color: secondary),
+        subtitle: subtitle == null
+            ? null
+            : SyncCardSubtitle(subtitle, color: secondary),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 同步中也允许收起：收起来只是把内容区藏了，同步照旧在后台跑，
-            // 再点开还能看到进度。开关本身仍受 `_busy` 限制。
+            // Collapsing is allowed during sync: it only hides the content and
+            // the sync keeps running. The switch itself is still gated by `_busy`.
             Switch(
               value: enabled,
               onChanged: configured && !_busy ? _toggleEnabled : null,
-              // 默认左右各 4dp 透明内边距会把控件撑到 60dp，收掉后正好是轨道宽度。
+              // The default 4dp horizontal padding inflates the control to 60dp;
+              // removing it leaves exactly the track width.
               padding: EdgeInsets.zero,
             ),
             SyncExpandChevron(expanded: _expanded, color: secondary),
@@ -368,11 +370,12 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
               if (mounted) setState(() {});
             },
           ),
-          // 总开关关闭时不显示动作按钮区：开关都禁用了，按钮留着也没法点。
+          // Hide the action buttons when the master switch is off: everything is
+          // disabled anyway.
           if (enabled)
             Padding(
-              // 横向在 childrenPadding 的 12dp 之上再缩 16dp，对齐卡内
-              // `Divider(indent: 16, endIndent: 16)`；顶部 10dp 与上面的开关列表拉开。
+              // Another 16dp on top of childrenPadding's 12dp, aligning with the
+              // inner `Divider(indent: 16)`; 10dp on top separates the switches.
               padding: const EdgeInsets.symmetric(horizontal: _buttonInset),
               child: Padding(
                 padding: const EdgeInsets.only(top: 10),
@@ -413,7 +416,7 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
             ),
           if (enabled && credentials)
             Padding(
-              // 「账号信息备份」区：与上方按钮区同款 16dp 内缩，顶部 10dp 拉开。
+              // Credential backup area: same 16dp inset as the buttons above, 10dp on top.
               padding: const EdgeInsets.symmetric(horizontal: _buttonInset),
               child: Padding(
                 padding: const EdgeInsets.only(top: 10),
@@ -453,11 +456,11 @@ class _WebDavSyncPageState extends State<WebDavSyncPage> {
     );
   }
 
-  /// 拨开关时同步展开态：开启就展开、关闭就折叠。
+  /// Keep the expanded state in sync with the switch: on expands, off collapses.
   ///
-  /// 只在**页内拨动**时生效；进页面时的初始态固定为折叠（见 `_expanded` 定义）。
-  /// `_expanded` 不在这里改 —— 控制器触发的 `onExpansionChanged` 会统一更新它，
-  /// 免得两处赋值打架。
+  /// Only applies to in-page toggles; the initial state is always collapsed (see
+  /// `_expanded`). `_expanded` is not set here — the controller-triggered
+  /// `onExpansionChanged` updates it, so there is a single owner.
   Future<void> _toggleEnabled(bool value) async {
     if (value) {
       _enableController.expand();

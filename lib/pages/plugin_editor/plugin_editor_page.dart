@@ -20,8 +20,8 @@ abstract final class _RuleEditorText {
   static const testRule = '测试规则';
   static const save = '保存';
 
-  static const modeXPath = 'XPath';
-  static const modeApi = 'API';
+  static const modeXPath = RuleModeText.xpath;
+  static const modeApi = RuleModeText.api;
   static const methodGet = 'GET';
   static const methodPost = 'POST';
   static const bodyTypeNone = '无';
@@ -59,11 +59,8 @@ abstract final class _RuleEditorText {
       'KazumiCaptcha.log("ready"); KazumiCaptcha.done();';
 
   static const sectionBasic = '基本信息';
-  static const sectionBasicDesc = '规则的名称、版本与站点地址';
   static const sectionSearch = '搜索规则';
-  static const sectionSearchDesc = '定义如何在站点内检索条目';
   static const sectionChapter = '选集规则';
-  static const sectionChapterDesc = '定义如何获取播放线路与剧集列表';
   static const sectionAuth = '登录';
   static const sectionAuthDesc = '定义如何用本机保存的账号换取令牌';
   static const authNotEnabledDesc =
@@ -86,7 +83,6 @@ abstract final class _RuleEditorText {
   static const authRefreshOnStatus = '刷新令牌的状态码（逗号分隔）';
   static const authRefreshOnStatusHelper = '响应返回这些状态码时清空令牌并重新登录一次，默认 401。';
   static const advancedOptions = '高级选项';
-  static const advancedOptionsDesc = '行为、网络与反反爬虫配置';
   static const groupBehavior = '行为设置';
   static const groupNetwork = '网络设置';
   static const groupAntiCrawler = '反反爬虫';
@@ -166,13 +162,9 @@ abstract final class _RuleEditorText {
   static const captchaDetectValue = '验证页检测值';
   static const captchaDetectValueHelper = '留空时使用验证码图片或验证按钮的 XPath 进行检测。';
   static const captchaImage = '验证码图片（XPath）';
-  static const captchaImageHelper = '填写验证码图片元素的 XPath。';
   static const captchaInput = '验证码输入框（XPath）';
-  static const captchaInputHelper = '填写验证码输入框元素的 XPath。';
   static const captchaSubmitButton = '验证提交按钮（XPath）';
-  static const captchaSubmitButtonHelper = '填写提交验证码按钮元素的 XPath。';
   static const verifyButton = '验证按钮（XPath）';
-  static const verifyButtonHelper = '填写验证按钮元素的 XPath，检测到后将自动点击。';
   static const captchaScript = '验证脚本（JavaScript）';
   static const captchaScriptHelper =
       '可调用 KazumiCaptcha.log、clicked、done 和 fail。';
@@ -278,7 +270,7 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
   bool _loginChecking = false;
   String? _loginResult;
 
-  /// 站点账号：每个规则各存一份，跟规则名绑定。
+  /// Site accounts: one stored per rule, keyed by rule name.
   final PluginCredentialsStore _accountStore = PluginCredentialsStore.instance;
   final TextEditingController accountController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
@@ -290,7 +282,7 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
   String chapterApiMethod = 'GET';
   String chapterApiBodyType = ApiBodyType.none;
   String chapterApiFormat = ApiChapterFormat.nested;
-  // 编辑器已不再展示的旧字段也要原样保留，避免保存时丢数据。
+  // Preserve legacy fields that the editor no longer exposes.
   late String _api;
   late String _type;
   late bool _muliSources;
@@ -301,8 +293,9 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
   bool adBlocker = false;
   bool directConnection = false;
 
-  /// 用户在本编辑器里动过直连开关。保存时写回 Plugin，
-  /// 更新源合并时据此决定本地赢还是跟随源。
+  /// Whether the user toggled direct connection in this editor. Written back
+  /// to the Plugin on save; update-source merging uses it to decide whether the
+  /// local value wins or the source is followed.
   bool directConnectionUserOverridden = false;
 
   final TextEditingController captchaImageController = TextEditingController();
@@ -519,8 +512,8 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
     context.pushNamed('/settings/plugin/test', arguments: editedPlugin);
   }
 
-  /// 按**当前编辑中**的内容跑一遍插件登录流程，
-  /// 让用户在保存规则前就能验证流程本身与已保存的账号。
+  /// Runs the plugin login flow against the **currently edited** content, so
+  /// the user can verify the flow and the stored account before saving.
   Future<void> _checkLogin() async {
     if (_loginChecking) return;
     final ruleName = nameController.text.trim();
@@ -550,10 +543,12 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
       _loginResult = null;
     });
     try {
-      // 登录接口是从 store 里按规则名取账号的，所以先落盘再登录。
+      // The login endpoint reads the account from the store by rule name, so
+      // persist first and log in afterwards.
       await _accountStore.saveCredentials(ruleName,
           username: username, password: password);
-      // 密码可能换过，旧令牌必须作废，否则「登录成功」只是拿到了旧令牌。
+      // The password may have changed, so the old token must be invalidated;
+      // otherwise "login succeeded" only means the old token was returned.
       await _accountStore.clearToken(ruleName);
       await editedPlugin.login();
       if (mounted) setState(() => _loginResult = '登录成功，令牌已保存');
@@ -583,8 +578,9 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
       _editorError = null;
     });
     try {
-      // 账号跟规则分开存：即使这次是把「启用登录」关了再保存，
-      // 已经填好的账号也要留住，不能因为没点「点击登录」就丢掉。
+      // Accounts are stored separately from the rule: even when saving with
+      // login disabled, the filled-in account must survive rather than be lost
+      // because "Click to log in" was never pressed.
       final accountName = nameController.text.trim();
       final accountUser = accountController.text.trim();
       if (accountName.isNotEmpty &&
@@ -623,7 +619,10 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
                     title: widget.plugin.name.isEmpty
                         ? '编写新规则'
                         : widget.plugin.name,
-                    description: '从站点信息到搜索与选集，逐步配置你的番剧来源。',
+                    description: RuleModeText.summary(
+                      searchMode: searchMode,
+                      chapterMode: chapterMode,
+                    ),
                     icon: Icons.edit_note_rounded,
                   ),
                   const SizedBox(height: 20),
@@ -711,11 +710,6 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
         1 => _RuleEditorText.sectionSearch,
         _ => _RuleEditorText.sectionChapter,
       },
-      description: switch (_section) {
-        0 => _RuleEditorText.sectionBasicDesc,
-        1 => _RuleEditorText.sectionSearchDesc,
-        _ => _RuleEditorText.sectionChapterDesc,
-      },
       icon: switch (_section) {
         0 => Icons.info_outline_rounded,
         1 => Icons.search_rounded,
@@ -773,9 +767,11 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
     );
   }
 
-  /// 站点账号：在「登录」里排在「登录请求」上方，账号密码和「点击登录」挨在一起。
+  /// Site account: sits above "Login request" in the login section, right next
+  /// to the credentials and "Click to log in".
   ///
-  /// 账号按规则名存进 PluginCredentialsStore，一个站点一份，不跟别的规则串。
+  /// Accounts are stored in PluginCredentialsStore by rule name, one per site,
+  /// never shared across rules.
   Widget _buildAccountFields() {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
@@ -865,7 +861,8 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
               _loginResult = null;
             }),
           ),
-          // 账号跟登录开关一起折叠：停用时这块收起来，数据仍留在本地。
+          // Accounts collapse together with the login switch: the section folds
+          // away when disabled, but the data stays locally.
           EditorAnimatedSection(
             activeKey: authEnabled,
             child: authEnabled
@@ -952,7 +949,8 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
 
   ApiAuthConfig? _buildAuthConfig() {
     if (!authEnabled) {
-      // 关掉开关只是停用，模板原样留着，再打开还能接着用。
+      // Turning the switch off only disables it; the template is kept intact so
+      // it can be reused when re-enabled.
       return widget.plugin.auth?.copyWith(enabled: false);
     }
     final url = authLoginURLController.text.trim();
@@ -993,7 +991,6 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
   Widget _buildAdvancedOptionsCard() {
     return RuleSection(
       title: _RuleEditorText.advancedOptions,
-      description: _RuleEditorText.advancedOptionsDesc,
       icon: Icons.tune_rounded,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1133,13 +1130,11 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
                   controller: captchaImageController,
                   label: _RuleEditorText.captchaImage,
                   hint: _RuleEditorText.captchaImageHint,
-                  helper: _RuleEditorText.captchaImageHelper,
                 ),
                 EditorTextField(
                   controller: captchaInputController,
                   label: _RuleEditorText.captchaInput,
                   hint: _RuleEditorText.captchaInputHint,
-                  helper: _RuleEditorText.captchaInputHelper,
                 ),
               ],
               if (captchaType != CaptchaType.customJavaScript)
@@ -1149,9 +1144,6 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
                       ? _RuleEditorText.captchaSubmitButton
                       : _RuleEditorText.verifyButton,
                   hint: _RuleEditorText.captchaButtonHint,
-                  helper: captchaType == CaptchaType.imageCaptcha
-                      ? _RuleEditorText.captchaSubmitButtonHelper
-                      : _RuleEditorText.verifyButtonHelper,
                 ),
               if (captchaType == CaptchaType.customJavaScript)
                 EditorTextField(
@@ -1434,8 +1426,8 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
         captchaDetectValue: captchaDetectValueController.text,
         captchaScript: captchaScriptController.text,
       ),
-      // 由「登录」页签构造；未启用登录时为 null。这里的 null 表示
-      // 「用户主动关掉了」，不是「被悄悄丢弃」。
+      // Built by the login tab; null when login is disabled. Here null means
+      // "the user turned it off", not "silently dropped".
       auth: authConfig,
     );
   }
@@ -1514,7 +1506,8 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
                 '播放页查询参数',
               ),
             ),
-      // 编辑器还没有播放接口的输入框，但保存表单时不能把它悄悄丢掉。
+      // The editor has no input for the playback endpoint yet, but saving the
+      // form must not silently drop it.
       play: widget.plugin.chapterApiConfig.play,
     );
     if (chapterMode != RuleMode.api) return config;

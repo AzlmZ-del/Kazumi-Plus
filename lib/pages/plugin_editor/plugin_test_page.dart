@@ -23,9 +23,9 @@ import 'package:url_launcher/url_launcher.dart';
 const _h8 = SizedBox(height: 8.0);
 const _h12 = SizedBox(height: 12.0);
 
-/// 结果卡片里链接文字固定用绿色，不跟主题色走（用户 2026-10-22 指定）。
+/// Link text in result cards is always green, not the theme color (specified by the user on 2026-10-22).
 ///
-/// 与耗时快档同色，直接复用，避免两处硬编码各自漂移。
+/// Reuses the fast-tier speed color so the two hardcoded values cannot drift apart.
 const _linkGreen = kSpeedTierFastColor;
 
 class PluginTestPage extends StatefulWidget {
@@ -63,13 +63,13 @@ class _PluginTestPageState extends State<PluginTestPage>
   final Map<int, String> _itemFragmentMap = {};
   int? _shownFragmentIndex;
 
-  /// 当前正在查看播放线路的搜索结果下标（0 基）。
+  /// Index of the search result whose playback roads are being viewed (0-based).
   int _selectedItemIndex = 0;
 
-  /// 章节请求序号，用来丢弃被后一次点击取代的旧响应。
+  /// Chapter request sequence number; responses superseded by a later tap are discarded.
   int _chapterRunId = 0;
 
-  /// 章节请求是否进行中（点选其他结果时用）。
+  /// Whether a chapter request is in flight (used while tapping another result).
   bool _chapterLoading = false;
 
   bool get _hasSearchRaw => searchRaw.isNotEmpty;
@@ -134,7 +134,7 @@ class _PluginTestPageState extends State<PluginTestPage>
       return;
     }
     _resetState();
-    // 取消没有被真正执行时，迟到的响应要丢掉。
+    // Ignore late responses when cancellation is not honored.
     final runId = _runId;
     final cancelToken = _testCancelToken = CancelToken();
     setState(() {
@@ -154,7 +154,7 @@ class _PluginTestPageState extends State<PluginTestPage>
         _itemFragmentMap.addAll(searchTrace.matchedFragments.asMap());
       });
       if (_hasSearchData && _needChapterParse) {
-        // 默认取第一条；之后点选结果卡片会重新拉取对应的播放线路。
+        // Defaults to the first one; tapping another result card re-fetches its playback roads.
         await _selectItem(0, cancelToken: cancelToken, throwOnError: true);
       }
     } catch (error, stack) {
@@ -170,10 +170,10 @@ class _PluginTestPageState extends State<PluginTestPage>
     }
   }
 
-  /// 选中第 [index] 条搜索结果，并拉取它自己的播放线路。
+  /// Selects search result [index] and fetches its own playback roads.
   ///
-  /// [throwOnError] 为 true 时把异常抛给调用方（首次测试走这条，错误统一显示在
-  /// 顶部错误卡片里）；点选卡片时传 false，出错只清掉旧数据，不打断页面。
+  /// With [throwOnError] true the exception is rethrown to the caller (first test run, shown
+  /// in the top error card); tapping a card passes false so errors only clear stale data.
   Future<void> _selectItem(
     int index, {
     CancelToken? cancelToken,
@@ -219,10 +219,10 @@ class _PluginTestPageState extends State<PluginTestPage>
     }
   }
 
-  /// 点击结果卡片：切到这条结果并重新拉取播放线路。
+  /// Tapping a result card: selects that result and re-fetches its playback roads.
   Future<void> _onItemTap(int index) async {
     if (isTesting) return;
-    // 已经是当前这条且数据还在，就不重复请求。
+    // Already selected and data still present: skip the duplicate request.
     if (index == _selectedItemIndex && chapters != null) return;
     await _selectItem(index);
   }
@@ -252,7 +252,11 @@ class _PluginTestPageState extends State<PluginTestPage>
                 children: [
                   RulePageIntro(
                     title: plugin.name,
-                    description: '一次测试，检查搜索请求、番剧条目和播放线路。',
+                    description: RuleModeText.summary(
+                      host: Uri.tryParse(plugin.baseUrl)?.host,
+                      searchMode: plugin.searchMode,
+                      chapterMode: plugin.chapterMode,
+                    ),
                     icon: Icons.science_outlined,
                   ),
                   const SizedBox(height: 20),
@@ -317,7 +321,7 @@ class _PluginTestPageState extends State<PluginTestPage>
                       child: _buildChapterRawContent(theme)),
                   _h12,
                   if (_hasChapters)
-                    // 一条线路一张卡，跟「搜索请求」同级铺开。
+                    // One card per road, laid out at the same level as the search request.
                     ...chapters!.asMap().entries.expand((e) {
                       final i = e.key;
                       final road = e.value;
@@ -498,15 +502,15 @@ class _PluginTestPageState extends State<PluginTestPage>
     return '${plugin.searchMode == RuleMode.api ? 'JSON' : 'HTML'}长度：${searchRaw.length} 字符';
   }
 
-  /// 请求耗时分级：< 500ms 绿、500–1000ms 橙、≥ 1000ms 红；
-  /// 没有耗时（未开始 / 出错 / 被取消）时回落到副标题默认色。
+  /// Request latency tiers: < 500ms green, 500-1000ms orange, >= 1000ms red;
+  /// falls back to the subtitle default color when no latency is recorded (not started / failed / cancelled).
   Color _elapsedColor(int? ms, Color fallback) =>
       speedTierColor(speedTierOf(ms), fallback);
 
-  /// 副标题 + 下一行「返回时间：xxxx ms」。
+  /// Subtitle plus a second line showing the elapsed time as `xxxx ms`.
   ///
-  /// 耗时行沿用副标题的 bodySmall 字号与字重，只把颜色换成分级色；
-  /// [ms] 为空时（未开始 / 出错 / 被取消）不占位，直接返回单行文本。
+  /// The latency row keeps the subtitle bodySmall size and weight, only the color switches to the tier color;
+  /// when [ms] is null (not started / failed / cancelled) no row is reserved and a single line is returned.
   Widget _buildSubtitleWithElapsed(
     String text,
     int? ms,
@@ -529,7 +533,7 @@ class _PluginTestPageState extends State<PluginTestPage>
     );
   }
 
-  /// 结果卡片底部那行：API 模式显示条目 ID，XPath 模式显示可点击复制的链接。
+  /// Bottom row of a result card: item ID in API mode, a tap-to-copy link in XPath mode.
   Widget _buildSrcLine(SearchItem item, bool selected, ThemeData theme) {
     if (plugin.searchMode == RuleMode.api) {
       return Text(
@@ -553,7 +557,7 @@ class _PluginTestPageState extends State<PluginTestPage>
     );
   }
 
-  /// 结果卡片标题行右侧的内部浏览 / 外部打开两枚图标按钮（仅 XPath 模式有链接）。
+  /// Two icon buttons at the right of a result card title: in-app browse and open externally (only XPath mode has a link).
   Widget _buildSrcActions(SearchItem item, ThemeData theme) {
     if (plugin.searchMode == RuleMode.api) {
       return const SizedBox.shrink();
@@ -581,7 +585,7 @@ class _PluginTestPageState extends State<PluginTestPage>
     );
   }
 
-  /// 在应用内打开一个网页，沿用该源设定的 UA 与直连策略。
+  /// Opens a page in the in-app browser, honoring the source UA and direct-connection setting.
   void _openUrlInternal(String url, String title) {
     Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute(
@@ -595,7 +599,7 @@ class _PluginTestPageState extends State<PluginTestPage>
     );
   }
 
-  /// 把链接交给系统浏览器。
+  /// Hands the link to the system browser.
   Future<void> _openUrlExternal(String url) async {
     try {
       if (await launchUrl(Uri.parse(url),
@@ -735,7 +739,7 @@ class _PluginTestPageState extends State<PluginTestPage>
   Widget _buildSearchItemCard(SearchItem item, int i, ThemeData theme) {
     final isShowingFragment = _shownFragmentIndex == i;
     final fragment = _itemFragmentMap[i] ?? '无匹配片段';
-    // 当前正在查看播放线路的那一条，用底色 + 描边标出来。
+    // Highlights the result whose playback roads are being viewed with a tinted background and border.
     final selected = _selectedItemIndex == i;
 
     return Column(children: [
@@ -820,7 +824,7 @@ class _PluginTestPageState extends State<PluginTestPage>
     return '第 ${_selectedItemIndex + 1} 条 · 获取到 ${chapters?.length ?? 0} 个播放线路$skipped';
   }
 
-  /// 卡片标题直接显示「番剧条目」里选中的那条的名称，没选中时退回默认文案。
+  /// Card title shows the name picked in the anime-entry list, falling back to the default label.
   String _getResponseTitle() {
     final data = searchRes?.data;
     if (data == null || data.isEmpty) return '响应内容';
@@ -830,7 +834,7 @@ class _PluginTestPageState extends State<PluginTestPage>
     return name.isEmpty ? '响应内容' : name;
   }
 
-  /// 「响应内容」卡的副标题：数据类型与长度（标题已显示番剧名，不再写第几条）。
+  /// Subtitle of the "response content" card: data type and length (the title already shows the anime name, so the item index is omitted).
   Widget _buildChapterRawSubtitle(ThemeData theme) {
     final kind = plugin.chapterMode == RuleMode.api ? 'JSON' : 'HTML';
     final String text;
@@ -869,8 +873,8 @@ class _PluginTestPageState extends State<PluginTestPage>
     );
   }
 
-  /// 单条线路的章节明细：一集一张小卡片，集标题那一行右侧排三枚图标按钮
-  /// （内部浏览 / 外部打开 / 测试播放），长按显示说明。
+  /// Chapter details for a single road: one small card per episode, with three icon buttons
+  /// (in-app browse / open externally / test playback) at the right of the title row; long-press shows a tooltip.
   Widget _buildRoadChapterList(Road road, ThemeData theme) {
     if (road.identifier.isEmpty) {
       return _buildEmpty('这条线路没有章节', theme);
@@ -959,7 +963,7 @@ class _PluginTestPageState extends State<PluginTestPage>
     );
   }
 
-  /// 章节卡右上角那排图标按钮，三枚尺寸与圆角保持一致。
+  /// Icon buttons in the top-right corner of an episode card; all three share size and corner radius.
   Widget _episodeActionButton({
     required String tooltip,
     required IconData icon,
@@ -983,7 +987,7 @@ class _PluginTestPageState extends State<PluginTestPage>
     );
   }
 
-  /// 把一段文本（章节链接、结果链接）复制到剪贴板。
+  /// Copies a text (episode link, result link) to the clipboard.
   Future<void> _copyUrl(String url) async {
     try {
       await Clipboard.setData(ClipboardData(text: url));
@@ -998,20 +1002,20 @@ class _PluginTestPageState extends State<PluginTestPage>
     }
   }
 
-  /// 章节链接在应用内打开。
+  /// Opens the episode link in the in-app browser.
   void _openEpisodeInternal(Road road, int index) {
     _openUrlInternal(road.data[index], road.identifier[index]);
   }
 
-  /// 章节链接交给系统浏览器打开。
+  /// Opens the episode link in the system browser.
   Future<void> _openEpisodeExternal(Road road, int index) async {
     await _openUrlExternal(road.data[index]);
   }
 
-  /// 测试播放：用当前已解析的线路直接进播放器，并定位到点的那一集。
+  /// Test playback: jumps into the player with the already-resolved road, positioned at the tapped episode.
   ///
-  /// 弹幕和讨论都要靠 Bangumi 条目 id 去查，所以先拿番剧名去 Bangumi 搜一次，
-  /// 取第一条真实条目带进去；搜不到才退回合成条目（此时弹幕与讨论不可用）。
+  /// Danmaku and discussion need a Bangumi subject id, so the anime name is searched on Bangumi
+  /// and the first real hit is passed in; without one a synthetic entry is used (no danmaku/discussion).
   Future<void> _startTestPlayback(Road road, int index) async {
     final data = searchRes?.data;
     if (data == null || data.isEmpty) {
@@ -1096,15 +1100,15 @@ class _PluginTestPageState extends State<PluginTestPage>
     );
   }
 
-  /// 把响应文本里的 JSON 展开成带缩进的多行文本，HTML 原样返回。
+  /// Expands JSON in the response into indented multi-line text; HTML is returned as-is.
   ///
-  /// 不按「搜索模式 / 章节模式」判断，直接看内容：只有首字符是 `{` 或 `[`
-  /// 才尝试解析，所以 HTML 响应（以 `<` 开头）永远不会被误处理。
+  /// Decided by content rather than search/chapter mode: only a first character of `{` or `[`
+  /// triggers parsing, so HTML responses (starting with `<`) are never mangled.
   String _formattedRaw(String raw) {
     final trimmed = raw.trimLeft();
     if (trimmed.isEmpty) return raw;
     final head = trimmed.codeUnitAt(0);
-    if (head != 0x7B && head != 0x5B) return raw; // '{' 或 '['
+    if (head != 0x7B && head != 0x5B) return raw; // '{' or '['
     try {
       return const JsonEncoder.withIndent('  ').convert(jsonDecode(raw));
     } catch (_) {
