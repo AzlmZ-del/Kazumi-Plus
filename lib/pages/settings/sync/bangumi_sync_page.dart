@@ -230,13 +230,15 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
                 description: '同步想看、在看、看过等追番状态。',
               ),
               _accountCard(configured),
-              const BangumiWebLoginCard(),
-              _syncControls(configured, enabled),
+              // 连接/授权类错误归「Bangumi 账号」卡管，紧贴其下展示，
+              // 不再落到「自动同步追番」与「同步偏好」之间。
               if (message != null)
                 SyncFeedback(
                   message: message,
                   error: _failed || _bangumi.lastError != null,
                 ),
+              const BangumiWebLoginCard(),
+              _syncControls(configured, enabled),
               TonalCard(
                 elevation: kSyncCardElevation,
                 child: ExpansionTile(
