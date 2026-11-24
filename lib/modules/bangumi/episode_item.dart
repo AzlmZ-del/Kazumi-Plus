@@ -5,16 +5,16 @@ class EpisodeInfo {
   String name;
   String nameCn;
 
-  /// 首播日期，形如 `2026-10-01`；未定档可能为空串。
+  /// First air date, e.g. `2026-10-01`; may be empty if not yet scheduled.
   String airDate;
 
-  /// 单集简介，常常包含一部分 STAFF 名单。
+  /// Episode synopsis, often including part of the staff list.
   String desc;
 
-  /// 时长原文，形如 `00:23:45`。
+  /// Raw duration string, e.g. `00:23:45`.
   String duration;
 
-  /// 时长秒数，接口未提供时为 0。
+  /// Duration in seconds, 0 if the API does not provide it.
   int durationSeconds;
 
   int commentCount;
@@ -63,17 +63,18 @@ class EpisodeInfo {
     commentCount = 0;
   }
 
-  /// 优先中文名，其次原名；两者都没有时退回集数。
+  /// Prefer the Chinese name, then the original; fall back to the episode label.
   String displayTitle() {
     if (nameCn.trim().isNotEmpty) return nameCn.trim();
     if (name.trim().isNotEmpty) return name.trim();
     return episodeLabel();
   }
 
-  /// 元信息行，沿用 Bangumi 网页的写法：`时长:00:23:45 / 首播:2026-10-01`。
+  /// Metadata line following the Bangumi site format: the air-date and duration
+  /// labels (localized at the call below) joined by ` / `.
   ///
-  /// 日期与时长各自带标签：裸的 `2026-10-01 · 00:23:45` 两段都是数字加冒号，
-  /// 很容易被读成一个时间点。缺失的项直接省略，不留空标签。
+  /// Both values are labeled because a bare `2026-10-01 · 00:23:45` reads as a
+  /// single timestamp; missing fields are omitted rather than left unlabeled.
   String metaLine() {
     final parts = <String>[];
     if (airDate.trim().isNotEmpty) parts.add('首播:${airDate.trim()}');
@@ -81,7 +82,7 @@ class EpisodeInfo {
     return parts.join(' / ');
   }
 
-  /// 正片显示为 `01`，其余类型带上类型前缀。
+  /// Main episodes show as `01`; other types carry a type prefix.
   String episodeLabel() {
     final number = episode is int
         ? episode.toString()
@@ -99,16 +100,17 @@ class EpisodeInfo {
     }
   }
 
-  /// 首播日期解析结果；日期缺失或格式非法时返回 null。
+  /// Parsed first-air date; returns null when the date is missing or malformed.
   ///
-  /// 只接受 `yyyy-MM-dd`：`DateTime.tryParse` 会把 `2026-13-40` 这类溢出值
-  /// 规范化成 `2027-02-09` 而不是返回 null，直接用会把脏数据当成未来剧集。
+  /// Only `yyyy-MM-dd` is accepted: `DateTime.tryParse` normalizes overflow values
+  /// like `2026-13-40` to `2027-02-09` instead of returning null, which would
+  /// treat dirty data as a future episode.
   DateTime? parsedAirDate() {
     final raw = airDate.trim();
     if (!_airDatePattern.hasMatch(raw)) return null;
     final parsed = DateTime.tryParse(raw);
     if (parsed == null) return null;
-    // 规范化后必须原样反映输入，否则就是溢出或非公历日期。
+    // The normalized result must echo the input exactly, otherwise it is an overflow or non-Gregorian date.
     if (parsed.year != int.parse(raw.substring(0, 4)) ||
         parsed.month != int.parse(raw.substring(5, 7)) ||
         parsed.day != int.parse(raw.substring(8, 10))) {
@@ -119,10 +121,10 @@ class EpisodeInfo {
 
   static final RegExp _airDatePattern = RegExp(r'^\d{4}-\d{2}-\d{2}$');
 
-  /// 是否尚未播出。
+  /// Whether the episode has not aired yet.
   ///
-  /// 没有可用日期时按「已播出」处理：接口会给未定档的条目返回空串，
-  /// 把这类占位条目标成待播只会造成误读。
+  /// Treat a missing date as already aired: the API returns an empty string for
+  /// unscheduled entries, and marking such placeholders as upcoming is misleading.
   bool isUpcoming(DateTime now) {
     final date = parsedAirDate();
     if (date == null) return false;
@@ -130,7 +132,7 @@ class EpisodeInfo {
     return _dateOnly(date).isAfter(today);
   }
 
-  /// 距首播还有几天；已播出或日期无效时返回 null。
+  /// Days until first air; returns null if already aired or the date is invalid.
   int? daysUntilAir(DateTime now) {
     final date = parsedAirDate();
     if (date == null) return null;
@@ -142,7 +144,7 @@ class EpisodeInfo {
   static DateTime _dateOnly(DateTime value) =>
       DateTime(value.year, value.month, value.day);
 
-  /// 分组标题；未知类型统一归到「其他」。
+  /// Group heading; unknown types are grouped under "Other".
   String readTypeLabel() {
     switch (type) {
       case 0:
@@ -170,5 +172,46 @@ class EpisodeInfo {
       default:
         return '';
     }
+  }
+}
+
+extension EpisodeInfoDisplay on EpisodeInfo {
+  static String typeLabelOf(int type) => switch (type) {
+        0 => '正片',
+        1 => 'SP',
+        2 => 'OP',
+        3 => 'ED',
+        _ => '其他',
+      };
+
+  String displayNumber(int fallbackEpisode) {
+    final value = episode != 0 ? episode : fallbackEpisode;
+    if (value is int) return '$value';
+    final rounded = value.toInt();
+    return value == rounded ? '$rounded' : '$value';
+  }
+
+  String badgeLabel(int fallbackEpisode) {
+    final code = readType().toUpperCase();
+    final number = displayNumber(fallbackEpisode);
+    return code.isEmpty ? number : '$code $number';
+  }
+
+  /// Named apart from [EpisodeInfo.displayTitle], which instance methods shadow
+  /// over extensions and which falls back to the episode label instead.
+  String panelTitle(int fallbackEpisode) {
+    final translated = nameCn.trim();
+    if (translated.isNotEmpty) return translated;
+    final original = name.trim();
+    if (original.isNotEmpty) return original;
+    return '第 ${displayNumber(fallbackEpisode)} 集';
+  }
+
+  String? displaySubtitle(int fallbackEpisode) {
+    final original = name.trim();
+    if (original.isEmpty || original == panelTitle(fallbackEpisode)) {
+      return null;
+    }
+    return original;
   }
 }

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:kazumi/bean/dialog/adaptive_bottom_sheet.dart';
 import 'package:kazumi/bean/dialog/dialog.dart'
     show KazumiDialog, KazumiDialogHandle;
 import 'package:kazumi/bean/widget/loading_indicator.dart';
@@ -39,8 +40,8 @@ class KazumiDialogController extends ChangeNotifier {
 
   bool get isRunning => _current?._isActive ?? false;
 
-  /// await 会把取消异常穿过任务体；换掉或销毁持有者不会触发 [onCancelled]，
-  /// 只有用户主动取消才会在清理之后调用它。
+  /// Await steps through the task to stop on cancellation. Replacing or disposing
+  /// the owner skips [onCancelled]; user cancellation calls it after cleanup.
   Future<void> run(
     Future<void> Function(KazumiDialogTask task) action, {
     String? errorMessage,
@@ -130,7 +131,7 @@ class KazumiDialogTask {
     }
   }
 
-  /// 只停止等待，不停底层操作；迟到的错误仍会被消费掉。
+  /// Stops waiting, not the operation itself; late errors are still consumed.
   Future<T> wait<T>(Future<T> future) async {
     final result = await Future.any<T>([
       future,
@@ -168,7 +169,7 @@ class KazumiDialogTask {
       _checkActive();
       result = await wait(action());
     } finally {
-      // 系统返回手势可能先于对话框 Future 完成，此时也要按取消处理。
+      // A system pop can precede completion of the dialog's Future.
       if (!dialog.isActive) cancel();
       _dialog = null;
       _onCancel = null;
@@ -179,21 +180,49 @@ class KazumiDialogTask {
     return result;
   }
 
-  /// 点遮罩关闭算取消整个流程；明确返回 false 则仍是一个结果值。
+  /// A dismissed choice cancels the workflow; an explicit false remains a result.
   Future<T> show<T extends Object>({
     required WidgetBuilder builder,
     bool clickMaskDismiss = true,
-  }) async {
+  }) =>
+      _showWithHandle<T>(
+        (handle) => KazumiDialog.show<T>(
+          context: _owner._context?.call(),
+          handle: handle,
+          clickMaskDismiss: clickMaskDismiss,
+          builder: builder,
+        ),
+      );
+
+  Future<T> showSheet<T extends Object>({
+    required WidgetBuilder builder,
+    double maxHeightFactor = 0.75,
+  }) =>
+      _showWithHandle<T>((handle) {
+        final context = _owner._context?.call();
+        if (context == null || !context.mounted) {
+          return Future<T?>.value(null);
+        }
+        return KazumiDialog.push<T>(
+          navigator: Navigator.of(context),
+          route: adaptiveBottomSheetRoute<T>(
+            context: context,
+            maxHeightFactor: maxHeightFactor,
+            routeSettings: KazumiDialog.routeSettings,
+            builder: builder,
+          ),
+          handle: handle,
+        );
+      });
+
+  Future<T> _showWithHandle<T extends Object>(
+    Future<T?> Function(KazumiDialogHandle<T> handle) open,
+  ) async {
     _checkActive();
     final dialog = KazumiDialogHandle<T>();
     _dialog = dialog;
     try {
-      final result = await wait(KazumiDialog.show<T>(
-        context: _owner._context?.call(),
-        handle: dialog,
-        clickMaskDismiss: clickMaskDismiss,
-        builder: builder,
-      ));
+      final result = await wait(open(dialog));
       if (result == null) {
         cancel();
         throw const _DialogTaskCancelled();

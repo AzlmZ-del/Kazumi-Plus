@@ -167,7 +167,7 @@ class _VideoPageState extends State<VideoPage>
   void _initOnlineMode() {
     videoPageController.historyOffset = 0;
 
-    // 「测试播放」是入口硬指定的集数，不能被观看记录改回去。
+    // "Test playback" pins the episode at the entry point; watch history must not override it.
     if (videoPageController.episodePinned) {
       _revealCurrentEpisode();
       _attachLogListener();
@@ -300,7 +300,7 @@ class _VideoPageState extends State<VideoPage>
 
   void _closeSidePanel() => _sidePanelKey.currentState?.close();
 
-  // 只有桌面端画中画参与本地导航。
+  // Only desktop PiP participates in local navigation.
   void _syncDesktopPipHistory(bool isPip) {
     if (!isDesktop()) return;
     if (isPip && _desktopPipEntry == null) {
@@ -354,20 +354,20 @@ class _VideoPageState extends State<VideoPage>
                 child: Focus(
                   focusNode: keyboardFocus,
                   autofocus: true,
-                  // 清理会在路由还可见时就重置加载态。
+                  // Cleanup resets loading while the route is still visible.
                   child: _isExiting
                       ? const SizedBox.expand()
                       : Observer(builder: (_) => _buildPlayerBody(layout)),
                 ),
               ),
-              tabs: tabBody,
+              tabs: _buildTabBody(),
               sidePanel: VideoSidePanel(
                 key: _sidePanelKey,
                 fullscreen: videoPageController.isFullscreen,
                 disableAnimations: disableAnimations,
                 onOpened: _revealCurrentEpisode,
                 onClosed: keyboardFocus.requestFocus,
-                child: tabBody,
+                child: _buildTabBody(onClose: _closeSidePanel),
               ),
             ),
           ),
@@ -526,7 +526,7 @@ class _VideoPageState extends State<VideoPage>
                 downloads[episode.episodePageUrl] = episode;
               } else if (episode.road >= 0 &&
                   episode.road < videoPageController.roadList.length) {
-                // 旧记录没有 URL，只在各自线路内匹配。
+                // Older records have no URL; only match within their own road.
                 final urls = videoPageController.roadList[episode.road].data;
                 if (episode.episodeNumber > 0 &&
                     episode.episodeNumber <= urls.length) {
@@ -544,10 +544,6 @@ class _VideoPageState extends State<VideoPage>
           selectedEpisode: videoPageController.selectedEpisode.episode,
           downloads: downloads,
           isOffline: videoPageController.isOfflineMode,
-          isPlaying: playerController.playback.playing &&
-              !playerController.playback.loading &&
-              !videoPageController.loading,
-          disableAnimations: disableAnimations,
           onEpisodeSelected: (episode, road) {
             if (episode == videoPageController.selectedEpisode.episode &&
                 road == videoPageController.selectedEpisode.road) {
@@ -566,11 +562,11 @@ class _VideoPageState extends State<VideoPage>
         );
       });
 
-  Widget get tabBody {
+  Widget _buildTabBody({VoidCallback? onClose}) {
     final colors = Theme.of(context).colorScheme;
     final int episodeNum = videoPageController.commentsEpisode;
 
-    return ColoredBox(
+    Widget body = ColoredBox(
       color: colors.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -578,6 +574,7 @@ class _VideoPageState extends State<VideoPage>
           PlayerContentTabs(
             controller: tabController,
             onEpisodesSelected: _revealCurrentEpisode,
+            onClose: onClose,
           ),
           Expanded(
             child: TabBarView(
@@ -595,5 +592,15 @@ class _VideoPageState extends State<VideoPage>
         ],
       ),
     );
+    if (disableAnimations) {
+      final child = body;
+      body = Builder(
+        builder: (context) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(disableAnimations: true),
+          child: child,
+        ),
+      );
+    }
+    return body;
   }
 }

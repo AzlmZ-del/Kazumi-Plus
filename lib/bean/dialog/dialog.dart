@@ -6,7 +6,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:kazumi/bean/dialog/kazumi_toast.dart';
 import 'package:kazumi/navigation.dart';
 
-/// 一次性持有的路由句柄，首帧渲染前就已生效。
+/// Single-use ownership of a route, including before its first frame.
 class KazumiDialogHandle<T> {
   Route<T>? _route;
   bool _used = false;
@@ -34,7 +34,7 @@ class KazumiDialogHandle<T> {
 
 class KazumiDialog {
   static final KazumiDialogObserver observer = KazumiDialogObserver();
-  // 让 modal sheet 也能共用同一套关闭与路由追踪逻辑。
+  // Allows modal sheets to use the same dismissal and route tracking.
   static const routeSettings = RouteSettings(name: 'KazumiDialog');
   static int _toastRevision = 0;
 
@@ -51,27 +51,50 @@ class KazumiDialog {
     if (dialog._used) {
       throw StateError('A dialog handle can only be used once.');
     }
+    final ctx = context ??
+        rootNavigatorKey.currentContext ??
+        observer.navigator?.context;
+    if (ctx == null || !ctx.mounted || dialog._dismissed) {
+      dialog._finish();
+      await onDismiss?.call();
+      return null;
+    }
+    final navigator = Navigator.of(ctx, rootNavigator: true);
+    final route = _KazumiDialogRoute<T>(
+      context: ctx,
+      builder: builder,
+      themes: InheritedTheme.capture(from: ctx, to: navigator.context),
+      barrierColor: DialogTheme.of(ctx).barrierColor ??
+          Theme.of(ctx).dialogTheme.barrierColor ??
+          Colors.black54,
+      barrierDismissible: clickMaskDismiss,
+      traversalEdgeBehavior: TraversalEdgeBehavior.closedLoop,
+      settings: routeSettings,
+      animationStyle: transitionDuration == null
+          ? null
+          : AnimationStyle(duration: transitionDuration),
+      transitionBuilder: transitionBuilder,
+    );
+    return push<T>(
+      navigator: navigator,
+      route: route,
+      handle: dialog,
+      onDismiss: onDismiss,
+    );
+  }
+
+  static Future<T?> push<T>({
+    required NavigatorState navigator,
+    required Route<T> route,
+    KazumiDialogHandle<T>? handle,
+    FutureOr<void> Function()? onDismiss,
+  }) async {
+    final dialog = handle ?? KazumiDialogHandle<T>();
+    if (dialog._used) {
+      throw StateError('A dialog handle can only be used once.');
+    }
     try {
-      final ctx = context ??
-          rootNavigatorKey.currentContext ??
-          observer.navigator?.context;
-      if (ctx == null || !ctx.mounted || dialog._dismissed) return null;
-      final navigator = Navigator.of(ctx, rootNavigator: true);
-      final route = _KazumiDialogRoute<T>(
-        context: ctx,
-        builder: builder,
-        themes: InheritedTheme.capture(from: ctx, to: navigator.context),
-        barrierColor: DialogTheme.of(ctx).barrierColor ??
-            Theme.of(ctx).dialogTheme.barrierColor ??
-            Colors.black54,
-        barrierDismissible: clickMaskDismiss,
-        traversalEdgeBehavior: TraversalEdgeBehavior.closedLoop,
-        settings: routeSettings,
-        animationStyle: transitionDuration == null
-            ? null
-            : AnimationStyle(duration: transitionDuration),
-        transitionBuilder: transitionBuilder,
-      );
+      if (!navigator.mounted || dialog._dismissed) return null;
       dialog._attach(route);
       return await navigator.push<T>(route);
     } catch (e) {
@@ -99,7 +122,7 @@ class KazumiDialog {
         actionLabel: showActionButton ? (actionLabel ?? '确定') : null,
         onActionPressed: showActionButton
             ? () {
-                // 点按钮先收提示，再执行动作，避免两个都留在屏幕上。
+                // Let SnackBarAction close the old toast before replacing it.
                 dismissKazumiToast();
                 onActionPressed?.call();
               }
@@ -111,11 +134,12 @@ class KazumiDialog {
     }
   }
 
-  /// 显示一条可原地更新文字的常驻胶囊（长任务进度用）。
+  /// Shows a persistent toast whose text can be updated in place (for long-task progress).
   ///
-  /// 与 [showToast] 的区别：不自动消失、每次 [UpdatableKazumiToast.update]
-  /// 只换文字不重建胶囊（无闪烁）。调用方任务结束后必须 [UpdatableKazumiToast.dismiss]。
-  /// 失败（无 Overlay 锚点）返回 null，调用方需自行兜底。
+  /// Unlike [showToast], it does not auto-dismiss, and each [UpdatableKazumiToast.update]
+  /// only replaces the text without rebuilding the toast (no flicker). Callers must call
+  /// [UpdatableKazumiToast.dismiss] when the task ends.
+  /// Returns null on failure (no Overlay anchor); the caller must handle the fallback.
   static UpdatableKazumiToast? showPersistentToast({
     required String message,
     BuildContext? context,
@@ -139,7 +163,7 @@ class KazumiDialog {
 
   static void _dismissRoute<T>(Route<T> route, T? result) {
     if (!route.isActive) return;
-    // Navigator 整理路由期间持有者可能已被销毁，此时不能直接 pop。
+    // Owners may be disposed while Navigator is reconciling its routes.
     if (SchedulerBinding.instance.schedulerPhase ==
         SchedulerPhase.persistentCallbacks) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -240,7 +264,7 @@ class KazumiDialogObserver extends NavigatorObserver {
     final revision = KazumiDialog._toastRevision;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _snackBarClearScheduled = false;
-      // 只清理旧页面留下的 toast，不碰跳转之后新弹的那条。
+      // Only clear the old page's toast, never one posted after navigation.
       if (revision == KazumiDialog._toastRevision) {
         rootScaffoldMessengerKey.currentState?.removeCurrentSnackBar();
         dismissKazumiToast();
