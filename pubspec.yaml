@@ -96,12 +96,12 @@ dependencies:
   media_kit:
     git:
       url: https://github.com/Predidit/media-kit.git
-      ref: cd75bcfe94ba45ebb6f6b940c68e072d079aee14
+      ref: f4b780d637c85c30edf5803ad2037b6b7300d86f
       path: ./media_kit
   media_kit_video:
     git:
       url: https://github.com/Predidit/media-kit.git
-      ref: cd75bcfe94ba45ebb6f6b940c68e072d079aee14
+      ref: f4b780d637c85c30edf5803ad2037b6b7300d86f
       path: ./media_kit_video
   macos_secure_bookmarks: ^0.2.1
   share_plus: ^12.0.2
@@ -111,11 +111,6 @@ dependencies:
   # PluginHandler.kt:220），但 GeneratedPluginRegistrant.java 仍会注册它，
   # 于是 javac 报「程序包 net.jonhanson.flutter_native_splash 不存在」。
   flutter_native_splash: ^2.4.3
-
-dependency_overrides:
-  # media_kit@cd75bcf ships a Windows 7z bundle, while system bsdtar may lack LZMA.
-  media_kit:
-    path: third_party/media_kit
 
 dev_dependencies:
   path_provider_platform_interface: ^2.1.2
