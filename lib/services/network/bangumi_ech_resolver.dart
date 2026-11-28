@@ -9,14 +9,18 @@ class BangumiEchResolver {
   static const _hosts = {...ApiEndpoints.bangumiPublicApiHosts, 'lain.bgm.tv'};
   static const _addresses = ['172.67.134.140', '104.21.6.61', '172.67.73.67'];
 
-  static RetryingEchResolver create(http.Client bootstrap) {
+  static RetryingEchResolver create(
+    http.Client bootstrap, {
+    Set<String> additionalHosts = const {},
+  }) {
+    final hosts = {..._hosts, ...additionalHosts};
     final inner = DohEchResolver(
       client: bootstrap,
       endpoint: endpoint,
-      hosts: _hosts,
+      hosts: hosts,
       // Shared Cloudflare ECH config and pinned IPs bypass polluted DNS.
-      configDomains: {for (final host in _hosts) host: 'crypto.cloudflare.com'},
-      addressOverrides: {for (final host in _hosts) host: _addresses},
+      configDomains: {for (final host in hosts) host: 'crypto.cloudflare.com'},
+      addressOverrides: {for (final host in hosts) host: _addresses},
     );
     return RetryingEchResolver(inner, inner.client);
   }

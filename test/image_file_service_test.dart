@@ -5,7 +5,6 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:http/http.dart' as http;
-import 'package:kazumi/services/network/bangumi_ech_image_service.dart';
 import 'package:kazumi/services/network/image_acceleration.dart';
 import 'package:kazumi/services/network/image_file_response.dart';
 import 'package:kazumi/services/network/image_file_service.dart';
@@ -39,7 +38,7 @@ void main() {
   ImageFileService buildService(
     ImageAcceleration mode,
     http.Client client, {
-    BangumiEchImageService? ech,
+    FileService? ech,
   }) {
     final service = ImageFileService(
       acceleration: () => mode,
@@ -81,12 +80,13 @@ void main() {
     final client = _RecordingClient();
     final service = buildService(ImageAcceleration.mirror, client);
 
-    await service.get(
-      'https://api.bgm.tv/v0/subjects/400602/image?type=large',
-    );
+    await service.get('https://api.bgm.tv/v0/subjects/400602/image?type=large');
 
     expect(client.requests.single.url.host, 'wsrv.nl');
-    expect(client.requests.single.headers.containsKey('Authorization'), isFalse);
+    expect(
+      client.requests.single.headers.containsKey('Authorization'),
+      isFalse,
+    );
   });
 
   test('mirror mode retries the original URL when the proxy fails', () async {
@@ -117,6 +117,43 @@ void main() {
     expect(response.statusCode, 404);
   });
 
+  for (final mode in [ImageAcceleration.mirror, ImageAcceleration.ech]) {
+    test('$mode keeps 304 without retrying the origin', () async {
+      await GStorage.putSetting(SettingsKeys.bangumiAccessToken, 'secret');
+      final client = _RecordingClient(notModified: {'wsrv.nl'});
+      final ech = _FakeEchService(statusCode: 304);
+      final service = buildService(mode, client, ech: ech);
+
+      final response = await service.get(
+        'https://api.bgm.tv/v0/subjects/74435/image?type=large',
+        headers: {'If-None-Match': '"cached-cover"'},
+      );
+
+      expect(response.statusCode, 304);
+      expect(client.requests.length + ech.requests.length, 1);
+    });
+  }
+
+  test('a 304 from the origin fallback keeps the cached image', () async {
+    await GStorage.putSetting(SettingsKeys.bangumiAccessToken, 'secret');
+    final client = _RecordingClient(
+      failing: {'wsrv.nl'},
+      notModified: {'api.bgm.tv'},
+    );
+    final service = buildService(ImageAcceleration.mirror, client);
+
+    final response = await service.get(
+      'https://api.bgm.tv/v0/subjects/74435/image?type=large',
+      headers: {'If-None-Match': '"cached-cover"'},
+    );
+
+    expect(response.statusCode, 304);
+    expect(client.requests.map((request) => request.url.host), [
+      'wsrv.nl',
+      'api.bgm.tv',
+    ]);
+  });
+
   test('ech mode keeps the token because the host does not change', () async {
     await GStorage.putSetting(SettingsKeys.bangumiAccessToken, 'secret');
     final ech = _FakeEchService();
@@ -133,14 +170,18 @@ void main() {
 }
 
 class _RecordingClient extends http.BaseClient {
-  _RecordingClient({this.failing = const {}});
+  _RecordingClient({this.failing = const {}, this.notModified = const {}});
 
   final Set<String> failing;
+  final Set<String> notModified;
   final requests = <http.Request>[];
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     requests.add(request as http.Request);
+    if (notModified.contains(request.url.host)) {
+      return http.StreamedResponse(const Stream.empty(), 304);
+    }
     final status = failing.contains(request.url.host) ? 404 : 200;
     return http.StreamedResponse(
       Stream.value(utf8.encode('bytes')),
@@ -150,8 +191,10 @@ class _RecordingClient extends http.BaseClient {
   }
 }
 
-class _FakeEchService extends FileService
-    implements BangumiEchImageService {
+class _FakeEchService extends FileService {
+  _FakeEchService({this.statusCode = 200});
+
+  final int statusCode;
   final requests = <http.Request>[];
 
   @override
@@ -163,17 +206,11 @@ class _FakeEchService extends FileService
     if (headers != null) request.headers.addAll(headers);
     requests.add(request);
     return createImageFileResponse(
-      http.StreamedResponse(Stream.value(const []), 200, contentLength: 0),
+      http.StreamedResponse(const Stream.empty(), statusCode, contentLength: 0),
       contentLength: 0,
       onComplete: () {},
     );
   }
-
-  @override
-  void reset() {}
-
-  @override
-  void close() {}
 }
 
 class _TestPaths extends PathProviderPlatform {

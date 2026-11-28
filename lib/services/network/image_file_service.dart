@@ -1,6 +1,5 @@
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:http/http.dart' as http;
-import 'package:kazumi/services/network/bangumi_ech_image_service.dart';
 import 'package:kazumi/services/network/bangumi_image_url_rewriter.dart';
 import 'package:kazumi/services/network/image_acceleration.dart';
 import 'package:kazumi/services/network/image_file_response.dart';
@@ -10,22 +9,19 @@ class ImageFileService extends FileService {
   ImageFileService({
     required ImageAcceleration Function() acceleration,
     required http.Client Function() clientFactory,
-    required BangumiEchImageService echService,
+    required FileService echService,
   }) : _acceleration = acceleration,
        _clientFactory = clientFactory,
        _echService = echService;
 
   final ImageAcceleration Function() _acceleration;
   final http.Client Function() _clientFactory;
-  final BangumiEchImageService _echService;
+  final FileService _echService;
   final _clients = <http.Client>{};
   bool _closed = false;
 
-  void resetNetworkClients() => _echService.reset();
-
   void close() {
     _closed = true;
-    _echService.close();
     for (final client in _clients) {
       client.close();
     }
@@ -40,10 +36,9 @@ class ImageFileService extends FileService {
     if (_closed) throw StateError('Image file service is closed');
     final mode = _acceleration();
     final source = Uri.parse(url);
-    final token =
-        BangumiImageUrlRewriter.isBangumiImage(source)
-            ? GStorage.getSetting(SettingsKeys.bangumiAccessToken).trim()
-            : '';
+    final token = BangumiImageUrlRewriter.isBangumiImage(source)
+        ? GStorage.getSetting(SettingsKeys.bangumiAccessToken).trim()
+        : '';
 
     switch (mode) {
       case ImageAcceleration.direct:
@@ -79,7 +74,9 @@ class ImageFileService extends FileService {
   }
 
   static Map<String, String>? _withoutToken(Map<String, String>? headers) {
-    if (headers == null || !headers.containsKey('Authorization')) return headers;
+    if (headers == null || !headers.containsKey('Authorization')) {
+      return headers;
+    }
     return {...headers}..remove('Authorization');
   }
 
@@ -92,15 +89,15 @@ class ImageFileService extends FileService {
     String token,
     Map<String, String>? headers,
   ) async {
-    if (_isSuccess(accelerated.statusCode) || token.isEmpty) {
+    if (_canUse(accelerated.statusCode) || token.isEmpty) {
       return accelerated;
     }
     final retry = await _fetch(source, _withToken(headers, token));
-    return _isSuccess(retry.statusCode) ? retry : accelerated;
+    return _canUse(retry.statusCode) ? retry : accelerated;
   }
 
-  static bool _isSuccess(int statusCode) =>
-      statusCode == 200 || statusCode == 202;
+  static bool _canUse(int statusCode) =>
+      statusCode == 200 || statusCode == 202 || statusCode == 304;
 
   Future<FileServiceResponse> _fetch(
     Uri uri,

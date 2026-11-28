@@ -2,14 +2,9 @@ import 'package:ech_http/ech_http.dart';
 import 'package:http/http.dart' as http;
 import 'package:kazumi/request/config/api_endpoints.dart';
 import 'package:kazumi/request/core/network_config.dart';
+import 'package:kazumi/services/network/bangumi_ech_resolver.dart';
 
-final _dohEndpoint = Uri.https('dns.alidns.com', '/resolve');
-const _hosts = {
-  ...ApiEndpoints.bangumiPublicApiHosts,
-  'lain.bgm.tv',
-  ApiEndpoints.ghProxyHost,
-};
-const _addresses = ['172.67.134.140', '104.21.6.61', '172.67.73.67'];
+final _dohEndpoint = BangumiEchResolver.endpoint;
 
 class EchTransport {
   EchTransport._();
@@ -48,7 +43,7 @@ class EchLease {
 
 class _EchPool {
   final _config = NetworkConfig.fromSettings();
-  final _resolvers = <Uri?, DohEchResolver>{};
+  final _resolvers = <Uri?, RetryingEchResolver>{};
   final _clients = <(Uri?, Uri?, Duration, Duration), EchClient>{};
   int _active = 0;
   bool _retired = false;
@@ -70,13 +65,9 @@ class _EchPool {
     return EchLease._(client, this);
   }
 
-  // Shared Cloudflare ECH config and pinned IPs bypass polluted DNS.
-  static DohEchResolver _resolver(Uri? proxy) => DohEchResolver(
-    client: EchClient(proxy: proxy),
-    endpoint: _dohEndpoint,
-    hosts: _hosts,
-    configDomains: {for (final host in _hosts) host: 'crypto.cloudflare.com'},
-    addressOverrides: {for (final host in _hosts) host: _addresses},
+  static RetryingEchResolver _resolver(Uri? proxy) => BangumiEchResolver.create(
+    EchClient(proxy: proxy),
+    additionalHosts: {ApiEndpoints.ghProxyHost},
   );
 
   void _release() {

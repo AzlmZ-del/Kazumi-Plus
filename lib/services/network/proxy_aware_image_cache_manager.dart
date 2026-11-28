@@ -16,7 +16,7 @@ class ProxyAwareImageCacheManager extends CacheManager with ImageCacheManager {
         ImageFileService(
           acceleration: () => ImageAcceleration.current,
           clientFactory: _createHttpClient,
-          echService: BangumiEchImageService(proxyForUrl: _currentEchProxy),
+          echService: BangumiEchImageService(),
         ),
       );
 
@@ -25,26 +25,10 @@ class ProxyAwareImageCacheManager extends CacheManager with ImageCacheManager {
 
   final ImageFileService _fileService;
 
-  void resetNetworkClients() => _fileService.resetNetworkClients();
-
   @override
   Future<void> dispose() async {
     _fileService.close();
     await super.dispose();
-  }
-
-  static Uri? _currentEchProxy(Uri uri) {
-    final proxy = _currentProxy();
-    if (proxy != null) {
-      return Uri(scheme: 'http', host: proxy.$1, port: proxy.$2);
-    }
-    if (Platform.isWindows) {
-      final systemProxy = SystemProxyService.findProxy(uri);
-      if (systemProxy.startsWith('PROXY ')) {
-        return Uri.parse('http://${systemProxy.substring(6)}');
-      }
-    }
-    return null;
   }
 
   static IOClient _createHttpClient() {
