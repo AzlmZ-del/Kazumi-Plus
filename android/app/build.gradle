@@ -104,9 +104,7 @@ flutter {
 
 dependencies {}
 
-// 正式版 versionCode 只取 pubspec.yaml 的 +NNNNN（2.6.3 → 20603），CI 的
-// split-per-abi 包与之一一对应。本机测试包在此之上追加 ABI 编号
-// （arm64 → 206032），便于同机区分测试包与正式包，也避免互相覆盖。
+// 正式分包沿用上游编号；测试包直接用 pubspec 基数，不叠加 Flutter 的 ABI 偏移。
 ext.abiCodes = ["armeabi-v7a": 1, "arm64-v8a": 2, "x86_64": 4]
 def testAbiCodes = [
     'android-arm'  : 1,
@@ -118,17 +116,15 @@ def isTestBuild =
 import com.android.build.OutputFile
 android.applicationVariants.all { variant ->
     variant.outputs.each { output ->
-        if (isTestBuild) {
-            def abiCode = project.ext.abiCodes.get(output.getFilter(OutputFile.ABI))
-            // 不 split 时 output 没有 ABI filter，只能从 target-platform 反推。
-            if (abiCode == null) {
-                abiCode = testAbiCodes[
-                    (project.findProperty('target-platform') ?: '').toString()
-                ]
-            }
-            if (abiCode != null) {
-                output.versionCodeOverride = variant.versionCode * 10 + abiCode
-            }
+        def abiCode = project.ext.abiCodes.get(output.getFilter(OutputFile.ABI))
+        if (isTestBuild && abiCode == null) {
+            abiCode = testAbiCodes[
+                (project.findProperty('target-platform') ?: '').toString()
+            ]
+        }
+        if (abiCode != null) {
+            def baseCode = isTestBuild ? flutterVersionCode.toInteger() : variant.versionCode
+            output.versionCodeOverride = baseCode * 10 + abiCode
         }
     }
 }
