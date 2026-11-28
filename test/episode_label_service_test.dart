@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kazumi/modules/bangumi/episode_item.dart';
 import 'package:kazumi/services/anime_schedule/episode_label_service.dart';
 
 void main() {
@@ -66,18 +69,23 @@ void main() {
       expect(store.labels[2], isNotNull);
     });
 
-    test('已加载的条目不会重复请求', () async {
+    test('同一条目只合并在途加载，不永久跳过', () async {
       var calls = 0;
+      final response = Completer<Map<String, String>>();
       final store = EpisodeLabelsStore(
-        loader: (id) async {
+        loader: (id) {
           calls++;
-          return {'2026-11-18': '第 1 话'};
+          return response.future;
         },
       );
 
-      await store.loadAll([1]);
+      final first = store.loadAll([1, 1]);
       await store.loadAll([1]);
       expect(calls, 1);
+      response.complete({'2026-11-18': '第 1 话'});
+      await first;
+      await store.loadAll([1]);
+      expect(calls, 2);
     });
 
     test('merge 只并缓存，不触发网络', () async {
@@ -98,6 +106,57 @@ void main() {
     });
   });
 
+  group('页面复查与服务层 TTL', () {
+    test('有效期内不联网，过期后换成新文案', () async {
+      final cache = _CacheFixture();
+      cache.episodes = [_episode('旧标题')];
+      await cache.store.loadAll([1]);
+      expect(cache.store.labels[1], {'2026-11-18': '第 1 话 · 旧标题'});
+
+      cache.episodes = [_episode('新标题')];
+      cache.advance(const Duration(minutes: 29));
+      await cache.store.loadAll([1]);
+      expect(cache.requests, 1);
+      expect(cache.changes, 1);
+
+      cache.advance(const Duration(minutes: 1));
+      await cache.store.loadAll([1]);
+      expect(cache.requests, 2);
+      expect(cache.store.labels[1], {'2026-11-18': '第 1 话 · 新标题'});
+    });
+
+    test('空结果也遵守有效期，过期后能显示补录的章节', () async {
+      final cache = _CacheFixture();
+      await cache.store.loadAll([1]);
+      expect(cache.store.labels[1], isEmpty);
+      cache.episodes = [_episode('后来补录')];
+      await cache.store.loadAll([1]);
+      expect(cache.requests, 1);
+
+      cache.advance(const Duration(minutes: 30));
+      await cache.store.loadAll([1]);
+      expect(cache.requests, 2);
+      expect(cache.store.labels[1], {'2026-11-18': '第 1 话 · 后来补录'});
+    });
+
+    test('刷新失败保留旧文案，下次复查可以重试', () async {
+      final cache = _CacheFixture();
+      cache.episodes = [_episode('旧标题')];
+      await cache.store.loadAll([1]);
+      cache.advance(const Duration(minutes: 30));
+      cache.fail = true;
+      await cache.store.loadAll([1]);
+      expect(cache.store.labels[1], {'2026-11-18': '第 1 话 · 旧标题'});
+      expect(cache.changes, 1);
+
+      cache.fail = false;
+      cache.episodes = [_episode('重试成功')];
+      await cache.store.loadAll([1]);
+      expect(cache.requests, 3);
+      expect(cache.store.labels[1], {'2026-11-18': '第 1 话 · 重试成功'});
+    });
+  });
+
   group('labelFor', () {
     const labels = {'2026-11-18': '第 7 话 · 秘密兵器を作ってみた！'};
 
@@ -112,17 +171,15 @@ void main() {
     test('UTC 日未命中时回退 +9 / +8 小时', () {
       final airTime = DateTime(2026, 11, 18, 1, 29).toUtc();
       expect(
-        EpisodeLabelService.labelFor(
-          const {'2026-11-19': '第 8 话 · 别的一天'},
-          airTime,
-        ),
+        EpisodeLabelService.labelFor(const {
+          '2026-11-19': '第 8 话 · 别的一天',
+        }, airTime),
         isNull,
       );
       expect(
-        EpisodeLabelService.labelFor(
-          const {'2026-11-17': '第 21 话 · 龟裂'},
-          airTime,
-        ),
+        EpisodeLabelService.labelFor(const {
+          '2026-11-17': '第 21 话 · 龟裂',
+        }, airTime),
         '第 21 话 · 龟裂',
       );
       expect(
@@ -132,7 +189,10 @@ void main() {
     });
 
     test('没有文案或没有时刻时返回 null', () {
-      expect(EpisodeLabelService.labelFor(null, DateTime(2026, 11, 18)), isNull);
+      expect(
+        EpisodeLabelService.labelFor(null, DateTime(2026, 11, 18)),
+        isNull,
+      );
       expect(
         EpisodeLabelService.labelFor(const {}, DateTime(2026, 11, 18)),
         isNull,
@@ -140,4 +200,36 @@ void main() {
       expect(EpisodeLabelService.labelFor(labels, null), isNull);
     });
   });
+}
+
+EpisodeInfo _episode(String title) => EpisodeInfo(
+  id: 1,
+  episode: 1,
+  type: 0,
+  name: '',
+  nameCn: title,
+  airDate: '2026-11-18',
+);
+
+class _CacheFixture {
+  DateTime _now = DateTime.utc(2026, 11, 18);
+  int requests = 0;
+  int changes = 0;
+  bool fail = false;
+  List<EpisodeInfo> episodes = [];
+
+  late final _service = EpisodeLabelService.inMemory(
+    now: () => _now,
+    fetchEpisodes: (_) async {
+      requests++;
+      if (fail) throw StateError('请求失败');
+      return episodes;
+    },
+  );
+  late final store = EpisodeLabelsStore(
+    loader: _service.load,
+    onChanged: () => changes++,
+  );
+
+  void advance(Duration duration) => _now = _now.add(duration);
 }

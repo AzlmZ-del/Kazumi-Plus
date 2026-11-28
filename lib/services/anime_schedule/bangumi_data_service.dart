@@ -169,7 +169,7 @@ class BangumiDataService {
     if (snapshot == null) return const {};
     final start = DateTime(monday.year, monday.month, monday.day);
     // 多展开一天：周日深夜的平台档期可能落在下周一凌晨。
-    final end = start.add(const Duration(days: 8));
+    final end = DateTime(start.year, start.month, start.day + 8);
 
     final result = <int, Map<String, SiteSchedule>>{};
     for (final item in snapshot.items) {
@@ -221,9 +221,11 @@ class BangumiDataService {
 
     final entries = <String, SiteSchedule>{};
     for (var day = 0; day < 7; day++) {
-      final date = start.add(Duration(days: day));
+      final date = DateTime(start.year, start.month, start.day + day);
       final key = localDateKey(date);
-      final nextKey = localDateKey(date.add(const Duration(days: 1)));
+      final nextKey = localDateKey(
+        DateTime(date.year, date.month, date.day + 1),
+      );
       final today = platforms[key] ?? const <_PlatformEvent>[];
 
       // 放送日锚点：条目级规则落在这一本地日期的那一次。
@@ -310,7 +312,8 @@ List<DateTime> expandRrule(String rule, DateTime from, DateTime to) {
   var cursor = anchor;
   if (cursor.isBefore(startUtc)) {
     final skipped = startUtc.difference(cursor).inMicroseconds;
-    final periods = skipped ~/ step.inMicroseconds + 1;
+    final stepMicros = step.inMicroseconds;
+    final periods = skipped ~/ stepMicros + (skipped % stepMicros == 0 ? 0 : 1);
     cursor = cursor.add(step * periods);
   }
   final result = <DateTime>[];

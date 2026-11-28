@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kazumi/modules/bangumi/bangumi_data_snapshot.dart';
 import 'package:kazumi/services/anime_schedule/bangumi_data_service.dart';
-import 'package:kazumi/services/anime_schedule/episode_label_service.dart';
 
 void main() {
   group('expandRrule', () {
@@ -16,6 +15,15 @@ void main() {
         expect(entry.isAfter(to), isFalse);
         expect(entry.toIso8601String(), endsWith('13:00:00.000Z'));
       }
+    });
+
+    test('保留恰好命中起点的事件，只跳过起点之前的事件', () {
+      const rule = 'R/2026-11-09T00:00:00.000Z/P7D';
+      const microsecond = Duration(microseconds: 1);
+
+      expect(expandRrule(rule, from.subtract(microsecond), to), [from, to]);
+      expect(expandRrule(rule, from, to), [from, to]);
+      expect(expandRrule(rule, from.add(microsecond), to), [to]);
     });
 
     test('锚点晚于窗口时返回空表', () {
@@ -152,6 +160,34 @@ void main() {
       final monday = week[900001]![localDateKey(DateTime(2026, 11, 16))];
       expect(monday!.platforms.length, 1);
       expect(monday.platforms.first.time, '次日 00:05');
+    });
+
+    test('本地周一零点的循环档期不会从本周漏掉', () {
+      final monday = DateTime(2026, 11, 16);
+      final anchor = monday.toUtc().subtract(const Duration(days: 7));
+      final rule = 'R/${anchor.toIso8601String()}/P7D';
+      final service = BangumiDataService.instance;
+      service.debugLoadSnapshot(
+        BangumiDataSnapshot(
+          fetchedAt: monday,
+          sites: const {
+            'gamer': BangumiSiteMeta(key: 'gamer', title: '動畫瘋', type: 'onair'),
+          },
+          items: [
+            BangumiDataItem(
+              bgmId: 646154,
+              title: '每周一放送',
+              titleZh: '',
+              broadcastRule: rule,
+              sites: [BangumiSiteEntry(site: 'gamer', id: '1', rule: rule)],
+            ),
+          ],
+        ),
+      );
+
+      final schedule = service.buildWeek(monday)[646154]?[localDateKey(monday)];
+      expect(schedule?.airTime, monday);
+      expect(schedule?.platforms.single.time, '00:00');
     });
 
     test('窗口外的日期不出现在结果里', () {

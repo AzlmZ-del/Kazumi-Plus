@@ -14,12 +14,11 @@ import 'package:kazumi/bean/widget/loading_indicator.dart';
 import 'package:kazumi/bean/widget/split_list_row.dart';
 import 'package:kazumi/bean/widget/state_presentation.dart';
 import 'package:kazumi/modules/bangumi/airing_slot.dart';
-import 'package:kazumi/modules/bangumi/bangumi_data_snapshot.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
-import 'package:kazumi/modules/bangumi/site_schedule.dart';
 import 'package:kazumi/pages/timeline/platform_sheet.dart';
 import 'package:kazumi/pages/timeline/timeline_agenda.dart';
 import 'package:kazumi/pages/timeline/timeline_controller.dart';
+import 'package:kazumi/pages/timeline/timeline_week_schedule.dart';
 import 'package:kazumi/services/anime_schedule/airing_schedule_service.dart';
 import 'package:kazumi/services/anime_schedule/bangumi_data_service.dart';
 import 'package:kazumi/services/anime_schedule/episode_label_service.dart';
@@ -51,11 +50,10 @@ class _TimelinePageState extends State<TimelinePage> {
   /// 正在拉排期的季度，避免重复触发。
   bool _airingLoading = false;
 
-  /// 本周平台档期：bgmId -> 本地日期键 -> 当日档期。
-  ///
-  /// 与 [_airingSlots] 是两套来源：这里来自 bangumi-data 的站点循环规则，
-  /// 只描述「哪天几点在哪个平台上」，拿不到时退回占位文案。
-  Map<int, Map<String, SiteSchedule>> _weekSchedule = const {};
+  late final _week = TimelineWeekSchedule(
+    selectedSeason: () => _controller.selectedDate,
+    buildWeek: BangumiDataService.instance.buildWeek,
+  );
 
   /// 单集文案缓存：bgmId -> 「日期 → 第 N 话 · 标题」。
   late final EpisodeLabelsStore _labels = EpisodeLabelsStore(
@@ -66,12 +64,18 @@ class _TimelinePageState extends State<TimelinePage> {
 
   Map<int, Map<String, String>?> get _episodeLabels => _labels.labels;
 
-  /// 已预取过文案的周（按周一日键），避免重复发请求。
-  String? _prefetchedWeek;
+  late final Future<void> _labelsReady;
+  late final AppLifecycleListener _labelsLifecycle;
+  TabController? _observedDayTabs;
+  int? _lastDayTab;
 
   @override
   void initState() {
     super.initState();
+    _week.start();
+    _week.addListener(_onWeekChanged);
+    _labelsReady = EpisodeLabelService.instance.ensureLoaded();
+    _labelsLifecycle = AppLifecycleListener(onResume: _refreshWeekLabels);
     _showRating = GStorage.getSetting(SettingsKeys.showRating);
     AiringScheduleService.instance.revision.addListener(_onScheduleRevision);
     // 与日历加载并行：磁盘读盘（毫秒级）和 Bangumi 日历请求同时开跑。
@@ -81,22 +85,15 @@ class _TimelinePageState extends State<TimelinePage> {
     unawaited(AiringScheduleService.instance.ensureCacheLoaded());
     BangumiDataService.instance.revision.addListener(_onScheduleRevision);
     unawaited(_loadWeekSchedule());
-    // 章节文案落盘过就要在首帧就能读到：否则整列先显示「第 N 集」兜底，
-    // 再逐条替换成「第 N 话 · 标题」，看上去就是明显滞后。
-    unawaited(
-      EpisodeLabelService.instance.ensureLoaded().then((_) {
-        if (!mounted) return;
-        _labels.merge(
-          EpisodeLabelService.instance.cachedLabels(_weekSchedule.keys),
-        );
-      }),
-    );
+    _refreshWeekLabels();
     // 先同步读一次内存缓存，预热已完成的场景首帧就能带 chip。
     _airingSlots = AiringScheduleService.instance.resolveCachedLatest(
       _calendarIds(),
     );
     if (_controller.bangumiCalendar.isEmpty) {
       _controller.loadSeason(_controller.selectedDate).then((_) {
+        if (!mounted) return;
+        _refreshWeekLabels();
         _refreshAiringSlots();
       });
     } else {
@@ -113,6 +110,9 @@ class _TimelinePageState extends State<TimelinePage> {
   void dispose() {
     AiringScheduleService.instance.revision.removeListener(_onScheduleRevision);
     BangumiDataService.instance.revision.removeListener(_onScheduleRevision);
+    _labelsLifecycle.dispose();
+    _observedDayTabs?.removeListener(_onDayTabChanged);
+    _week.dispose();
     super.dispose();
   }
 
@@ -123,63 +123,40 @@ class _TimelinePageState extends State<TimelinePage> {
   Future<void> _loadWeekSchedule() async {
     await BangumiDataService.instance.ensureLoaded();
     if (!mounted) return;
-    _rebuildWeekSchedule();
+    _week.refresh();
     unawaited(BangumiDataService.instance.refreshInBackground());
   }
 
-  /// 重算本周档期。
-  ///
-  /// 星期页签永远是「本周一到周日」，与季度选择无关，所以基准日固定取今天；
-  /// 不在当前季时直接清空，历史季的循环规则展开出来也不会再更新。
-  void _rebuildWeekSchedule() {
-    final today = DateTime.now();
-    if (!isSameSeason(_controller.selectedDate, today)) {
-      setState(() => _weekSchedule = const {});
-      return;
-    }
-    final monday = today.subtract(Duration(days: today.weekday - 1));
-    setState(() {
-      _weekSchedule = BangumiDataService.instance.buildWeek(monday);
-    });
-    // 档期一就位就把已落盘的章节文案并进来，别等各天页各自触发。
-    _labels.merge(
-      EpisodeLabelService.instance.cachedLabels(_weekSchedule.keys),
+  void _onWeekChanged() {
+    setState(() {});
+    _refreshWeekLabels();
+  }
+
+  void _refreshWeekLabels() {
+    if (!_week.isCurrentSeason || _week.ids.isEmpty) return;
+    unawaited(
+      _labelsReady.then((_) async {
+        if (!mounted || !_week.isCurrentSeason) return;
+        final ids = _week.ids.toSet().intersection(_calendarIds().toSet());
+        _labels.merge(EpisodeLabelService.instance.cachedLabels(ids));
+        await _labels.loadAll(ids);
+      }),
     );
   }
 
-  /// 并发加载单集文案。
-  ///
-  /// 具体并发与去重逻辑在 [EpisodeLabelsStore]，这里只负责把结果接到页面上。
-  void _ensureLabelsFor(Iterable<int> ids) {
-    unawaited(_labels.loadAll(ids));
+  void _observeDayTabs(TabController tabs) {
+    if (identical(_observedDayTabs, tabs)) return;
+    _observedDayTabs?.removeListener(_onDayTabChanged);
+    _observedDayTabs = tabs;
+    _lastDayTab = tabs.index;
+    tabs.addListener(_onDayTabChanged);
   }
 
-  /// 后台预取整周文案，切到别的天页时不必再等。
-  ///
-  /// 只发一次：`_prefetched` 记住已展开过的周，避免每次 setState 重发。
-  void _prefetchWeekLabels() {
-    final monday = DateTime.now();
-    final weekKey = '${monday.year}-${monday.month}-${monday.day}';
-    if (_prefetchedWeek == weekKey) return;
-    if (_weekSchedule.isEmpty) return;
-    _prefetchedWeek = weekKey;
-    _ensureLabelsFor(_weekSchedule.keys);
-  }
-
-  /// 该番在 [date] 当天的档期。
-  ///
-  /// 差一天也认：Bangumi 日历按日本放送日归类，bangumi-data 的时刻换算到本机
-  /// 时区后可能落到前一天（深夜档），严格按日对齐会让整列显示成「未确认」。
-  SiteSchedule? _scheduleFor(int bgmId, DateTime date) {
-    final days = _weekSchedule[bgmId];
-    if (days == null) return null;
-    final exact = days[localDateKey(date)];
-    if (exact != null) return exact;
-    for (final delta in const [1, -1]) {
-      final near = days[localDateKey(date.add(Duration(days: delta)))];
-      if (near != null) return near;
-    }
-    return null;
+  void _onDayTabChanged() {
+    final index = _observedDayTabs!.index;
+    if (index == _lastDayTab) return;
+    _lastDayTab = index;
+    _refreshWeekLabels();
   }
 
   /// 拉取当前季番单的放送排期。
@@ -195,7 +172,7 @@ class _TimelinePageState extends State<TimelinePage> {
   /// 失败时保持已有的（缓存）数据，卡片不显示空 chip，不影响列表本身。
   Future<void> _refreshAiringSlots() async {
     if (_airingLoading) return;
-    if (!isSameSeason(_controller.selectedDate, DateTime.now())) return;
+    if (!_week.isCurrentSeason) return;
     _airingLoading = true;
     try {
       final bgmIds = _calendarIds();
@@ -225,7 +202,7 @@ class _TimelinePageState extends State<TimelinePage> {
   /// 缓存补齐后自动重算，避免页面停在空状态。
   void _onScheduleRevision() {
     if (!mounted) return;
-    _rebuildWeekSchedule();
+    _week.refresh();
     if (_airingLoading) return;
     if (_calendarIds().isEmpty) return;
     unawaited(_refreshAiringSlots());
@@ -236,7 +213,7 @@ class _TimelinePageState extends State<TimelinePage> {
   }
 
   void _showSeasonBottomSheet(BuildContext context) {
-    final now = DateTime.now();
+    final now = _week.today;
     final years = List.generate(20, (i) => now.year - i);
     showAdaptiveBottomSheet<void>(
       context: context,
@@ -313,7 +290,8 @@ class _TimelinePageState extends State<TimelinePage> {
               // 切季度后重新拉排期：只有切回当前季才会真的发请求。
               setState(() => _airingSlots = const {});
               _controller.loadSeason(date).then((_) {
-                _rebuildWeekSchedule();
+                if (!mounted) return;
+                _week.refresh();
                 _refreshAiringSlots();
               });
             }
@@ -336,11 +314,16 @@ class _TimelinePageState extends State<TimelinePage> {
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 7,
-      initialIndex: DateTime.now().weekday - 1,
+      initialIndex: _week.today.weekday - 1,
       animationDuration: MediaQuery.disableAnimationsOf(context)
           ? Duration.zero
           : null,
-      child: _buildContent(context),
+      child: Builder(
+        builder: (context) {
+          _observeDayTabs(DefaultTabController.of(context));
+          return _buildContent(context);
+        },
+      ),
     );
   }
 
@@ -370,8 +353,8 @@ class _TimelinePageState extends State<TimelinePage> {
             // 已收藏（任意类型）用于卡片边框高亮，与「只看追番」筛选无关。
             final collectedIds = _controller.loadCollectedBangumiIds();
             final calendar = _controller.filterCalendar(watchingIds);
-            final today = DateTime.now();
-            final currentSeason = isSameSeason(_controller.selectedDate, today);
+            final today = _week.today;
+            final currentSeason = _week.isCurrentSeason;
             final seasonHeader = narrowPortrait
                 ? null
                 : _buildSeasonHeader(
@@ -464,6 +447,8 @@ class _TimelinePageState extends State<TimelinePage> {
                                       _controller
                                           .loadSeason(_controller.selectedDate)
                                           .then((_) {
+                                            if (!mounted) return;
+                                            _refreshWeekLabels();
                                             _refreshAiringSlots();
                                           });
                                     },
@@ -623,36 +608,21 @@ class _TimelinePageState extends State<TimelinePage> {
     required double inset,
     required bool compact,
   }) {
-    // 档期只对当前周有意义：历史季的循环规则展开出来也不会再更新。
-    final today = DateTime.now();
-    final weekStart = today.subtract(Duration(days: today.weekday - 1));
-    final dayDate = DateTime(
-      weekStart.year,
-      weekStart.month,
-      weekStart.day,
-    ).add(Duration(days: day));
-    final showSchedule = isSameSeason(_controller.selectedDate, today);
-    if (showSchedule) {
-      // 整周一起预取：并发上限由 service 控制，切到别的天页时不再等。
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        _prefetchWeekLabels();
-      });
-    }
-    final entries = [
-      for (final item in items)
-        AgendaEntry(
-          item: item,
-          schedule: showSchedule ? _scheduleFor(item.id, dayDate) : null,
-          episodeLabel: showSchedule
-              ? EpisodeLabelService.labelFor(
-                  _episodeLabels[item.id],
-                  _scheduleFor(item.id, dayDate)?.airTime,
-                )
-              : null,
-          fallbackEpisode: _airingSlots[item.id]?.episode,
-        ),
-    ];
+    final showSchedule = _week.isCurrentSeason;
+    final entries = items.map((item) {
+      final schedule = showSchedule ? _week.scheduleFor(item.id, day) : null;
+      return AgendaEntry(
+        item: item,
+        schedule: schedule,
+        episodeLabel: showSchedule
+            ? EpisodeLabelService.labelFor(
+                _episodeLabels[item.id],
+                schedule?.airTime,
+              )
+            : null,
+        fallbackEpisode: showSchedule ? _airingSlots[item.id]?.episode : null,
+      );
+    }).toList();
     final groups = groupAgenda(entries);
     final rawCalendar = _controller.bangumiCalendar;
     final filteredOut = day < rawCalendar.length && rawCalendar[day].isNotEmpty;

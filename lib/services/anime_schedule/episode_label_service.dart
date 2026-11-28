@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart' show VoidCallback;
+import 'package:flutter/foundation.dart'
+    show VoidCallback, mapEquals, visibleForTesting;
+import 'package:kazumi/modules/bangumi/episode_item.dart';
 import 'package:kazumi/request/apis/bangumi_api.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:path_provider/path_provider.dart';
@@ -15,9 +17,27 @@ import 'package:path_provider/path_provider.dart';
 /// 数据落盘：章节文案很少变，冷启动必须能立刻显示，否则整列先出「第 N 集」
 /// 兜底、再逐条替换成「第 N 话 · 标题」，看上去就是严重滞后。
 class EpisodeLabelService {
-  EpisodeLabelService._();
+  EpisodeLabelService._(
+    this._now,
+    this._fetchEpisodes, [
+    this._resolveCacheFile,
+  ]);
 
-  static final EpisodeLabelService instance = EpisodeLabelService._();
+  @visibleForTesting
+  EpisodeLabelService.inMemory({
+    required DateTime Function() now,
+    required Future<List<EpisodeInfo>> Function(int) fetchEpisodes,
+  }) : this._(now, fetchEpisodes);
+
+  static final EpisodeLabelService instance = EpisodeLabelService._(
+    DateTime.now,
+    (id) => BangumiApi.getBangumiEpisodesByID(id, throwOnError: true),
+    _cacheFile,
+  );
+
+  final DateTime Function() _now;
+  final Future<List<EpisodeInfo>> Function(int) _fetchEpisodes;
+  final Future<File> Function()? _resolveCacheFile;
 
   /// 内存有效期：同一次运行内不必反复查。
   static const Duration _ttl = Duration(minutes: 30);
@@ -55,14 +75,16 @@ class EpisodeLabelService {
   }
 
   Future<void> _loadFromDisk() async {
+    final resolveFile = _resolveCacheFile;
+    if (resolveFile == null) return;
     try {
-      final file = await _cacheFile();
+      final file = await resolveFile();
       if (!await file.exists()) return;
       final raw = await file.readAsString();
       if (raw.trim().isEmpty) return;
       final decoded = jsonDecode(raw);
       if (decoded is! Map) return;
-      final now = DateTime.now();
+      final now = _now();
       decoded.forEach((key, value) {
         final id = int.tryParse('$key');
         if (id == null || value is! Map) return;
@@ -71,6 +93,8 @@ class EpisodeLabelService {
         if (at is! int || labels is! Map) return;
         final fetchedAt = DateTime.fromMillisecondsSinceEpoch(at);
         if (now.difference(fetchedAt) > _diskTtl) return;
+        final current = _cache[id];
+        if (current != null && !fetchedAt.isAfter(current.at)) return;
         _cache[id] = _LabelCache(fetchedAt, {
           for (final entry in labels.entries)
             if (entry.value is String) '${entry.key}': entry.value as String,
@@ -93,7 +117,7 @@ class EpisodeLabelService {
   /// 取某条目的「日期 → 单集文案」映射；失败返回 null（不是空表）。
   Future<Map<String, String>?> load(int bgmId) {
     final cached = _cache[bgmId];
-    if (cached != null && DateTime.now().difference(cached.at) < _ttl) {
+    if (cached != null && _now().difference(cached.at) < _ttl) {
       return Future.value(cached.labels);
     }
     return _inFlight[bgmId] ??= _fetch(bgmId).whenComplete(() {
@@ -104,10 +128,7 @@ class EpisodeLabelService {
   Future<Map<String, String>?> _fetch(int bgmId) async {
     await _acquire();
     try {
-      final episodes = await BangumiApi.getBangumiEpisodesByID(
-        bgmId,
-        throwOnError: true,
-      );
+      final episodes = await _fetchEpisodes(bgmId);
       final labels = <String, StringBuffer>{};
       for (final episode in episodes) {
         final date = episode.airDate;
@@ -130,15 +151,19 @@ class EpisodeLabelService {
       final result = {
         for (final entry in labels.entries) entry.key: entry.value.toString(),
       };
-      _cache[bgmId] = _LabelCache(DateTime.now(), result);
-      _dirty = true;
-      unawaited(_persist());
+      _cache[bgmId] = _LabelCache(_now(), result);
+      if (_resolveCacheFile != null) {
+        _dirty = true;
+        unawaited(_persist());
+      }
       return result;
     } catch (error) {
-      KazumiLogger().w(
-        'EpisodeLabelService: 拉取章节失败 bgmId=$bgmId',
-        error: error,
-      );
+      if (_resolveCacheFile != null) {
+        KazumiLogger().w(
+          'EpisodeLabelService: 拉取章节失败 bgmId=$bgmId',
+          error: error,
+        );
+      }
       return null;
     } finally {
       _release();
@@ -277,26 +302,24 @@ class EpisodeLabelsStore {
 
   /// 已落盘的文案直接并进来，不发请求。
   void merge(Map<int, Map<String, String>?> cached) {
-    if (cached.isEmpty) return;
-    _labels = {..._labels, ...cached};
+    final changed = {
+      for (final entry in cached.entries)
+        if (!mapEquals(_labels[entry.key], entry.value)) entry.key: entry.value,
+    };
+    if (changed.isEmpty) return;
+    _labels = {..._labels, ...changed};
     _onChanged?.call();
   }
 
-  /// 对尚未加载的条目并发发起请求，各自回来各自写入。
-  ///
-  /// 返回一个能等到全部完成的 Future，测试与调用方都可以 await。
+  /// 保留已显示文案，复查时由加载器决定是否联网。
   Future<void> loadAll(Iterable<int> ids) {
-    final pending = ids
-        .where((id) => !_labels.containsKey(id))
-        .where(_loading.add)
-        .toList();
+    final pending = ids.where(_loading.add).toList();
     if (pending.isEmpty) return Future.value();
     return Future.wait(
       pending.map((id) async {
         try {
           final labels = await _loader(id);
-          // 失败（null）不写入：否则 containsKey 会当成已加载，永远不重试。
-          if (labels != null) {
+          if (labels != null && !mapEquals(_labels[id], labels)) {
             _labels = {..._labels, id: labels};
             _onChanged?.call();
           }
